@@ -22,7 +22,7 @@ sudo apt update
 sudo apt install build-essential cmake ninja-build libboost-all-dev libssl-dev libgtest-dev   # Ubuntu 24.04+ (24.04: и g++-13)
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-./build/nmm_tests            # 418 тестов, ~50 с
+./build/nmm_tests            # 421 тест, ~50 с
 ```
 
 - Компилятор CMake берёт сам: самый новый GCC 13+ из `g++`, `c++`, `g++-16`…`g++-13` (другой — через
@@ -139,6 +139,7 @@ bash bench/paper_pair.sh stop               # SIGTERM обоим, как Ctrl+C
 ```
 
 Именованные пары — как боты в `scripts/paper_ab.sh`: `basis`, `basis-both`, `ml`, `ml-both`,
+`ml26-both` (BTC, модель 19 октября на 26 признаках с Bybit: `config.btc-ml26-both.toml`),
 `eth-basis-both`, `eth-ml-both`, `gld`; можно и любой конфиг: `start config.sol-both.toml sol`. Оба
 бота читают один и тот же файл (из этого checkout), Python-версия должна быть на коде, с которого
 сделан порт (ветка `claude/funny-wright-a95ao3`, `2ab7fbe` или новее), — `start` печатает коммиты
