@@ -31,6 +31,7 @@ void BinanceTradesFeed::on_message(const Json& msg, int64_t recv_ts_us, Link* li
     if (!kind || *kind != "aggTrade") return;
     const auto& t = trade.as_object();
     int64_t trade_id = to_int(t.at("a"));
+    copy(link, trade_id);  // how far behind the other links its link runs
     if (trade_id <= last_id) return;  // another link delivered it first
     last_id = trade_id;
     ++(link != nullptr ? *link : links[0]).wins;
@@ -58,14 +59,7 @@ std::string BinanceTradesFeed::status() const {
         parts.push_back("no trade yet");
     }
     parts.push_back(std::format("msgs {} conn {}", message_count, connect_count));
-    if (links.size() > 1) {
-        int64_t total = 0;
-        for (const auto& l : links) total += l.wins;
-        if (!total) total = 1;
-        std::vector<std::string> shares;
-        for (const auto& l : links) shares.push_back(std::to_string(l.wins * 100 / total));
-        parts.push_back(std::format("links {}/{} first {}%", links_up(), links.size(), join(shares, "/")));
-    }
+    if (links.size() > 1) parts.push_back(links_status());
     return join(parts, "  ");
 }
 

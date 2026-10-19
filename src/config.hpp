@@ -331,6 +331,10 @@ struct AgentConfig {
     bool tob_lines = true;
     // The buy/sell price lines: at most one this often, ms; 0 = one on every change of a price.
     double quote_line_ms = 0.0;
+    // C++ only: a feed's connection that delivers its updates this far behind the other connections
+    // of the feed (median over the last 30 s) is reconnected; 0 = never. 19 Oct: an Arcus connection
+    // ran 73 ms behind another to the same address for a whole run, until it was made anew.
+    double slow_link_ms = 25.0;
 };
 
 struct Config {

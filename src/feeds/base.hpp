@@ -9,9 +9,11 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
+#include <unordered_map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -20,6 +22,7 @@
 #include "net/net.hpp"
 #include "orderbook.hpp"
 #include "util/aio.hpp"
+#include "util/clock.hpp"
 #include "util/json.hpp"
 #include "util/log.hpp"
 
@@ -34,7 +37,24 @@ struct Link {
     std::optional<int64_t> last;  // id of the last update it delivered since connecting
     int64_t wins = 0;  // updates it delivered first
     bool up() const { return ws != nullptr; }
+
+    // How far behind the first copy this link delivered each update of the last SLOW_LINK_WINDOW_S
+    // (0 when it was the first): (monotonic time, ms). A link the server feeds late stays late for as
+    // long as it lives (19 Oct, Arcus: one connection 73 ms behind another to the same address, for
+    // a whole run), and only a new connection gets on time again.
+    std::deque<std::pair<double, double>> behind;
+    int since_check = 0;
+    double connected_at = 0.0;  // monotonic
+    double slow_wait = 0.0;  // seconds a slow link waits before it is reconnected again (doubles)
+    int64_t slow_reconnects = 0;
 };
+
+inline constexpr double SLOW_LINK_WINDOW_S = 30.0;
+inline constexpr size_t SLOW_LINK_MIN_SAMPLES = 50;  // and the link connected SLOW_LINK_MIN_S at least
+inline constexpr size_t SLOW_LINK_MAX_SAMPLES = 2000;
+inline constexpr double SLOW_LINK_MIN_S = 20.0;
+inline constexpr double SLOW_LINK_WAIT_MAX_S = 1800.0;
+inline constexpr size_t COPY_KEYS = 8192;  // updates remembered to match their copies on the other links
 
 struct FeedOptions {
     BookListener on_update;
@@ -43,6 +63,9 @@ struct FeedOptions {
     double reconnect_min = 0.5;
     double reconnect_max = 30.0;
     int connections = 1;
+    // A link whose updates come this far behind the other links' copies (median over the last
+    // SLOW_LINK_WINDOW_S) is reconnected; 0 = never. Only with several links.
+    double slow_link_ms = 0.0;
 };
 
 // Owns the connection lifecycle; subclasses own the book protocol.
@@ -63,6 +86,14 @@ public:
     awaitable<void> run();
 
     int links_up() const;
+    // Note that `link` delivered update `key` (unique within the feed): true for its first copy over
+    // all links. A later copy measures how far behind its link runs, and a link that keeps running
+    // slow_link_ms behind is reconnected.
+    bool copy(Link* link, int64_t key);
+    // How far behind its link runs now, ms: the median of its window; nullopt without samples.
+    std::optional<double> behind(const Link& link) const;
+    // "links 2/2 first 81/18% behind 0/3 ms" for the status lines; "" with one link.
+    std::string links_status() const;
     // `msg` carries market data (not an ack, a greeting or an app-level pong):
     // only such frames keep a link from going stale.
     virtual bool carries_data(const Json& msg) const { return true; }
@@ -82,6 +113,7 @@ public:
     FeedOptions options;
     Logger& log;
     std::vector<Link> links;
+    Clock clock = monotonic;  // when copies arrive and links connect (tests set it)
     int64_t connect_count = 0;
     int64_t resync_count = 0;  // book rebuilt after missed updates
     int64_t refresh_count = 0;  // book rebuilt by design, e.g. to extend its depth
@@ -91,6 +123,16 @@ protected:
     bool others_up(const Link& link) const;
     void notify();
     awaitable<void> run_link(Link& link);
+
+private:
+    void sample(Link& link, double ms, double now);
+    struct FirstCopy {
+        double at;
+        unsigned links;  // bit per link index that delivered it
+        int first;
+    };
+    std::unordered_map<int64_t, FirstCopy> first_copy_;
+    std::deque<int64_t> copy_order_;
 };
 
 // Feed whose book is seeded from a REST snapshot spliced with stream updates.

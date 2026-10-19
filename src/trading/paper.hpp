@@ -15,6 +15,7 @@
 #include <map>
 #include <string>
 
+#include "feeds/arcus_trades.hpp"
 #include "trading/gateway.hpp"
 
 namespace nmm {
@@ -30,6 +31,10 @@ public:
     void on_message(const Json& msg);
 
     std::string ws_url;
+    // The trades feed's connections (several: the first copy of each trade fills, a link that runs
+    // behind is reconnected), stale timeout and heartbeat; set before run().
+    FeedOptions trades_options = default_trades_options();
+    std::unique_ptr<ArcusTradesFeed> trades;  // made by run()
     // The orders whose placement time is kept: those a trade can still fill (tests).
     size_t placements_kept() const { return placed_us_.size(); }
 
@@ -39,6 +44,14 @@ protected:
     void finish(const OrderPtr& order, OrderState state, std::optional<std::string> reason = {}, bool fresh = true) override;
 
 private:
+    static FeedOptions default_trades_options() {
+        FeedOptions o;
+        o.heartbeat = 20.0;
+        o.stale_timeout = 0.0;  // trades can be minutes apart
+        return o;
+    }
+    void trades_up();
+    void trades_down(const std::string& reason);
     void cancel_acts(const OrderPtr& order);
     // The trade happened before `order` was placed: on the exchange's clock, set against ours when the offset is known.
     bool printed_before(const Json& trade, const Order& order) const;

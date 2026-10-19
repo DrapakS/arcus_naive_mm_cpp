@@ -67,15 +67,7 @@ std::string status_line(const BookFeed& feed) {
     counts += std::format(" msgs {} resync {}", feed.message_count, feed.resync_count);
     if (feed.refresh_count) counts += std::format(" refresh {}", feed.refresh_count);
     parts.push_back(std::format("{} conn {}", counts, feed.connect_count));
-    if (feed.links.size() > 1) {
-        // which connection delivered updates first, as shares of all updates
-        int64_t total = 0;
-        for (const auto& link : feed.links) total += link.wins;
-        if (!total) total = 1;
-        std::vector<std::string> shares;
-        for (const auto& link : feed.links) shares.push_back(std::to_string(link.wins * 100 / total));
-        parts.push_back(std::format("links {}/{} first {}%", feed.links_up(), feed.links.size(), join(shares, "/")));
-    }
+    if (feed.links.size() > 1) parts.push_back(feed.links_status());
     return join(parts, "  ");
 }
 
@@ -241,11 +233,12 @@ awaitable<void> Agent::run() {
                           forest->forest->threshold_scale());
     }
     if (cfg.trading.mode != "off") co_await start_trading();
-    auto options = [this](double stale_timeout, int connections) {
+    auto options = [this, &cfg](double stale_timeout, int connections) {
         FeedOptions o;
         o.on_update = [this](OrderBook& book) { on_book_update(book); };
         o.stale_timeout = stale_timeout;
         o.connections = connections;
+        o.slow_link_ms = cfg.agent.slow_link_ms;
         return o;
     };
     feeds.push_back(std::make_unique<BinanceSpotBookFeed>(reference_book, cfg.binance.symbol, cfg.binance.ws_url, cfg.binance.rest_url,
@@ -298,6 +291,7 @@ std::unique_ptr<BinanceTradesFeed> Agent::make_trades_feed() {
     FeedOptions o;  // no book: each trade goes to on_trade
     o.stale_timeout = cfg.trades.stale_timeout_s;
     o.connections = cfg.trades.connections;
+    o.slow_link_ms = cfg.agent.slow_link_ms;
     return std::make_unique<BinanceTradesFeed>(
         cfg.binance.symbol, cfg.trades.ws_url.empty() ? cfg.binance.ws_url : cfg.trades.ws_url,
         [this](double price, int64_t trade_us, int64_t received_us) { on_trade(price, trade_us, received_us); },
@@ -442,7 +436,10 @@ awaitable<void> Agent::start_trading() {
     }
     auto changed = [this] { changed_.set(); };
     if (t.mode == "paper") {
-        gateway = std::make_unique<PaperGateway>(market, config.arcus.ws_url, changed);
+        auto paper = std::make_unique<PaperGateway>(market, config.arcus.ws_url, changed);
+        paper->trades_options.connections = config.arcus.connections;  // as many links as the Arcus book's
+        paper->trades_options.slow_link_ms = config.agent.slow_link_ms;
+        gateway = std::move(paper);
     } else {
         ArcusGateway::Options o;
         o.ws_url = config.arcus.ws_url;

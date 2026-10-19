@@ -46,6 +46,7 @@ void BinanceSpotBookFeed::on_book_ticker(const Json& ticker, Link& link) {
     // newer than the seeded update id is still the freshest top of book.
     // With several links only the first copy of a ticker is newer.
     const auto& t = ticker.as_object();
+    copy(&link, to_int(t.at("u")) * 2 + 1);  // odd: a ticker's id, apart from the depth updates' (even)
     if (book->apply_bbo(to_float(t.at("b")), to_float(t.at("B")), to_float(t.at("a")), to_float(t.at("A")), to_int(t.at("u")))) {
         ++link.wins;
         notify();

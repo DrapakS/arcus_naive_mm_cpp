@@ -12,40 +12,33 @@ PaperGateway::PaperGateway(MarketSpec market_, std::string ws_url_, std::functio
 }
 
 awaitable<void> PaperGateway::run() {
-    double backoff = 0.5;
-    for (;;) {
-        std::string reason = "trades feed lost";
-        std::exception_ptr error;
-        bool closed = false;
-        try {
-            auto ws = co_await WsConnection::connect(ws_url, 20.0);
-            ws->send(dump_json(JsonObject {{"type", "subscribe"}, {"channel", "trades"}, {"id", market.symbol}}));
-            log->info("paper trading on {} trades", market.symbol);
-            ready = true;
-            on_change();
-            FrameParser parser;
-            for (;;) {
-                auto text = co_await ws->read();
-                if (!text) break;
-                on_message(parser.parse(*text));
-            }
-            closed = true;
-        } catch (...) {
-            error = std::current_exception();
-        }
-        bool cancelled = false;
-        if (error) cancelled = co_await is_cancelled();
-        if (closed) backoff = 0.5;
-        else if (cancelled) reason = "shutting down";
-        else log->warning("trades connection error: {}", what(error));
-        // Without trades we cannot tell whether the orders would have filled.
-        ready = false;
-        for (const auto& o : working()) finish(o, OrderState::CANCELED, reason);
-        on_change();
-        if (cancelled) std::rethrow_exception(error);
-        co_await sleep(backoff);
-        backoff = std::min(backoff * 2, 30.0);
+    trades = std::make_unique<ArcusTradesFeed>(
+        market.symbol, ws_url, [this](const Json& msg) { on_message(msg); }, [this] { trades_up(); },
+        [this] { trades_down("trades feed lost"); }, trades_options);
+    std::exception_ptr error;
+    try {
+        co_await trades->run();
+    } catch (...) {
+        error = std::current_exception();
     }
+    trades_down("shutting down");  // the links wind down after this: nothing is left for them to cancel
+    trades->on_down = nullptr;
+    std::rethrow_exception(error);
+}
+
+void PaperGateway::trades_up() {
+    log->info("paper trading on {} trades", market.symbol);
+    ready = true;
+    on_change();
+}
+
+void PaperGateway::trades_down(const std::string& reason) {
+    // Without trades we cannot tell whether the orders would have filled.
+    if (!ready) return;
+    ready = false;
+    if (reason != "shutting down") log->warning("trades feed lost: every connection is down");
+    for (const auto& o : working()) finish(o, OrderState::CANCELED, reason);
+    on_change();
 }
 
 void PaperGateway::send_place(const OrderPtr& o) {

@@ -22,7 +22,7 @@ sudo apt update
 sudo apt install build-essential cmake ninja-build libboost-all-dev libssl-dev libgtest-dev   # Ubuntu 24.04+ (24.04: и g++-13)
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-./build/nmm_tests            # 410 тестов, ~50 с
+./build/nmm_tests            # 418 тестов, ~50 с
 ```
 
 - Компилятор CMake берёт сам: самый новый GCC 13+ из `g++`, `c++`, `g++-16`…`g++-13` (другой — через
@@ -69,6 +69,18 @@ build/naive_mm --config config.toml --check                  # только пр
 - Прокси — как у aiohttp с `trust_env`: `https://` идёт через `HTTPS_PROXY`, `wss://` — только
   через `WSS_PROXY` (не `HTTPS_PROXY`), `ws://`/`http://` — через `WS_PROXY`/`HTTP_PROXY`;
   `NO_PROXY` соблюдается.
+- Только в C++: **отстающие соединения переподключаются.** Каждая лента с несколькими соединениями
+  сверяет копии одних и тех же обновлений и для каждого соединения считает, насколько оно отстаёт от
+  первого (медиана за 30 с, в строке статуса: `links 2/2 first 81/18% behind 0/3 ms`). Соединение,
+  отстающее устойчиво на `[agent] slow_link_ms` (по умолчанию 25 мс; 0 — выключено) и дольше 20 с
+  после подключения, переподключается, пока остальные несут поток (`... ms behind the other links ...:
+  reconnecting [link 2/2]`); повторно — с удваивающейся паузой, до 30 мин. Причина: 19 октября Arcus
+  весь прогон отдавал одному соединению данные на 73 мс позже, чем другому к тому же адресу, и
+  помогало только новое соединение. Ключ `slow_link_ms` Python-версия не знает: в общих конфигах его
+  нет, а задать можно через `--set agent.slow_link_ms=...`.
+- Только в C++: **сделки Arcus бумажного шлюза идут по `arcus.connections` соединениям** (как стакан),
+  каждая сделка исполняет ордера один раз — с того соединения, что принесло её первым. Когда падают
+  все соединения, в логе `trades feed lost: every connection is down`, ордера снимаются.
 - OKX (`[okx]`, в ETH-конфигах включён) по умолчанию идёт на порт 8443; если он закрыт,
   `--set okx.ws_url='"wss://ws.okx.com"'` — тот же поток на 443.
 - Binance с HTTP 451 — те же зеркала: `--set binance.ws_url='"wss://data-stream.binance.vision"'

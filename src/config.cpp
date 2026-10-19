@@ -138,6 +138,7 @@ template <class F> void fields(ImbalanceConfig& c, F&& f) {
 template <class F> void fields(AgentConfig& c, F&& f) {
     f("depth", c.depth); f("status_interval_s", c.status_interval_s); f("health_interval_s", c.health_interval_s);
     f("tob_lines", c.tob_lines); f("quote_line_ms", c.quote_line_ms);
+    f("slow_link_ms", c.slow_link_ms);
 }
 
 // Every section of the config, by name, in the order Python's dataclass lists them.
@@ -454,6 +455,8 @@ void Config::validate() const {
     if (!(agent.status_interval_s >= 0.5)) throw std::invalid_argument("agent.status_interval_s must be at least 0.5");
     if (agent.health_interval_s && !(5 <= agent.health_interval_s && agent.health_interval_s <= 3600))
         throw std::invalid_argument("agent.health_interval_s must be 0 (off) or within 5..3600");
+    if (!(0 <= agent.slow_link_ms && agent.slow_link_ms <= 10'000))
+        throw std::invalid_argument("agent.slow_link_ms must be within 0..10000 (0 = never reconnect a slow link)");
     if (!(0 <= agent.quote_line_ms && agent.quote_line_ms <= 60'000))
         throw std::invalid_argument("agent.quote_line_ms must be within 0..60000 (0 = a line on every change)");
     if (!(1 <= arcus.n_levels && arcus.n_levels <= 100)) throw std::invalid_argument("arcus.n_levels must be within 1..100");
