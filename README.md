@@ -18,11 +18,19 @@ Python-версии рассказывает о прайсинге, защита
 собирается только бот). [toml++](https://github.com/marzer/tomlplusplus) лежит в `third_party/`.
 
 ```bash
-sudo apt install g++-13 cmake ninja-build libboost-all-dev libssl-dev libgtest-dev   # Ubuntu 24.04
+sudo apt update
+sudo apt install build-essential g++-13 cmake ninja-build libboost-all-dev libssl-dev libgtest-dev   # Ubuntu 24.04
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ./build/nmm_tests            # 410 тестов, ~50 с
 ```
+
+- Компилятор CMake берёт сам: `g++-15`/`g++-14`/`g++-13`, затем `c++`, `g++`, `clang++` (другой — через
+  `CXX=...` или `-DCMAKE_CXX_COMPILER=...`); GCC старше 13 он не примет. Пакет `g++-13` ставит только
+  `g++-13`, без `c++` и `g++`, — старый CMakeLists его не видел (`No CMAKE_CXX_COMPILER could be found`).
+- После неудачной настройки — `rm -rf build`: CMake запоминает в `build/CMakeCache.txt`, что
+  компилятора нет, и не ищет его снова.
+- Ubuntu 22.04 не подойдёт как есть: там GCC 11 и Boost 1.74.
 
 Версия бота (коммит, ветка, есть ли незакоммиченные правки, отпечаток исходников) вшивается при
 каждой сборке и пишется в лог при старте и раз в час — как у Python-версии.

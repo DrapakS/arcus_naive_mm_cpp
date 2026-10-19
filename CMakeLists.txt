@@ -1,5 +1,21 @@
 cmake_minimum_required(VERSION 3.20)
+
+# The compiler, when neither CXX nor -DCMAKE_CXX_COMPILER names one: a GCC with <format> (13+) by its
+# versioned name first, since Ubuntu's g++-13 package installs g++-13 only (no c++, no g++), and a
+# plain c++ may be an older GCC (Ubuntu 22.04: 11).
+if(NOT CMAKE_CXX_COMPILER AND NOT DEFINED ENV{CXX})
+  find_program(NMM_CXX NAMES g++-15 g++-14 g++-13 c++ g++ clang++)
+  if(NMM_CXX)
+    set(CMAKE_CXX_COMPILER ${NMM_CXX})
+  endif()
+endif()
+
 project(naive_mm_cpp LANGUAGES CXX)
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13)
+  message(FATAL_ERROR "GCC ${CMAKE_CXX_COMPILER_VERSION} (${CMAKE_CXX_COMPILER}) has no <format>: GCC 13 or later is needed "
+                      "(Ubuntu 24.04: sudo apt install g++-13; then rm -rf build and configure again)")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
