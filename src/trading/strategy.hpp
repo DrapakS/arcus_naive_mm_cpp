@@ -46,6 +46,10 @@
 // of the book. With an open_guard, around each open of the underlying no order
 // opens or adds to the position. With a session (a market with trading hours),
 // outside it every order takes off_hours_markup_factor times its markup.
+//
+// With a portfolio (portfolio.hpp: the other bots' positions of the same asset
+// class), an order that adds to the class's lean takes a wider markup and one that
+// takes it back a narrower one, on top of the own skew.
 #pragma once
 
 #include <map>
@@ -56,6 +60,7 @@
 #include <vector>
 
 #include "orderbook.hpp"
+#include "portfolio.hpp"
 #include "trading/gateway.hpp"
 #include "trading/guard.hpp"
 #include "trading/market.hpp"
@@ -135,6 +140,7 @@ struct StrategyOptions {
     double came_hold_s = 0.0;
     OpenWindows* open_guard = nullptr;
     double open_limit_share = 0.0;
+    Portfolio* portfolio = nullptr;
 };
 
 class QuoteStrategy {
@@ -209,6 +215,7 @@ public:
     Decimal add_limit_share;
     OpenWindows* open_guard;
     Decimal open_limit_share;
+    Portfolio* portfolio;  // the asset class's lean across the bots: its markup factor on each side
     DriftWatch* drift;
     Decimal drift_factor;
     double drift_factor_float;

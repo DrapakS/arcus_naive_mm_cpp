@@ -88,7 +88,7 @@ std::string lopsided(const std::pair<std::string, double>& thin, bool held) {
 
 QuoteStrategy::QuoteStrategy(Gateway* gateway_, MarketSpec market_, StrategyOptions o)
     : direction(o.direction), both(o.direction == "both"), session(o.session), exit_after_s(o.exit_after_s),
-      add_guard(o.add_guard), open_guard(o.open_guard), drift(o.drift), drift_factor_float(o.drift_factor), gateway(gateway_),
+      add_guard(o.add_guard), open_guard(o.open_guard), portfolio(o.portfolio), drift(o.drift), drift_factor_float(o.drift_factor), gateway(gateway_),
       market(std::move(market_)), guards(o.guards), never_lead(o.never_lead), imbalance(o.imbalance), came_hold_s(o.came_hold_s) {
     if (direction != "long" && direction != "short" && direction != "both")
         throw std::invalid_argument("direction must be \"long\", \"short\" or \"both\"");
@@ -218,6 +218,7 @@ std::optional<Decimal> QuoteStrategy::price(const std::string& s, const MarketVi
         Decimal u = used(fair);
         if (u) m *= is_closing ? max(Decimal(0), Decimal(1) - skew_close * u) : Decimal(1) + skew_open * u;
     }
+    if (portfolio != nullptr) m *= portfolio->multiplier(s, position_now(), fair);
     if (is_urgent) m = Decimal(0);
     if (session != nullptr && off_hours_factor != 1 && session->outside()) m *= off_hours_factor;
     if (drifted(s)) m *= drift_factor;
@@ -577,6 +578,8 @@ void QuoteStrategy::place(const Quote& quote, const MarketView& view) {
     why += "; " + queue_note(levels, quote.side, quote.price.to_double(), market.tick_at(quote.price).to_double());
     if (auto note = gap_note(view.fair_gap_bps, view.fair_gap_change_bps, quote.side)) why += "; " + *note;
     if (auto note = drift_note(quote.side)) why += "; " + *note;
+    if (portfolio != nullptr && view.fair_bid)
+        if (auto note = portfolio->note(quote.side, position_now(), D(*view.fair_bid))) why += "; " + *note;
     if (auto held = held_back_[quote.side]; held && came_at_.count(quote.side))
         why += std::format("; the book came to our order at {} {:.0f} ms ago: one tick behind it for {:.0f} ms", fmt(*held),
                            (clock() - came_at_[quote.side]) * 1000, came_hold_s * 1000);

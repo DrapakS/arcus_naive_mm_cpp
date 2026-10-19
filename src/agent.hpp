@@ -28,6 +28,7 @@
 #include "health.hpp"
 #include "ml.hpp"
 #include "orderbook.hpp"
+#include "portfolio.hpp"
 #include "pricing.hpp"
 #include "trading/credentials.hpp"
 #include "trading/gateway.hpp"
@@ -94,6 +95,7 @@ public:
     std::unique_ptr<SweepGuard> trades_guard;
     std::unique_ptr<TrendGuard> trend_guard, add_guard;
     std::unique_ptr<OpenWindows> open_guard;
+    std::unique_ptr<Portfolio> portfolio;  // [portfolio], live only: the asset class's lean across the bots of the host
     std::unique_ptr<DriftWatch> drift;
     std::unique_ptr<LagGuard> lag_guard;
     std::unique_ptr<TakeGuard> take_guard;
@@ -154,6 +156,8 @@ private:
     void sample(Pricer& pricer, double reference_price);
     void update_spot_fair(OrderBook& updated);
     std::optional<double> venue_bid();
+    double own_position() const;
+    std::optional<double> arcus_mid() const;
     void print_ladders(OrderBook& updated);
     std::string pricing_summary();
     void fail(std::exception_ptr error);
