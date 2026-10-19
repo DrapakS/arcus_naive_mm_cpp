@@ -1,0 +1,155 @@
+# arcus_naive_mm_cpp
+
+[arcus_naive_mm](https://github.com/DrapakS/arcus_naive_mm), переписанный на C++20: тот же наивный
+маркетмейкер для перпов [Arcus](https://docs.arcus.xyz) — котирует рынок Arcus по стакану и сделкам
+Binance (спот, фьючерс), Bybit и самого Arcus, режимы `off`/`quote`/`paper`/`live`.
+
+Порт сделан с Python-версии на коммите `ffb2bc9` и повторяет её поведение один в один: те же
+конфиги (они лежат здесь же, `config*.toml`), те же ключи командной строки, те же формулы, тики и
+округления, те же защиты, те же строки в логах — вплоть до текста. Поэтому всё, что README
+Python-версии рассказывает о прайсинге, защитах, торговле, ML, ключах и логах, верно и здесь;
+ниже — только то, что касается C++.
+
+## Сборка
+
+Нужны: GCC 13+ (C++20, `<format>`, часовые пояса `std::chrono`), CMake 3.20+, Boost 1.81+
+(Asio, Beast, JSON), OpenSSL 1.1.1+ (TLS и подпись Ed25519). Тесты — GoogleTest (без него
+собирается только бот). [toml++](https://github.com/marzer/tomlplusplus) лежит в `third_party/`.
+
+```bash
+sudo apt install g++-13 cmake ninja-build libboost-all-dev libssl-dev libgtest-dev   # Ubuntu 24.04
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./build/nmm_tests            # 396 тестов, ~45 с
+```
+
+Версия бота (коммит, ветка, есть ли незакоммиченные правки, отпечаток исходников) вшивается при
+каждой сборке и пишется в лог при старте и раз в час — как у Python-версии.
+
+## Запуск
+
+Как у Python-версии, только вместо `python -m naive_mm` — `build/naive_mm`:
+
+```bash
+cp config.example.toml config.toml
+build/naive_mm --config config.toml --ladder                 # обе лестницы на каждый апдейт
+build/naive_mm --config config.toml --trade quote            # цены покупки/продажи без ордеров
+build/naive_mm --config config.toml --trade paper --orders-log paper.log
+build/naive_mm --config config.toml --trade live --credentials ~/.arcus/credentials.toml
+build/naive_mm --config config.btc-both.toml --set drift.markup_factor=1 --trade paper
+build/naive_mm --config config.toml --check                  # только проверить конфиг: 0 — всё хорошо
+```
+
+- Ключи: `--config`, `--ladder`, `--log-level`, `--trade {off,quote,paper,live}`, `--credentials`,
+  `--orders-log`, `--color {auto,always,never}`, `--set SECTION.KEY=VALUE` (сколько угодно раз).
+  Новый только `--check`: загрузить конфиг с `--set`, проверить и выйти, ничего не подключая.
+- Останавливать так же: Ctrl+C, SIGTERM или SIGHUP — бот снимает ордера, ждёт ответов до 3 с,
+  выключает dead man's switch и пишет `=== AT EXIT`. Не `kill -9`.
+- Прокси — как у aiohttp с `trust_env`: `https://` идёт через `HTTPS_PROXY`, `wss://` — только
+  через `WSS_PROXY` (не `HTTPS_PROXY`), `ws://`/`http://` — через `WS_PROXY`/`HTTP_PROXY`;
+  `NO_PROXY` соблюдается.
+- Binance с HTTP 451 — те же зеркала: `--set binance.ws_url='"wss://data-stream.binance.vision"'
+  --set binance.rest_url='"https://data-api.binance.vision"'` (или в конфиге).
+- ML-модели: LightGBM читается без библиотеки LightGBM — из текстового формата или из pickle
+  (строка модели достаётся из опкодов pickle, сам pickle не исполняется); линейные — как в Python.
+  Деревья обходятся по правилам LightGBM, предсказание совпадает до последнего бита
+  (`tests/data/lgbm` — эталоны, посчитанные самим LightGBM).
+- `scripts/paper_ab.sh` — тот же A/B на бумаге, только запускает C++-бинарник (`BIN`, по умолчанию
+  `build/naive_mm`).
+
+## Устройство
+
+Один поток с `boost::asio::io_context` вместо цикла asyncio: каждая корутина Python стала
+`asio::awaitable`, `asyncio.Event`/`create_task`/`call_later`/`sleep` — их аналогами из
+`src/util/aio.hpp`. Пачка кадров, уже прочитанных из сокетов, обрабатывается до того, как
+стратегия пересчитает котировки — как в asyncio, где лента дочитывает всё, что лежит в сокете,
+прежде чем очередь дойдёт до цикла стратегии. Логи пишут отдельные потоки (как в Python), так
+что остановленный терминал или медленный диск цикл не держат.
+
+Цены и размеры — `Decimal` (`src/util/decimal.hpp`): фиксированная точка, 18 знаков после
+запятой, 128 бит, округление half-even — там же, где Python берёт `decimal.Decimal`; там, где
+Python считает во `float`, C++ считает в `double`, а печатает так же, как Python (`repr`, `{:g}`).
+
+| Python (`naive_mm/`)        | C++ (`src/`)                                             |
+|-----------------------------|----------------------------------------------------------|
+| `__main__.py`               | `main.cpp`, `logsetup.*`                                 |
+| `config.py`                 | `config.*`                                               |
+| `agent.py`                  | `agent.*`                                                |
+| `orderbook.py`, `view.py`   | `orderbook.*`, `view.hpp`                                |
+| `pricing.py`                | `pricing.*`                                              |
+| `ml.py`, `lgbm.py`          | `ml.*`, `lgbm.*`                                         |
+| `health.py`                 | `health.*`                                               |
+| `feeds/*.py`                | `feeds/*` (базовая лента, Binance спот/фьючерс/сделки, Bybit, Arcus) |
+| `trading/*.py`              | `trading/*` (шлюз Arcus и бумажный, стратегия, защиты, сессии, round trips, подпись) |
+| aiohttp, orjson, PyNaCl     | `net/net.*` (Beast + OpenSSL), `util/json.*` (Boost.JSON), `trading/signing.*` (OpenSSL Ed25519) |
+| asyncio, logging            | `util/aio.*`, `util/log.*`, `util/pyfmt.*` (форматирование как в Python) |
+
+Тесты (`tests/`) перенесены с pytest: фейковые биржи (`fake_server.*`, `fake_arcus_trading.*`)
+поднимают локальные HTTP/WebSocket-серверы, как фикстуры Python-версии.
+
+## Сравнение с Python-версией
+
+### Бумага бок о бок
+
+`bench/paper_pair.sh` запускает Python- и C++-бота на бумаге одновременно, с одним конфигом,
+на одном живом рынке, каждого со своим `--orders-log`; `bench/compare_logs.py` сводит два лога
+за общее время:
+
+```bash
+SETS='binance.ws_url="wss://data-stream.binance.vision" binance.rest_url="https://data-api.binance.vision"' \
+  bash bench/paper_pair.sh start config.btc-both.toml      # имя пары: btc-both
+bash bench/paper_pair.sh status
+bash bench/paper_pair.sh stop                               # SIGTERM обоим, как Ctrl+C
+bash bench/paper_pair.sh compare                            # = python3 bench/compare_logs.py A.log B.log
+```
+
+`PY_REPO` — checkout Python-версии (по умолчанию `../arcus_naive_mm`), `PY` — его интерпретатор
+(по умолчанию `$PY_REPO/.venv/bin/python`), `BIN` — C++-бинарник. Логи — `paper-pair/<имя>-py.log`
+и `-cpp.log`, логи прошлого запуска переименовываются с временем. Сравнение печатает рядом:
+выставления и отмены по причинам, исполнения и финальные состояния ордеров, round trips и их
+результат, срабатывания защит (`DROP`/`RISE`/`TAKE`/`LATE`/`DRIFT`/`FALL`/`RALLY`), насколько
+совпадают цены покупки/продажи и fair bid посекундно, совпавшие исполнения и медианы строк
+здоровья (лаг цикла, CPU, задержки чтения лент). `compare_logs.py` можно натравить на любые два
+orders-лога (`--names`, `--from`, `--to`).
+
+Пара на BTC-USD (`config.btc-both.toml`, бумага, живой рынок, 19 октября 2026, 4,6 мин):
+
+|                                   | Python      | C++         |
+|-----------------------------------|-------------|-------------|
+| выставлено покупок / продаж       | 114 / 118   | 114 / 119   |
+| отмен (из них «target is N bp away») | 231 (113) | 230 (115)   |
+| исполнений, все совпали с другим ботом | 6       | 6           |
+| round trips, результат            | 2, −$0.0803 | 2, −$0.0803 |
+| AT EXIT                           | long 0.00493731, +2.39 bp | то же |
+| DROP / RISE / TAKE / DRIFT / FALL | 154 / 112 / 126 / 21 / 1 | 154 / 110 / 126 / 21 / 1 |
+| секунд с той же ценой покупки / продажи | 92.7% / 94.1% (медиана расхождения 0 bp) | |
+| CPU (медиана строк здоровья)      | 24.5%       | 9%          |
+| лаг цикла p99 / max, мс           | 4 / 65      | 0.6 / 19    |
+| чтение фьючерса p50 / p99, мс     | 72 / 110    | 70 / 77     |
+
+Расхождения — в мелочах времени: C++ разбирает кадр быстрее и видит промежуточные состояния
+стакана, которые Python, ещё занятый предыдущим кадром, склеивает с последующими, — поэтому строк
+цен у него больше (1401 против 983), а отдельные защиты срабатывают на кадр раньше или позже.
+
+### Скорость
+
+`bench/compare.sh` гоняет ботов по одному против `bench/replay_server.py` — локальной «биржи»,
+которая шлёт поток оживлённого рынка BTC (стакан и bookTicker спота, сделки, bookTicker
+фьючерса, стакан и сделки Arcus, REST-снимки) с множителем `RATE` (×1 ≈ 740 кадров/с). После
+разгона меряет процессорное время бота (все его потоки) на кадр, долю ядра, память и задержки из
+строки здоровья:
+
+```bash
+PY=../arcus_naive_mm/.venv/bin/python bash bench/compare.sh                 # оба бота, ×1 и ×4
+RATES="1 4 16" DURATION=60 bash bench/compare.sh
+BOTS=cpp CONFIG=config.btc-ml-both.toml bash bench/compare.sh
+```
+
+Замер на 4-ядерной облачной машине, занятой другими процессами (точные числа — после
+повторного замера на свободной машине):
+
+| ×1 (≈740 кадров/с)  | Python (uvloop) | C++      |
+|---------------------|-----------------|----------|
+| CPU на кадр         | 127 мкс         | 33–40 мкс |
+| доля ядра           | 17.8%           | 5–6%     |
+| память (RSS)        | 52 МБ           | 14 МБ    |
