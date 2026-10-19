@@ -225,6 +225,8 @@ public:
     std::map<std::string, bool> add_held_ {{"BUY", false}, {"SELL", false}};
 
 private:
+    friend struct QuoteStrategyTestAccess;
+
     Decimal position_now() const;
     bool big_enough(const Decimal& size, const std::string& side, const MarketView* view);
     void evaluate_both(const MarketView& view);
