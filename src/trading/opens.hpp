@@ -11,6 +11,11 @@
 // followed) and tells when now is within `before_s` before to `after_s` after one of them. The
 // strategy then places no order that opens or adds to the position (or, with a limit share, none past
 // that share of the limit); the order that shrinks it is quoted as usual. No taker, no stop-loss.
+//
+// The same windows, shorter, also halt trading outright ([open_halt]): at the US stock open
+// (09:30 New York) every order is pulled, the closing one too, and none is placed from a minute before
+// to two minutes after (NVDA, 19 Oct 13:30 UTC: -50 bp in the first 30 s of the open, 284 trades;
+// its closing sell was hit at 217.15 against a 218.54 buy, the long carried down the next minutes).
 #pragma once
 
 #include <chrono>
@@ -45,8 +50,11 @@ double local_to_unix(const std::chrono::time_zone* zone, int64_t local_s);
 
 class OpenWindows {
 public:
+    // `holds`, `closing` and `over`: what the start and the end lines of a window say (`closing`
+    // empty: nothing about the closing order).
     OpenWindows(std::vector<std::string> opens, std::string tz, double before_s, double after_s,
-                Clock clock = wall_time);
+                Clock clock = wall_time, std::string holds = "no adding to the position",
+                std::string closing = "the closing order is quoted as usual", std::string over = "adding allowed again");
 
     std::string describe() const;
     // The open (and when it is, Unix seconds) whose window holds now; nullopt when none does.
@@ -61,6 +69,7 @@ public:
     double before_s;
     double after_s;
     Clock clock;
+    std::string holds, closing, over;  // what the start and the end lines say
     // (when, what window() found then): reused for a second
     std::optional<std::pair<double, std::optional<std::pair<Open, double>>>> cached;
 

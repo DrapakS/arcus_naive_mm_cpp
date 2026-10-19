@@ -68,8 +68,10 @@ double local_to_unix(const std::chrono::time_zone* zone, int64_t local_s) {
     return static_cast<double>(local_s - info.first.offset.count());
 }
 
-OpenWindows::OpenWindows(std::vector<std::string> opens_, std::string tz, double before_s, double after_s, Clock clock)
-    : tz(std::move(tz)), before_s(before_s), after_s(after_s), clock(std::move(clock)) {
+OpenWindows::OpenWindows(std::vector<std::string> opens_, std::string tz, double before_s, double after_s, Clock clock,
+                         std::string holds, std::string closing, std::string over)
+    : tz(std::move(tz)), before_s(before_s), after_s(after_s), clock(std::move(clock)), holds(std::move(holds)),
+      closing(std::move(closing)), over(std::move(over)) {
     for (const auto& o : opens_) opens.push_back(Open::parse(o));
     try {
         zone_ = std::chrono::locate_zone(this->tz);
@@ -81,7 +83,7 @@ OpenWindows::OpenWindows(std::vector<std::string> opens_, std::string tz, double
 std::string OpenWindows::describe() const {
     std::vector<std::string> texts;
     for (const auto& o : opens) texts.push_back(o.text);
-    return std::format("{} {}: no adding from {:g} s before to {:g} s after each", join(texts, ", "), tz, before_s,
+    return std::format("{} {}: {} from {:g} s before to {:g} s after each", join(texts, ", "), tz, holds, before_s,
                        after_s);
 }
 
@@ -116,11 +118,10 @@ std::optional<std::pair<Open, double>> OpenWindows::window(std::optional<double>
     std::optional<double> at = found ? std::optional<double>(found->second) : std::nullopt;
     if (at != current_) {
         if (found) {
-            log().info("--- market open {} {} ({} UTC): no adding to the position until {} UTC; the closing order "
-                       "is quoted as usual",
-                       found->first.text, tz, utc(*at), utc(*at + after_s));
+            log().info("--- market open {} {} ({} UTC): {} until {} UTC{}", found->first.text, tz, utc(*at), holds,
+                       utc(*at + after_s), closing.empty() ? "" : "; " + closing);
         } else {
-            log().info("--- market open window over: adding allowed again");
+            log().info("--- market open window over: {}", over);
         }
         current_ = at;
     }

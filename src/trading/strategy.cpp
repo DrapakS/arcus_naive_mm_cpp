@@ -88,8 +88,9 @@ std::string lopsided(const std::pair<std::string, double>& thin, bool held) {
 
 QuoteStrategy::QuoteStrategy(Gateway* gateway_, MarketSpec market_, StrategyOptions o)
     : direction(o.direction), both(o.direction == "both"), session(o.session), exit_after_s(o.exit_after_s),
-      add_guard(o.add_guard), open_guard(o.open_guard), drift(o.drift), drift_factor_float(o.drift_factor), gateway(gateway_),
-      market(std::move(market_)), guards(o.guards), never_lead(o.never_lead), imbalance(o.imbalance), came_hold_s(o.came_hold_s) {
+      add_guard(o.add_guard), open_guard(o.open_guard), halt(o.halt), vol(o.vol), drift(o.drift), drift_factor_float(o.drift_factor),
+      gateway(gateway_), market(std::move(market_)), guards(o.guards), never_lead(o.never_lead), imbalance(o.imbalance),
+      came_hold_s(o.came_hold_s) {
     if (direction != "long" && direction != "short" && direction != "both")
         throw std::invalid_argument("direction must be \"long\", \"short\" or \"both\"");
     // One side at a time: the sides by role. Both sides: no fixed roles (closing() says by the position).
@@ -218,6 +219,7 @@ std::optional<Decimal> QuoteStrategy::price(const std::string& s, const MarketVi
         Decimal u = used(fair);
         if (u) m *= is_closing ? max(Decimal(0), Decimal(1) - skew_close * u) : Decimal(1) + skew_open * u;
     }
+    if (vol != nullptr) m *= vol->factor();
     if (is_urgent) m = Decimal(0);
     if (session != nullptr && off_hours_factor != 1 && session->outside()) m *= off_hours_factor;
     if (drifted(s)) m *= drift_factor;
@@ -513,6 +515,8 @@ std::optional<Decimal> QuoteStrategy::both_size(const std::string& s, const Deci
     return open_cap(s, *capped, position, p);
 }
 
+bool QuoteStrategy::halted() const { return halt != nullptr && halt->active(); }
+
 bool QuoteStrategy::at_open() const { return open_guard != nullptr && open_guard->active(); }
 
 std::optional<Decimal> QuoteStrategy::open_cap(const std::string& s, const Decimal& sz, const Decimal& position, const Decimal& p) const {
@@ -577,6 +581,8 @@ void QuoteStrategy::place(const Quote& quote, const MarketView& view) {
     why += "; " + queue_note(levels, quote.side, quote.price.to_double(), market.tick_at(quote.price).to_double());
     if (auto note = gap_note(view.fair_gap_bps, view.fair_gap_change_bps, quote.side)) why += "; " + *note;
     if (auto note = drift_note(quote.side)) why += "; " + *note;
+    if (vol != nullptr)
+        if (auto note = vol->note()) why += "; " + *note;
     if (auto held = held_back_[quote.side]; held && came_at_.count(quote.side))
         why += std::format("; the book came to our order at {} {:.0f} ms ago: one tick behind it for {:.0f} ms", fmt(*held),
                            (clock() - came_at_[quote.side]) * 1000, came_hold_s * 1000);
@@ -616,7 +622,7 @@ void QuoteStrategy::check_cancel(const MarketView& view) {
 }
 
 bool QuoteStrategy::paused(const std::string& s) const {
-    return std::any_of(guards.begin(), guards.end(), [&](const Pauses* g) { return g->paused(s); });
+    return std::any_of(guards.begin(), guards.end(), [&](const Pauses* g) { return g->paused(s); }) || halted();
 }
 
 void QuoteStrategy::pull(const std::string& s, const std::string& why) {
@@ -629,6 +635,7 @@ void QuoteStrategy::pull(const std::string& s, const std::string& why) {
 }
 
 std::optional<std::string> QuoteStrategy::cancel_reason(const OrderPtr& o, const std::optional<Quote>& quote, const MarketView& view) {
+    if (halted()) return "market open: no trading";
     if (!quote) {
         if (both && limited_[o->side])
             return std::format("position {} is at the limit of ${}", fmt(gateway->position()), fmt(max_position_usd));

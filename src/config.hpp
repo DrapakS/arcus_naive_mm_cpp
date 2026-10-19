@@ -274,6 +274,17 @@ struct OpenGuardConfig {
     double limit_share = 0.0;
 };
 
+struct OpenHaltConfig {
+    // Moments trading stops outright, weekly, local time in `tz` (as [open_guard]): from `before_s` before to
+    // `after_s` after each, every order is pulled, the closing one too, and none is placed. For the US stock
+    // open, "Mon-Fri 09:30": NVDA, 19 Oct 13:30 UTC, -50 bp in the first 30 s, 284 trades in them; its
+    // closing sell was hit at 217.15 against a 218.54 buy. [open_guard] still holds adding after it. [] = off.
+    ConfigList opens;
+    std::string tz = "America/New_York";
+    double before_s = 60.0;
+    double after_s = 120.0;
+};
+
 struct AddGuardConfig {
     // direction = "both": after the futures mid moved more than `drawdown` against a side within
     // `window_s`, an order on that side may take the position there to `limit_share` of
@@ -282,6 +293,19 @@ struct AddGuardConfig {
     double drawdown = 0.0;
     double pause_s = 60.0;
     double limit_share = 0.5;
+};
+
+struct VolMarkupConfig {
+    // The markup scaled by volatility: the reference mid (Binance futures, else the spot book) sampled each
+    // second, its squared returns in an exponential mean over short_s (now) and one over long_s (the usual);
+    // every order's markup x sqrt(short / long), within low..high (x1 for warmup_s after start). 19 Oct, 6 h at
+    // 60 s / 30 min: mean x1.0, median x0.87-0.94, p90 x1.45, at x0.8 31-41% of the time, at x2 1-2%. Off unless enabled.
+    bool enabled = false;
+    double short_s = 60.0;
+    double long_s = 1800.0;
+    double low = 0.8;
+    double high = 2.0;
+    double warmup_s = 300.0;
 };
 
 struct DriftConfig {
@@ -362,6 +386,8 @@ struct Config {
     TrendConfig trend;
     AddGuardConfig add_guard;
     OpenGuardConfig open_guard;
+    OpenHaltConfig open_halt;
+    VolMarkupConfig vol_markup;
     DriftConfig drift;
     LagConfig lag;
     ImbalanceConfig imbalance;

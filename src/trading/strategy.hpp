@@ -44,8 +44,12 @@
 // any guard pauses that side. With an Imbalance, a lopsided Arcus book widens the
 // quote on its thin side. never_lead keeps the order among the others on its side
 // of the book. With an open_guard, around each open of the underlying no order
-// opens or adds to the position. With a session (a market with trading hours),
-// outside it every order takes off_hours_markup_factor times its markup.
+// opens or adds to the position. With a halt (the same windows, shorter: the US
+// stock open) nothing trades at all: every order is pulled, the closing one too,
+// and none is placed until the window is over. With a session (a market with
+// trading hours), outside it every order takes off_hours_markup_factor times its
+// markup. With a vol (VolScale: the reference's volatility now over its usual),
+// every markup takes that factor, x0.8..x2 by default.
 #pragma once
 
 #include <map>
@@ -61,6 +65,7 @@
 #include "trading/market.hpp"
 #include "trading/opens.hpp"
 #include "trading/session.hpp"
+#include "trading/volatility.hpp"
 #include "util/clock.hpp"
 #include "util/decimal.hpp"
 #include "view.hpp"
@@ -135,6 +140,8 @@ struct StrategyOptions {
     double came_hold_s = 0.0;
     OpenWindows* open_guard = nullptr;
     double open_limit_share = 0.0;
+    OpenWindows* halt = nullptr;
+    VolScale* vol = nullptr;
 };
 
 class QuoteStrategy {
@@ -185,11 +192,13 @@ public:
     // Both sides: order_size cut to what keeps the position within max_position_usd at `price`;
     // none when no valid order fits or order_size itself is under the minimum notional.
     std::optional<Decimal> both_size(const std::string& side, const Decimal& position, const Decimal& price);
+    // Within a window of halt: nothing is traded.
+    bool halted() const;
     // Within a market-open window of open_guard.
     bool at_open() const;
     // The cancel half of evaluate alone, cheap enough to run on every book frame.
     void check_cancel(const MarketView& view);
-    // A guard holds off placing on `side`.
+    // A guard holds off placing on `side` (or trading is halted around a market open).
     bool paused(const std::string& side) const;
     // Cancel the working order on `side` now, whatever its price: the guard tripped.
     void pull(const std::string& side, const std::string& why);
@@ -208,6 +217,8 @@ public:
     TrendGuard* add_guard;
     Decimal add_limit_share;
     OpenWindows* open_guard;
+    OpenWindows* halt;  // within one of its windows: no order at all, the working ones pulled
+    VolScale* vol;  // the volatility now over the usual: every order's markup factor
     Decimal open_limit_share;
     DriftWatch* drift;
     Decimal drift_factor;
