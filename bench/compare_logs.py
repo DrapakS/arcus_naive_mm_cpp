@@ -13,7 +13,11 @@ side by side:
 - the quotes: how often the two bots' buy and sell prices were the same, second by second,
   and how far apart they were otherwise; the same for the fair bid;
 - the fills matched between the two (the same side and price within a second);
-- the health lines: CPU share of a core, event loop lag, read delays (medians over the run).
+- the health lines: CPU share of a core, event loop lag, read delays (medians over the run);
+- the same market events seen by both (a taker on Arcus, a new best bid on a venue): how much later
+  the second bot saw each, feed by feed. Both bots on one host get the same packets at the same
+  moment, so a feed one of them sees later all the time points at its connections (19 Oct: the C++
+  bot's Arcus links ran 49-73 ms behind for a whole run, and not after a restart).
 
     python3 bench/compare_logs.py paper-pair/btc-both-py.log paper-pair/btc-both-cpp.log
     python3 bench/compare_logs.py A.log B.log --names python c++ --from 07:10 --to 08:10
@@ -64,6 +68,18 @@ class Run:
     health: dict[str, list[float]] = field(default_factory=dict)
     at_exit: str = ""
     lines: int = 0
+    seen: dict[str, list[float]] = field(default_factory=dict)  # feed + event text -> times logged
+
+
+# Lines both bots write the moment a feed shows them: (feed, pattern whose group 1 names the event)
+SEEN = (
+    ("Arcus trades (TAKE)", re.compile(r"^!!! TAKE (Arcus taker \w+ \$[\d,]+ by \w+)")),
+    ("Arcus book", re.compile(r"^(ARCUS: [\d.]+) exchange")),
+    ("Binance futures", re.compile(r"^(BINANCE FUTURES: [\d.]+ exchange [\d:.]+)")),
+    ("Binance spot", re.compile(r"^(BINANCE SPOT: [\d.]+) exchange")),
+    ("Bybit", re.compile(r"^(BYBIT: [\d.]+ exchange [\d:.]+)")),
+    ("OKX", re.compile(r"^(OKX: [\d.]+ exchange [\d:.]+)")),
+)
 
 
 def seconds(m: re.Match) -> float:
@@ -146,7 +162,12 @@ def parse(path: str, start: float | None, end: float | None) -> Run:
                 word = message.split()[1]
                 if word in GUARDS:
                     run.guards[word] += 1
-            elif message.startswith("--- health over"):
+            if message[:4] in ("!!! ", "ARCU", "BINA", "BYBI", "OKX:"):
+                for feed, pattern in SEEN:
+                    if (seen := pattern.match(message)) is not None:
+                        run.seen.setdefault(f"{feed}|{seen[1]}", []).append(t)
+                        break
+            if message.startswith("--- health over"):
                 for name, pattern in HEALTH_PARTS.items():
                     if (h := pattern.search(message)) is not None:
                         run.health.setdefault(name, []).append(float(h[1]))
@@ -274,6 +295,21 @@ def main() -> None:
         va, vb = a.health.get(name), b.health.get(name)
         if va or vb:
             print(row(name, statistics.median(va) if va else "-", statistics.median(vb) if vb else "-"))
+
+    print(f"the same events seen by both: {nb} minus {na}, ms (+: {nb} later)")
+    for feed, _ in SEEN:
+        diffs = sorted(
+            (b.seen[key][0] - times[0]) * 1000
+            for key, times in a.seen.items()
+            if key.startswith(feed + "|") and len(times) == 1 and len(b.seen.get(key, ())) == 1
+            and abs(b.seen[key][0] - times[0]) < 2
+        )
+        if diffs:
+            def q(share: float) -> float:
+                return diffs[int(share * (len(diffs) - 1))]
+            later = sum(d > 0 for d in diffs) / len(diffs)
+            print(f"  {feed:<24} n {len(diffs):>6}   p10 {q(0.1):+5.0f}  median {q(0.5):+5.0f}  p90 {q(0.9):+5.0f}"
+                  f"   {nb} later {later:.0%}")
 
 
 if __name__ == "__main__":
