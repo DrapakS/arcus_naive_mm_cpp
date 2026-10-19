@@ -12,21 +12,21 @@
 
 namespace nmm::ml {
 
-const std::vector<std::string> VENUES {"arcus", "binance", "binance_futures"};
+const std::vector<std::string> VENUES {"arcus", "binance", "binance_futures", "bybit"};
 const std::vector<std::string> PRICES {"mid", "bid", "ask"};
 const std::vector<std::string> TARGET_BASES {"now", "prev", "futures", "basis"};
 const std::vector<std::string> KINDS {"linear", "lightgbm"};
 const std::string FEATURE_FORMS =
     "{venue}_{price}_r{seconds}s, {venue}_{price}_d{seconds}s, basis_{venue}_{price}_ema{seconds}s, "
     "{venue}_imb1, {venue}_imb1_m{seconds}s or basis_pred_ema{seconds}s "
-    "(venue one of arcus, binance, binance_futures, not arcus for d and basis; price one of mid, bid, ask; "
+    "(venue one of arcus, binance, binance_futures, bybit, not arcus for d and basis; price one of mid, bid, ask; "
     "0 < seconds <= 600)";
 
 namespace {
 
-const std::regex FEATURE_RE(R"((arcus|binance_futures|binance)_(mid|bid|ask)_([rd])(\d+(?:\.\d+)?)s)");
-const std::regex BASIS_RE(R"(basis_(binance_futures|binance)_(mid|bid|ask)_ema(\d+(?:\.\d+)?)s)");
-const std::regex IMB_RE(R"((arcus|binance_futures|binance)_imb1(?:_m(\d+(?:\.\d+)?)s)?)");
+const std::regex FEATURE_RE(R"((arcus|binance_futures|binance|bybit)_(mid|bid|ask)_([rd])(\d+(?:\.\d+)?)s)");
+const std::regex BASIS_RE(R"(basis_(binance_futures|binance|bybit)_(mid|bid|ask)_ema(\d+(?:\.\d+)?)s)");
+const std::regex IMB_RE(R"((arcus|binance_futures|binance|bybit)_imb1(?:_m(\d+(?:\.\d+)?)s)?)");
 const std::regex BPRED_RE(R"(basis_pred_ema(\d+(?:\.\d+)?)s)");
 
 // bisect.bisect_right as CPython runs it: the same probes even on a list that is not sorted (a

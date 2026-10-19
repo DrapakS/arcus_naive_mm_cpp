@@ -63,7 +63,7 @@ TEST(MlConfig, MlSettings) {
         {"[ml.weights]\narcus_mid_r1s = \"0.5\"\n", "finite number"},
         {"[ml]\ntarget_price = \"last\"\n", "ml.target_price"},
         {"[ml]\neval_interval_ms = -1\n", "eval_interval_ms"},
-        {"[pricing]\nmodel = \"ml\"\n[ml.weights]\nbybit_mid_r1s = 1.0\n", "not a feature of the notebook"},  // no Bybit
+        {"[pricing]\nmodel = \"ml\"\n[bybit]\nenabled = false\n[ml.weights]\nbybit_mid_r1s = 1.0\n", "[bybit] enabled"},
         {"[pricing]\nmodel = \"ml\"\n[futures]\nenabled = false\n[ml.weights]\nbinance_futures_mid_r1s = 1.0\n",
          "[futures] enabled"},
     });
@@ -81,7 +81,7 @@ TEST(MlConfig, TheChangeAndBasisFeaturesInTheSettings) {
     expect_refused(f, {
         {"[ml.weights]\narcus_mid_d5s = 1.0\n", "not a feature of the notebook"},
         {"[ml.weights]\nbasis_arcus_mid_ema30s = 1.0\n", "not a feature of the notebook"},
-        {"[pricing]\nmodel = \"ml\"\n[ml.weights]\nbybit_mid_d5s = 1.0\n", "not a feature of the notebook"},
+        {"[pricing]\nmodel = \"ml\"\n[bybit]\nenabled = false\n[ml.weights]\nbybit_mid_d5s = 1.0\n", "[bybit] enabled"},
         {"[pricing]\nmodel = \"ml\"\n[futures]\nenabled = false\n[ml.weights]\nbasis_binance_futures_mid_ema30s = 1.0\n",
          "[futures] enabled"},
     });
@@ -131,8 +131,8 @@ TEST(MlConfig, LightgbmSettings) {
         {head + "features = [\"arcus_mid_r1s\", \"binance_mid_d5s\", \"binance_futures_mid_r5s\"]\n", "reads 4 features"},
         {head + "features = [\"arcus_mid_r1s\", \"okx_mid_r1s\", \"binance_futures_mid_r5s\", \"binance_mid_r1s\"]\n",
          "not a feature of the notebook"},
-        {head + "features = [\"arcus_mid_r1s\", \"bybit_mid_r5s\", \"binance_futures_mid_r5s\", \"binance_mid_r1s\"]\n",
-         "not a feature of the notebook"},
+        {head + "features = [\"arcus_mid_r1s\", \"bybit_mid_r5s\", \"binance_futures_mid_r5s\", \"binance_mid_r1s\"]\n[bybit]\nenabled = false\n",
+         "[bybit] enabled"},
         {head + scaled_names + "[ml.mean]\narcus_mid_r1s = 0.0\n[ml.scale]\narcus_mid_r1s = 1.0\n",
          "must give every feature of ml.features"},
         {head + names + "[futures]\nenabled = false\n", "[futures] enabled"},

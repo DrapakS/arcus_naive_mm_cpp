@@ -196,8 +196,8 @@ TEST(MlFeatures, FeatureNamesFollowTheNotebook) {
     EXPECT_EQ(parse_feature("arcus_bid_r10s")->venue, "arcus");
     f = parse_feature("binance_mid_d5s");
     EXPECT_EQ((Feature {"binance_mid_d5s", "binance", "mid", 5.0, "d"}), *f);
-    EXPECT_FALSE(parse_feature("bybit_mid_d5s"));  // no Bybit for the model
-    EXPECT_FALSE(parse_feature("bybit_mid_r1s"));
+    f = parse_feature("bybit_mid_d5s");  // Bybit among the venues again (19 Oct model)
+    EXPECT_EQ((Feature {"bybit_mid_d5s", "bybit", "mid", 5.0, "d"}), *f);
     f = parse_feature("basis_binance_futures_bid_ema30s");
     EXPECT_EQ((Feature {"basis_binance_futures_bid_ema30s", "binance_futures", "bid", 30.0, "basis"}), *f);
     for (const char* bad : {"okx_mid_r5s", "arcus_last_r5s", "arcus_mid_5s", "arcus_mid_r0s", "arcus_mid_r601s", "intercept",
@@ -209,7 +209,7 @@ TEST(MlFeatures, FeatureNamesFollowTheNotebook) {
 TEST(MlFeatures, TheBestLevelImbalanceNowAndItsTimeMean) {
     EXPECT_EQ(*parse_feature("binance_futures_imb1"), (Feature {"binance_futures_imb1", "binance_futures", "imb", 0.0, "imb"}));
     EXPECT_EQ(*parse_feature("binance_imb1_m1s"), (Feature {"binance_imb1_m1s", "binance", "imb", 1.0, "imb"}));
-    EXPECT_FALSE(parse_feature("bybit_imb1"));
+    EXPECT_EQ(*parse_feature("bybit_imb1"), (Feature {"bybit_imb1", "bybit", "imb", 0.0, "imb"}));
     EXPECT_FALSE(parse_feature("binance_imb2"));
     LinearPricer pr(Weights {{"intercept", 0.0}, {"binance_imb1", 1.0}, {"binance_imb1_m1s", 1.0}});
     Feature imb = pr.features[0], mean = pr.features[1];

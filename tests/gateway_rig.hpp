@@ -57,10 +57,10 @@ inline std::string unregistered_key() {
 // formatted when logged (an order's str() changes as it moves on).
 class GatewayLog {
 public:
-    GatewayLog() : handler_(std::make_shared<logging::CaptureHandler>()) {
+    explicit GatewayLog(int level = logging::INFO) : handler_(std::make_shared<logging::CaptureHandler>()) {
         for (auto* l : loggers()) {
             levels_.push_back(l->level());
-            l->set_level(logging::INFO);
+            l->set_level(level);
             l->add_handler(handler_);
         }
     }

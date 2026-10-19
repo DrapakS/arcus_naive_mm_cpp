@@ -65,6 +65,7 @@ Bot ml_agent(ConfigTable weights, const std::function<void(MlConfig&)>& set = {}
     Config config;
     config.pricing.model = "ml";
     config.ml.weights = std::move(weights);
+    config.ml.reuse_ms = 0;  // every ask worked out: the tests move the clock by less than that
     if (set) set(config.ml);
     config.guard.drawdown = config.futures.drawdown = config.bybit.drawdown = config.arcus_guard.drawdown = 0;
     config.trades.drawdown = config.trend.drawdown = config.lag.max_ms = 0;
@@ -326,4 +327,61 @@ TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts19FeaturesWhenEveryBookRuns) {
     for (const auto& n : names)
         y += number_of(c.ml.weights, n) * (pred->feature(n) - number_of(c.ml.mean, n)) / number_of(c.ml.scale, n);
     EXPECT_NEAR(pred->value, y, 1e-12);
+}
+
+TEST(AgentMl, APredictionIsReusedWithinReuseMsThenWorkedOutAgain) {
+    Loop loop;
+    Bot b = ml_agent(table({{"intercept", 0.0}, {"binance_futures_mid_r1s", 1.0}}), [](MlConfig& m) { m.reuse_ms = 1.0; });
+    Agent& agent = *b.agent;
+    for (int k = 0; k < 400; ++k) {
+        b.clock.advance(0.01);
+        tick(agent, agent.venue_book, 100'000.0, 100'000.5);
+        tick(agent, *agent.futures_book, 100'100.0 + k, 100'100.5 + k);
+    }
+    auto first = A::ml_prediction(agent);
+    ASSERT_TRUE(first);
+    b.clock.advance(0.0005);
+    tick(agent, *agent.futures_book, 100'900.0, 100'900.5);  // within 1 ms: the same prediction
+    EXPECT_EQ(A::ml_prediction(agent)->value, first->value);
+    b.clock.advance(0.001);
+    EXPECT_NE(A::ml_prediction(agent)->value, first->value);  // the futures jump, worked out now
+}
+
+// A burst of futures tickers within [ml] reuse_ms, the prediction reused and the Arcus book, the orders and
+// the drift as they were: one cancel check, not one a ticker. An Arcus frame is always checked, and so is a
+// frame after reuse_ms or after a fill.
+TEST(AgentMl, ThePerFrameCancelCheckIsSkippedWhileNothingItReadsChanged) {
+    Loop loop;
+    Bot b = ml_agent(table({{"intercept", 0.0}, {"binance_futures_mid_r1s", 1.0}, {"binance_futures_imb1", 1e-5}}),
+                     [](MlConfig& m) { m.reuse_ms = 1.0; });
+    Agent& agent = *b.agent;
+    for (int k = 0; k < 400; ++k) {
+        b.clock.advance(0.01);
+        tick(agent, agent.venue_book, 100'000.0, 100'000.5);
+        tick(agent, *agent.futures_book, 100'100.0 + k, 100'100.5 + k);
+    }
+    evaluate(agent);
+    ASSERT_FALSE(b.gw->orders.empty());
+    auto futures = [&](double size) {
+        OrderBook& f = *agent.futures_book;
+        f.apply_snapshot(std::vector<Level> {{100'500.0, size}}, std::vector<Level> {{100'500.5, 1.0}}, f.seq + 1);
+        agent.on_book_update(f);
+    };
+    b.clock.advance(0.01);
+    int64_t before = agent.ml_checks_skipped;
+    for (int k = 0; k < 20; ++k) {  // 20 tickers 10 us apart: the sizes move the model's inputs, its prediction is reused
+        b.clock.advance(0.00001);
+        futures(1 + k % 3);
+    }
+    EXPECT_GE(agent.ml_checks_skipped - before, 18);
+    int64_t skipped = agent.ml_checks_skipped;
+    tick(agent, agent.venue_book, 100'000.0, 100'000.5);  // an Arcus frame: checked whatever
+    EXPECT_EQ(agent.ml_checks_skipped, skipped);
+    b.clock.advance(0.0011);
+    futures(5);  // past reuse_ms: checked again
+    EXPECT_EQ(agent.ml_checks_skipped, skipped);
+    b.gw->add_pos(Decimal("0.001"));  // a fill: the position changed, so within reuse_ms it is checked too
+    b.clock.advance(0.00001);
+    futures(6);
+    EXPECT_EQ(agent.ml_checks_skipped, skipped);
 }

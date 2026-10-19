@@ -17,7 +17,12 @@
 # Use the latest code of branch claude/funny-wright-a95ao3 ([pricing] model and [ml] are new keys).
 log_level = "INFO"            # order events and price lines reach the orders log at any level
 
+[binance]
+connections = 1               # ML bots: one connection (19 Oct; was 2): each spot frame parsed once
+
 [arcus]
+connections = 1               # ML bots: one connection (19 Oct; was 2: the second came first 0% of the time on ETH);
+                              # a dropped link drops the book until it is back (Arcus dropped all bots 09:44-09:58)
 stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected (a stream that stopped
                               # while the connection still answers pings; needs the 15 Oct code)
 
@@ -97,6 +102,7 @@ pause_ms = 200
 
 [futures]                     # Binance USD-M futures bookTicker: the earliest mover, main filter of toxic flow
 enabled = true
+connections = 1               # ML bots: one connection (19 Oct; was 2): each ticker parsed once. A dropped link leaves no price until it reconnects
 stale_timeout_s = 5           # was 30. A silent link reconnects after 5 s (normal flow ~190 msgs/s; the other link
                               # keeps the book). Shortens the time this guard can be blind on a hung connection.
 window_ms = 100               # 18 Oct (was 300 ms / 0.5 bp / 200 ms): a smaller futures move pauses the side, so the
@@ -106,6 +112,7 @@ pause_ms = 300                # Recording of 18 Oct: 45% of the Arcus takes >= $
 
 [trades]                      # NEW: Binance spot trades (<symbol>@aggTrade), the earliest sign of a sweep. A trade 0.3 bp
 enabled = true                # under the high of the last 300 ms pulls the buy at once (0.3 bp over the low: the sell)
+connections = 1               # ML bots: one connection (19 Oct; was 2): each message parsed once, fewer loop stalls
 window_ms = 300               # and no buy goes in for 200 ms. Night of 14-15 Oct: 32% of BTC fills came >= 20 ms after such
 drawdown = 0.00003            # a trade (the takers hit some 80 ms after it), at -1.8 bp each 5 s later (the other fills
 pause_ms = 200                # -0.3 bp); by 30 s those fills had lost $1.69, the whole night $1.93. The book guards saw the
@@ -169,7 +176,7 @@ hold_ms = 300
 sides = "open"                # when on, only the opening order is widened: the closing one keeps its markup
 
 [agent]
-quote_line_ms = 250           # the buy/sell price lines at most every 250 ms: the ML fair moves on every frame and
+quote_line_ms = 1000          # the buy/sell price lines at most every 1 s (was 250 ms, 19 Oct: loop stalls): the ML fair moves on every frame and
                               # every 100 ms tick (paper ETH ML, 18-19 Oct: 981k lines in 7 h, a 351 MB orders log,
                               # against 124k for basis). A change within it shows on the first update after it.
 

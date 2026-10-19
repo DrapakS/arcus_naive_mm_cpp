@@ -115,11 +115,15 @@ struct MlConfig {
     bool skip_missing = false;
     ConfigList required;
     std::string target_price = "mid";  // TARGET_PRICE: "mid", "bid" or "ask"
-    double max_gap_s = 10.0;  // MAX_GAP_S of the Binance books: no frame this long, the price is unknown
+    double max_gap_s = 10.0;  // MAX_GAP_S of the Binance and Bybit books: no frame this long, the price is unknown
     double arcus_max_gap_s = 60.0;  // MAX_GAP_S["arcus"]
     // The windows slide with no market data: re-price at least this often (the notebook's grid
     // is 100 ms); 0 = only on market data and order events
     double eval_interval_ms = 100.0;
+    // A prediction is reused for this long (ms) rather than worked out again: in a burst of futures
+    // tickers the model ran twice a ticker (the cancel check and the strategy loop), and the
+    // Python bot's loop stood 100-150 ms (live ETH 19 Oct). The shortest window is 1 s; 0 = on every ask.
+    double reuse_ms = 1.0;
 };
 
 struct TradingConfig {
@@ -329,6 +333,11 @@ struct AgentConfig {
     double health_interval_s = 60.0;
     // A line in the orders log on every change of a book's best bid price; false = none
     bool tob_lines = true;
+    // ... at most one a book this often (ms); 0 = every change. The first change after a quiet spell is
+    // written at once, so when a move started stays exact; the changes within it are not written.
+    double tob_line_ms = 250.0;
+    // The Python bot's garbage collector tuning: read and logged, nothing to tune in C++.
+    bool gc_tune = true;
     // The buy/sell price lines: at most one this often, ms; 0 = one on every change of a price.
     double quote_line_ms = 0.0;
     // C++ only: a feed's connection that delivers its updates this far behind the other connections

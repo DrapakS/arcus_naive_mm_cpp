@@ -90,7 +90,7 @@ TEST(TradingGateway, CancelIsLoggedWhenSentAnsweredAndDone) {
 }
 
 TEST(TradingGateway, CancelGoesOutOnEveryLaneAndTheFirstCopyWins) {
-    GatewayLog log;
+    GatewayLog log(logging::DEBUG);  // the losing copies are logged at DEBUG
     Rig rig({.cancel_lanes = 2});
     rig.quote();
     log.clear();
@@ -116,7 +116,7 @@ TEST(TradingGateway, CancelGoesOutOnEveryLaneAndTheFirstCopyWins) {
     // the losing copies are the expected end of the race, not a warning, and change nothing
     for (auto& r : log.records())
         if (r.name == ORDERS_LOGGER && r.message.find(" 401 ") != std::string::npos) {
-            EXPECT_EQ(r.level, logging::INFO) << r.message;
+            EXPECT_EQ(r.level, logging::DEBUG) << r.message;  // not in the orders log
             EXPECT_TRUE(ends_with(r.message, "request timestamp already used (TimestampReused); the same cancel got there first on another connection"))
                 << r.message;
         }
@@ -519,7 +519,7 @@ TEST(TradingGateway, OrderEventsHaveTheirOwnLogger) {
 }
 
 TEST(TradingGateway, TwinRefusedForItsTimestampKeepsCancelsSignedAhead) {
-    GatewayLog log;
+    GatewayLog log(logging::DEBUG);  // the losing copies are logged at DEBUG
     Rig rig({.cancel_lanes = 1, .presign_cancel = 5.0});
     rig.fake->cancel_event_delay = 0.05;  // like Arcus: the loser's answer comes before the order is reported gone
     rig.quote();
@@ -533,7 +533,7 @@ TEST(TradingGateway, TwinRefusedForItsTimestampKeepsCancelsSignedAhead) {
 }
 
 TEST(TradingGateway, TwinRefusedForItsTimestampHoldsNothingUp) {
-    GatewayLog log;
+    GatewayLog log(logging::DEBUG);  // the losing copies are logged at DEBUG
     Rig rig({.cancel_lanes = 1, .presign_cancel = 5.0});
     rig.fake->cancel_event_delay = 0.05;
     rig.quote();

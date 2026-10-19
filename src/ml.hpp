@@ -9,8 +9,7 @@
 //   max_gap_s after a frame when no other frame follows that long (arcus_max_gap_s for Arcus,
 //   whose quiet book may stand still longer).
 // * {venue}_{price}_r{w}s is the price now over its time-weighted mean over the last w seconds,
-//   minus one (venues arcus, binance, binance_futures; prices mid, bid, ask; no Bybit for the
-//   model). A window not known all along gives no value, and then no price at all, as the
+//   minus one (venues arcus, binance, binance_futures, bybit; prices mid, bid, ask). A window not known all along gives no value, and then no price at all, as the
 //   notebook drops such points.
 // * {venue}_{price}_d{w}s (any venue but Arcus) is that venue's change over the window less
 //   Arcus's: {venue}_{price}_r{w}s - arcus_{price}_r{w}s.
@@ -49,7 +48,7 @@
 
 namespace nmm::ml {
 
-extern const std::vector<std::string> VENUES;        // no Bybit for the model
+extern const std::vector<std::string> VENUES;
 extern const std::vector<std::string> PRICES;        // mid, bid, ask
 extern const std::vector<std::string> TARGET_BASES;  // now, prev, futures, basis
 extern const std::vector<std::string> KINDS;         // [ml] kind: linear or lightgbm

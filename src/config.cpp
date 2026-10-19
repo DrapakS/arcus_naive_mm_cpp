@@ -79,6 +79,7 @@ template <class F> void fields(MlConfig& c, F&& f) {
     f("target_base", c.target_base); f("baseline_tau_s", c.baseline_tau_s); f("skip_missing", c.skip_missing);
     f("required", c.required); f("target_price", c.target_price); f("max_gap_s", c.max_gap_s);
     f("arcus_max_gap_s", c.arcus_max_gap_s); f("eval_interval_ms", c.eval_interval_ms);
+    f("reuse_ms", c.reuse_ms);
 }
 template <class F> void fields(TradingConfig& c, F&& f) {
     f("mode", c.mode); f("markup", c.markup); f("direction", c.direction); f("max_position_usd", c.max_position_usd);
@@ -137,7 +138,7 @@ template <class F> void fields(ImbalanceConfig& c, F&& f) {
 }
 template <class F> void fields(AgentConfig& c, F&& f) {
     f("depth", c.depth); f("status_interval_s", c.status_interval_s); f("health_interval_s", c.health_interval_s);
-    f("tob_lines", c.tob_lines); f("quote_line_ms", c.quote_line_ms);
+    f("tob_lines", c.tob_lines); f("tob_line_ms", c.tob_line_ms); f("gc_tune", c.gc_tune); f("quote_line_ms", c.quote_line_ms);
     f("slow_link_ms", c.slow_link_ms);
 }
 
@@ -455,6 +456,8 @@ void Config::validate() const {
     if (!(agent.status_interval_s >= 0.5)) throw std::invalid_argument("agent.status_interval_s must be at least 0.5");
     if (agent.health_interval_s && !(5 <= agent.health_interval_s && agent.health_interval_s <= 3600))
         throw std::invalid_argument("agent.health_interval_s must be 0 (off) or within 5..3600");
+    if (!(0 <= agent.tob_line_ms && agent.tob_line_ms <= 60'000))
+        throw std::invalid_argument("agent.tob_line_ms must be within 0..60000 (0 = a line on every change)");
     if (!(0 <= agent.slow_link_ms && agent.slow_link_ms <= 10'000))
         throw std::invalid_argument("agent.slow_link_ms must be within 0..10000 (0 = never reconnect a slow link)");
     if (!(0 <= agent.quote_line_ms && agent.quote_line_ms <= 60'000))
@@ -669,6 +672,8 @@ void Config::validate_ml() const {
         throw std::invalid_argument("ml.max_gap_s and ml.arcus_max_gap_s must be above 0");
     if (!(0 <= m.eval_interval_ms && m.eval_interval_ms <= 10'000))
         throw std::invalid_argument("ml.eval_interval_ms must be within 0..10000 (0 = only on market data)");
+    if (!(0 <= m.reuse_ms && m.reuse_ms <= 100))
+        throw std::invalid_argument("ml.reuse_ms must be within 0..100 (0 = a prediction on every ask)");
     if (pricing.model != "ml") return;
     if (lightgbm) {
         if (m.lightgbm_model.empty())
@@ -684,8 +689,10 @@ void Config::validate_ml() const {
     } else if (features.empty()) {
         throw std::invalid_argument("pricing.model = \"ml\" needs the model: [ml.weights] with feature = weight lines");
     }
-    if (!futures.enabled && std::any_of(features.begin(), features.end(), [](const ml::Feature& f) { return f.venue == "binance_futures"; }))
-        throw std::invalid_argument("the ML model reads binance_futures_* features: set [futures] enabled = true");
+    for (auto [venue, section, on] : {std::tuple<const char*, const char*, bool> {"binance_futures", "futures", futures.enabled},
+                                      {"bybit", "bybit", bybit.enabled}})
+        if (!on && std::any_of(features.begin(), features.end(), [&](const ml::Feature& f) { return f.venue == venue; }))
+            throw std::invalid_argument(std::format("the ML model reads {}_* features: set [{}] enabled = true", venue, section));
     if ((m.target_base == "futures" || m.target_base == "basis") && !futures.enabled)
         throw std::invalid_argument(std::format("ml.target_base = \"{}\" prices off Binance futures: set [futures] enabled = true", m.target_base));
 }

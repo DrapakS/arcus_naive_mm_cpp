@@ -1,5 +1,5 @@
 # naive_mm config: Arcus NVDA-USD (a perp on NVIDIA stock) priced off the Binance NVDAUSDT perp, basis pricing, no ML.
-# Small to start: orders of ~$100 (0.46 NVDA). Paper first, then live (README, "Запуск").
+# Orders of ~$500 (2.3 NVDA, 19 Oct; were ~$100). Paper first, then live (README, "Запуск").
 # Needs the code of branch claude/funny-wright-a95ao3 from 17 Oct: [arcus] feed_assets, off_hours_markup_factor.
 # Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
 # This file never trades by itself: the command line passes --trade quote / paper / live.
@@ -45,7 +45,7 @@ off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
 tol_away = 0.0001             # 1 bp (BTC's): a buy left deeper keeps its place in the queue until 2 ticks off
 close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
-order_size = 0.46             # NVDA, ~$98 at $214 (Arcus minimum 0.01 NVDA and $5; step 0.01). $1000 = 4.67 NVDA
+order_size = 2.3              # NVDA, ~$500 at $217 (19 Oct; was 0.46, ~$98). Arcus minimum 0.01 NVDA and $5; step 0.01
 never_lead = true             # join, never improve; pull when the book comes to the order
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)

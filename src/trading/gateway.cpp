@@ -1189,7 +1189,10 @@ void ArcusGateway::on_cancel_response(Conn& conn, int64_t request_id, const Requ
         else if (!o->overtook) note = "; it overtook the placement: cancelling again at once, and once more if the order shows up";
         else note = "; it overtook the placement again: cancelling once the order shows up";
     }
-    events->log(accepted || late || overtook || twin_won ? logging::INFO : logging::WARNING, "<<< cancel #{} {} {}{}: {}{}",
+    // The losing copy of a cancel another copy got through with (or that found the order settled): half
+    // the answers to cancels, and nothing to read in them; the console at DEBUG still has them.
+    bool loser = twin_won || (late && o && (terminal(o->state) || o->cancel_accepted));
+    events->log(loser ? logging::DEBUG : accepted || late || overtook ? logging::INFO : logging::WARNING, "<<< cancel #{} {} {}{}: {}{}",
                 request_id, conn.name, accepted ? "ACCEPTED" : "REFUSED", took_ms ? std::format(" in {:.1f} ms", *took_ms) : "",
                 text, note);
 

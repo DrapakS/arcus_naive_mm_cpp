@@ -185,13 +185,15 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     if (i.ratio) imbalance = Imbalance {i.levels, i.ratio, i.factor, i.hold_ms / 1000, sides};
     // levels the per-frame cancel check needs: two to see past our own order, and the imbalance's
     top_levels_ = imbalance ? std::max(2, i.levels) : 2;
+    ml_reuse_s_ = config.ml.reuse_ms / 1000;
     // The books the ML model reads, each with the age past which it is no price (as for the basis pricing).
     if (ml) {
         std::map<std::string, std::pair<OrderBook*, double>> books {
             {"arcus", {&venue_book, config.arcus.max_book_age_s}},
             {"binance", {&reference_book, config.binance.max_book_age_s}},
             {"binance_futures", {futures_book.get(), config.futures.max_book_age_s}},
-        };  // no Bybit for the model (its feed stays for the guard and the logs)
+            {"bybit", {bybit_book.get(), 0.0}},
+        };
         for (const auto& venue : ml->venues) {
             auto [book, max_age] = books.at(venue);
             if (book == nullptr) throw std::invalid_argument("the ML model reads " + venue + "_* features, and that feed is off");
@@ -574,7 +576,7 @@ void Agent::on_ml_update(OrderBook& book) {
     // The Arcus levels themselves feed the cancel rules (the book came to the order), whatever the model.
     if (changed || &book == &venue_book) {
         changed_.set();
-        if (strategy && gateway && !gateway->orders.empty()) strategy->check_cancel(top_view());
+        if (strategy && gateway && !gateway->orders.empty()) ml_check_cancel(book);
     }
     if (&book == &venue_book) {
         if (gateway) note_top(book);
@@ -597,12 +599,39 @@ void Agent::mark_trip(OrderBook& book) {
                working ? std::optional(order->price.to_double()) : std::nullopt);
 }
 
+void Agent::ml_check_cancel(OrderBook& book) {
+    // The per-frame cancel check with the model: skipped for a frame of another book when all it reads
+    // is as at the last check within [ml] reuse_ms (the same prediction, Arcus book, orders, position
+    // and drift): a burst of futures tickers ran it ~2000 times a second for the same answer. An Arcus
+    // frame is always checked; what only time changes (a hold running out) waits <= reuse_ms.
+    ml_prediction();  // reused within reuse_ms: then the very same one
+    MlCheckKey key {ml_cached_ ? ml_cached_->first : -1.0, venue_book.update_count, venue_book.bbo_count, gateway->position(), {},
+                    drift->against("BUY"), drift->against("SELL")};
+    for (const auto& o : gateway->working()) key.orders.emplace_back(o->client_id, o->state, o->filled, o->price);
+    double now = ml_clock();
+    if (&book != &venue_book && ml_check_key_ == key && 0 <= now - ml_check_at_ && now - ml_check_at_ < ml_reuse_s_) {
+        ++ml_checks_skipped;
+        return;
+    }
+    ml_check_key_ = std::move(key);
+    ml_check_at_ = now;
+    strategy->check_cancel(top_view());
+}
+
 std::optional<ml::Prediction> Agent::ml_prediction() {
     // The ML model now; none while a book it reads is not ready (or older than the max age its
     // pricing allows) or any of its windows is not known all along.
-    for (auto& [book, max_age] : ml_books_)
-        if (!book->is_ready(max_age)) return std::nullopt;
-    auto prediction = ml->predict(ml_clock());
+    double now = ml_clock();
+    if (ml_cached_ && 0 <= now - ml_cached_->first && now - ml_cached_->first < ml_reuse_s_)
+        return ml_cached_->second;  // [ml] reuse_ms: asked again within it
+    for (auto& [book, max_age] : ml_books_) {
+        if (!book->is_ready(max_age)) {
+            ml_cached_.emplace(now, std::nullopt);
+            return std::nullopt;
+        }
+    }
+    auto prediction = ml->predict(now);
+    ml_cached_.emplace(now, prediction);
     if (prediction && prediction->skipped != ml_skipped_) {
         std::vector<std::string> gone, back;
         for (const auto& n : prediction->skipped)
@@ -999,7 +1028,11 @@ void Agent::log_tob(OrderBook& book, const std::string& label) {
     auto top = book.best_bid();
     if (!top) return;
     if (auto it = tob_last_.find(&book); it != tob_last_.end() && it->second == top->first) return;
+    double mono = tob_clock();
+    if (auto it = tob_at_.find(&book); it != tob_at_.end() && mono - it->second < config.agent.tob_line_ms / 1000)
+        return;  // agent.tob_line_ms: the next change after it is written
     tob_last_[&book] = top->first;
+    tob_at_[&book] = mono;
     int64_t now = now_us();
     std::optional<int64_t> stamp = book.bbo() ? std::nullopt : book.exchange_ts_us;  // the overlay (bookTicker) has no stamp
     if (stamp && *stamp)

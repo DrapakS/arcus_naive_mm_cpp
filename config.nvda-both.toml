@@ -1,6 +1,6 @@
-# NVDA quoted on BOTH sides at once (direction = "both"): config.nvda.toml with only the direction changed, orders ~$98
-# (0.46 NVDA) and the position within $100 either way: one filled order puts it at the limit, then only the order that
-# shrinks it is quoted (with the cut markup and close_tol_away) until it is under $95. The trend guard holds buys after a
+# NVDA quoted on BOTH sides at once (direction = "both"): config.nvda.toml with only the direction changed, orders ~$500
+# (2.3 NVDA, 19 Oct; were ~$98) and the position within $500 either way: one filled order puts it at the limit, then only
+# the order that shrinks it is quoted (with the cut markup and close_tol_away) until it is under $475. The trend guard holds buys after a
 # fall and sells after a rally. No stop-loss and no taker. NOT next to the long NVDA bot on the same subaccount (one
 # position per market): stop that one first. Raise order_size and max_position_usd together once paper and the first
 # live hours look right ($1000: order_size = 4.6, max_position_usd = 1000). Below: the notes of the long config.
@@ -44,10 +44,10 @@ min_samples = 100
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 100        # the position either way stays within $100 to start; a side at the limit is not quoted
-max_position_resume = 0.95    # ... and comes back once the position on that side is under $95
+max_position_usd = 500        # the position either way stays within $500 (19 Oct; was $100); a side at the limit is not quoted
+max_position_resume = 0.95    # ... and comes back once the position on that side is under $475
 skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
-skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $100, none at the limit
+skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $500, none at the limit
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
                               # joined the best price with no markup after 10 min). The closing order keeps its markup
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0005: the same once that far under water at the Arcus mid)
@@ -59,7 +59,7 @@ off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
 tol_away = 0.0001             # 1 bp (BTC's): a buy left deeper keeps its place in the queue until 2 ticks off
 close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
-order_size = 0.46             # NVDA, ~$98 at $214 (Arcus minimum 0.01 NVDA and $5; step 0.01). $1000 = 4.67 NVDA
+order_size = 2.3              # NVDA, ~$500 at $217 (19 Oct; was 0.46, ~$98). Arcus minimum 0.01 NVDA and $5; step 0.01
 never_lead = true             # join, never improve; pull when the book comes to the order
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)

@@ -12,7 +12,7 @@
 #
 # Named pairs, as scripts/paper_ab.sh names its bots: basis (config.recommended.toml, BTC long, priced by the
 # basis off Binance futures), basis-both (config.btc-both.toml, BTC both sides), ml (config.btc-ml.toml),
-# ml-both (config.btc-ml-both.toml), eth-basis-both (config.eth-both.toml), eth-ml-both (config.eth-ml-both.toml),
+# ml-both (config.btc-ml-both.toml), ml26-both (config.btc-ml26-both.toml: BTC, the 26-feature model of 19 Oct), eth-basis-both (config.eth-both.toml), eth-ml-both (config.eth-ml-both.toml),
 # gld (config.gld.toml). Both bots read the very same file (this checkout's), so they run one config.
 #
 # Logs: paper-pair/<name>-py.log and <name>-cpp.log (+ .err). An earlier run's logs are kept under a name
@@ -30,6 +30,7 @@ fi
 BIN=${BIN:-build/naive_mm}
 OUT=paper-pair
 PAIRS="basis:config.recommended.toml basis-both:config.btc-both.toml ml:config.btc-ml.toml ml-both:config.btc-ml-both.toml
+       ml26-both:config.btc-ml26-both.toml
        eth-basis-both:config.eth-both.toml eth-ml-both:config.eth-ml-both.toml gld:config.gld.toml"
 mkdir -p "$OUT"
 

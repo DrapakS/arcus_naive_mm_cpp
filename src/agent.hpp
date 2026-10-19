@@ -70,6 +70,8 @@ public:
     // ---------------------------------------------------------- the parts
     Config config;
     bool show_ladder;
+    int64_t ml_checks_skipped = 0;
+    Clock tob_clock = monotonic;  // [agent] tob_line_ms is timed by it (tests set it)  // per-frame cancel checks the model's inputs left as they were
     std::optional<ArcusCredentials> credentials;
     std::unique_ptr<Gateway> gateway;
     std::unique_ptr<QuoteStrategy> strategy;  // with a gateway only: mode quote prices without one (quote_strategy)
@@ -162,6 +164,7 @@ private:
     std::optional<double> futures_mid_;  // the futures mid last priced off
     std::map<const OrderBook*, std::string> tob_labels_;  // [agent] tob_lines: the label of each book
     std::map<const OrderBook*, double> tob_last_;  // ... and the price last written for it
+    std::map<const OrderBook*, double> tob_at_;  // ... and when (monotonic): [agent] tob_line_ms
     std::map<std::string, std::pair<int64_t, double>> drift_mark_;  // (episodes, seconds) at the last report
     TimerHandle lag_timer_;
     std::optional<std::pair<double, double>> lag_mark_;  // (clock, seconds paused) at the last health line
@@ -171,6 +174,21 @@ private:
     std::vector<std::pair<OrderBook*, double>> ml_books_;  // the books the ML model reads, with their max age
     std::map<const OrderBook*, std::string> ml_venues_;  // the model's name for each book's venue
     std::vector<std::string> ml_skipped_;  // skip_missing: the features the last prediction went without
+    // [ml] reuse_ms: (ml_clock, prediction) of the last one worked out, reused when asked again within it
+    std::optional<std::pair<double, std::optional<ml::Prediction>>> ml_cached_;
+    double ml_reuse_s_ = 0.0;
+    // What the last per-frame cancel check with the model read, and when (ml_clock)
+    struct MlCheckKey {
+        double prediction_at;
+        int64_t arcus_updates, arcus_bbos;
+        Decimal position;
+        std::vector<std::tuple<std::string, OrderState, Decimal, Decimal>> orders;
+        bool drift_buy, drift_sell;
+        bool operator==(const MlCheckKey&) const = default;
+    };
+    std::optional<MlCheckKey> ml_check_key_;
+    double ml_check_at_ = 0.0;
+    void ml_check_cancel(OrderBook& book);
     Event changed_;
     Event stop_;
     std::exception_ptr failure_;

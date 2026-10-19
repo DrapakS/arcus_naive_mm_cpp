@@ -702,6 +702,7 @@ TEST(AgentTobLines, ALinePerBestBidChangeOfEachBook) {
     LogCapture log(ORDERS_LOGGER);
     Config config;
     config.bybit.enabled = true;
+    config.agent.tob_line_ms = 0;  // every change
     Agent agent(config);
     int64_t stamp = time_ns() / 1000 - 5'000;  // 5 ms ago: within the [lag] limit
     agent.futures_book->apply_snapshot(lv("100000"), lv("100000.2"), 1, stamp);
@@ -747,4 +748,28 @@ TEST(AgentTobLines, TobLinesOff) {
     agent.venue_book.apply_snapshot(lv("99990.5"), lv("99991"), 1);
     frame(agent, agent.venue_book);
     EXPECT_FALSE(any_starts(log.messages(), "ARCUS:"));
+}
+
+TEST(AgentTobLines, AtMostALineABookEveryTobLineMsAndTheFirstChangeAtOnce) {
+    Loop loop;
+    LogCapture log(ORDERS_LOGGER);
+    Agent agent {Config()};  // tob_line_ms 250 by default
+    FakeClock clock;
+    agent.tob_clock = clock.fn();
+    OrderBook& book = agent.venue_book;
+    auto bid = [&](const char* price, double dt) {
+        clock.advance(dt);
+        book.apply_snapshot(lv(price), lv("100000"), book.seq + 1);
+        agent.on_book_update(book);
+    };
+    bid("99990.0", 0.0);  // the first: at once
+    bid("99990.5", 0.1);  // 100 ms later: not written
+    bid("99991.0", 0.1);  // 200 ms: not written
+    bid("99991.5", 0.1);  // 300 ms: written
+    bid("99991.5", 0.5);  // the same price as the last line: nothing
+    bid("99992.0", 2.0);  // after a quiet spell: at once
+    std::vector<std::string> lines;
+    for (const auto& m : log.messages())
+        if (starts_with(m, "ARCUS:")) lines.push_back(m.substr(0, m.find(" exchange")));
+    EXPECT_EQ(lines, (std::vector<std::string> {"ARCUS: 99990", "ARCUS: 99991.5", "ARCUS: 99992"}));
 }
