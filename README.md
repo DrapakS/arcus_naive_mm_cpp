@@ -29,6 +29,7 @@ cmake --build build -j
   `CXX=...` или `-DCMAKE_CXX_COMPILER=...`); GCC старше 13 не годится (нет `<format>`). Самый новый —
   потому что системный Boost собран системным GCC: Boost 1.90, собранный GCC 15, с `g++-13` не
   линкуется (`undefined reference to __cxa_call_terminate@CXXABI_1.3.15`).
+- Если `cmake` пишет, что Boost не линкуется с выбранным GCC, — поставьте штатный `g++` (`sudo apt install g++`).
 - После неудачной настройки — `rm -rf build`: CMake запоминает в `build/CMakeCache.txt` и
   компилятор, и его отсутствие.
 - Память: одна компиляция берёт до ~2 ГБ (`net.cpp`; `agent.cpp` ~700 МБ). С Ninja CMake сам

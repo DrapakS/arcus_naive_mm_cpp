@@ -66,7 +66,23 @@ endif()
 
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)  # Boost's own BoostConfig.cmake, not CMake's FindBoost
+endif()
 find_package(Boost 1.81 REQUIRED COMPONENTS json)
+
+# The system's Boost is built by the system's GCC: an older compiler compiles everything and then
+# fails at the link (Boost 1.90 built by GCC 15, linked by g++-13: __cxa_call_terminate). Seen here.
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_LIBRARIES Boost::json)
+check_cxx_source_compiles("#include <boost/json.hpp>
+int main() { return boost::json::parse(\"1\").as_int64() == 1 ? 0 : 1; }" NMM_BOOST_LINKS)
+unset(CMAKE_REQUIRED_LIBRARIES)
+if(NOT NMM_BOOST_LINKS)
+  message(FATAL_ERROR "Boost ${Boost_VERSION} does not link with ${CMAKE_CXX_COMPILER} (GCC ${CMAKE_CXX_COMPILER_VERSION}): "
+                      "it was built by a newer GCC, the system's own. Install it (sudo apt install g++), "
+                      "then rm -rf build and configure again.")
+endif()
 
 file(GLOB_RECURSE NMM_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/*.cpp)
 list(REMOVE_ITEM NMM_SOURCES ${CMAKE_SOURCE_DIR}/src/main.cpp)
