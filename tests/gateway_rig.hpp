@@ -22,7 +22,7 @@
 #include "util/pyfmt.hpp"
 #include "view.hpp"
 
-namespace nmm::test {
+namespace nmm::test::gw {
 
 // RFC 8032 test 1 key pair and the EIP-55 example address: public test values.
 inline const std::string SECRET = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
@@ -197,3 +197,8 @@ struct ArcusGatewayTestAccess {
     static void on_order_update(ArcusGateway& gw, const Json& data) { gw.on_order_update(data); }
 };
 }  // namespace nmm
+
+// Each test helper header keeps its names apart (several define a FakeGateway or a view()).
+namespace nmm::test {
+using namespace nmm::test::gw;
+}  // namespace nmm::test

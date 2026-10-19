@@ -42,7 +42,7 @@ struct AgentTestAccess {
     static awaitable<void> exchange_watch(Agent& a) { return a.exchange_watch(); }
 };
 
-namespace test {
+namespace test::agent {
 
 using A = AgentTestAccess;
 
@@ -176,7 +176,7 @@ inline bool any_starts(const std::vector<std::string>& lines, const std::string&
         EXPECT_NE(_err.find(needle), std::string::npos) << "error: '" << _err << "' wants: " << (needle); \
     } while (0)
 
-namespace nmm::test {
+namespace nmm::test::agent {
 
 // An event loop made the loop for the test's life.
 struct Loop {
@@ -258,4 +258,9 @@ inline Bot futures_priced_agent(const std::string& reference = "futures", double
     return b;
 }
 
+}  // namespace nmm::test
+
+// Each test helper header keeps its names apart (several define a FakeGateway or a view()).
+namespace nmm::test {
+using namespace nmm::test::agent;
 }  // namespace nmm::test

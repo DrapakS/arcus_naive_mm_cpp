@@ -31,7 +31,7 @@ inline std::ostream& operator<<(std::ostream& out, const Decimal& d) { return ou
 
 }  // namespace nmm
 
-namespace nmm::test {
+namespace nmm::test::strategy {
 
 inline Decimal D(const char* text) { return Decimal(text); }
 
@@ -171,4 +171,9 @@ inline Rig both(double markup = 0.001, double tol = 0.0002, double order_size = 
     return both(markup, tol, order_size, limit, [](StrategyOptions&) {});
 }
 
+}  // namespace nmm::test
+
+// Each test helper header keeps its names apart (several define a FakeGateway or a view()).
+namespace nmm::test {
+using namespace nmm::test::strategy;
 }  // namespace nmm::test
