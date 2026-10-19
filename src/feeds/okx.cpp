@@ -60,7 +60,7 @@ void OkxTickerFeed::on_message(const Json& msg, int64_t recv_ts_us, Link* link) 
     int64_t ts = truthy(ts_field) ? to_int(*ts_field) : 0;
     int64_t seq = to_int(top.as_object().at("seqId"));
     std::pair<int64_t, int64_t> key {ts, seq};
-    copy(link, ts * 1'000'003 + seq);  // how far behind the other links its link runs
+    arrived(link, ts * 1'000'003 + seq, recv_ts_us);  // (ts, seqId)
     if (key <= last) return;  // another link delivered it first, or it is older than the book
     last = key;
     ++(link != nullptr ? *link : links[0]).wins;

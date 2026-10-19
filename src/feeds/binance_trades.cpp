@@ -31,7 +31,7 @@ void BinanceTradesFeed::on_message(const Json& msg, int64_t recv_ts_us, Link* li
     if (!kind || *kind != "aggTrade") return;
     const auto& t = trade.as_object();
     int64_t trade_id = to_int(t.at("a"));
-    copy(link, trade_id);  // how far behind the other links its link runs
+    arrived(link, trade_id, recv_ts_us);
     if (trade_id <= last_id) return;  // another link delivered it first
     last_id = trade_id;
     ++(link != nullptr ? *link : links[0]).wins;

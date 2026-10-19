@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "health.hpp"
+#include "race.hpp"
 #include "trading/credentials.hpp"
 #include "trading/market.hpp"
 #include "trading/roundtrip.hpp"
@@ -256,6 +257,10 @@ struct Request {
 using RequestPtr = std::shared_ptr<Request>;
 
 // One websocket to the exchange: its own request ids and requests in flight.
+// One frame of the public trades (one taker order's trades), the same on every connection: the
+// first trade's tradeId (or its timestamp, price and size) and the frame's length, hashed.
+int64_t trade_frame_key(const JsonArray& trades);
+
 struct Conn {
     explicit Conn(std::string name) : name(std::move(name)) {}
     std::string name;
@@ -267,6 +272,7 @@ struct Conn {
     std::deque<std::pair<double, double>> replies, events;  // the last 2000 each
     double connected_at = 0.0;
     double slow_reconnect_at = -1e300;  // when it was last reconnected for being slow
+    LinkLag lag;  // its copies of the public trades, ms behind the first
 
     void attach(std::shared_ptr<WsConnection> conn);
     // What is slow on it over the last SLOW_WINDOW_S: (what, median ms, samples), or none.
@@ -282,6 +288,8 @@ public:
         double presign_cancel = 0.0;
         std::string rest_url;  // for GET /v1/openOrders; "" = never asked
         double slow_reconnect_ms = 0.0;  // reconnect a connection answering slower than this; 0 = never
+        // reconnect a connection whose copies of the public trades come this far behind another's; 0 = never
+        double slow_link_ms = 0.0;
     };
 
     ArcusGateway(MarketSpec market, ArcusCredentials credentials, Options options, std::function<void()> on_change = {});
@@ -362,6 +370,8 @@ private:
     void cancel_stray(const Json& data);
     void check_ready();
     void on_order_update(const Json& data, bool snapshot = false);
+    // A frame of the public trades on `conn`; with cancel lanes up, only its first copy counts.
+    void on_trades_copy(const JsonArray& trades, Conn& conn);
     void on_public_trades(const JsonArray& trades);
     void log_taker(const Json& ours, const JsonArray& trades);
     void on_user_fills(const Json& contents);
@@ -376,6 +386,7 @@ private:
     std::map<std::string, double> stray_since_;  // when each was last cancelled (monotonic)
     Task dms_task_, watchdog_, presigner_, main_task_;
     std::vector<Task> lane_tasks_;
+    FirstCopies trade_copies_;
     std::optional<double> dms_asked_;  // when the switch request still unanswered went out
     bool dms_armed_ = false;
     bool stopping_ = false;

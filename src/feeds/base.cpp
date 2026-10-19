@@ -1,7 +1,6 @@
 #include "feeds/base.hpp"
 
 #include <algorithm>
-#include <bit>
 #include <cmath>
 #include <boost/asio/this_coro.hpp>
 #include <boost/beast/core/error.hpp>
@@ -94,7 +93,8 @@ BookFeed::BookFeed(std::string name, OrderBook* book, std::string url, FeedOptio
       options(std::move(options)),
       log(get_logger("naive_mm." + this->name)) {
     if (this->options.connections < 1) throw std::invalid_argument("a feed needs at least one connection");
-    for (int i = 0; i < this->options.connections; ++i) links.push_back(Link {i, nullptr, std::nullopt, 0});
+    links.resize(static_cast<size_t>(this->options.connections));
+    for (int i = 0; i < this->options.connections; ++i) links[static_cast<size_t>(i)].index = i;
 }
 
 BookFeed::~BookFeed() = default;
@@ -102,6 +102,7 @@ BookFeed::~BookFeed() = default;
 awaitable<void> BookFeed::run() {
     std::vector<Task> tasks;
     for (auto& link : links) tasks.push_back(Task::spawn(run_link(link), name, "naive_mm." + name));
+    if (links.size() > 1 && options.slow_link_ms) tasks.push_back(Task::spawn(watch_links(), name, "naive_mm." + name));
     try {
         Event forever;
         co_await forever.wait();
@@ -123,9 +124,7 @@ awaitable<void> BookFeed::run_link(Link& link) {
             auto ws = co_await WsConnection::connect(url, options.heartbeat);
             link.ws = ws;
             link.last.reset();
-            link.behind.clear();
-            link.since_check = 0;
-            link.connected_at = clock();
+            link.lag.connected();
             ++connect_count;
             log.info("connected {}{}", url, tag);
             on_connected(link);
@@ -153,7 +152,10 @@ awaitable<void> BookFeed::run_link(Link& link) {
         auto cancel_state = co_await boost::asio::this_coro::cancellation_state;
         bool cancelled = cancel_state.cancelled() != boost::asio::cancellation_type::none;
         if (!cancelled) {
-            if (closed_by_server) {
+            if (closed_by_server && link.slow_drop) {
+                received = true;  // a new connection at once
+                log.info("closed a slow connection{}", tag);
+            } else if (closed_by_server) {
                 log.warning("connection closed by server (code={}){}", close_code ? std::to_string(close_code) : "None", tag);
             } else if (timed_out || is_timeout(error)) {
                 log.warning("no data for {:.0f}s or heartbeat timed out{}", options.stale_timeout, tag);
@@ -164,6 +166,7 @@ awaitable<void> BookFeed::run_link(Link& link) {
         if (link.ws) link.ws->close();
         link.ws.reset();
         link.last.reset();
+        link.slow_drop = false;
         on_disconnected(&link);
         if (cancelled) co_return;
         if (received) backoff = options.reconnect_min;
@@ -173,80 +176,47 @@ awaitable<void> BookFeed::run_link(Link& link) {
     }
 }
 
-bool BookFeed::copy(Link* link, int64_t key) {
-    if (links.size() < 2) return true;
-    Link& from = link != nullptr ? *link : links[0];
-    double now = clock();
-    auto [it, fresh] = first_copy_.try_emplace(key, FirstCopy {now, 1u << from.index, from.index});
-    if (fresh) {
-        copy_order_.push_back(key);
-        if (copy_order_.size() > COPY_KEYS) {
-            first_copy_.erase(copy_order_.front());
-            copy_order_.pop_front();
-        }
-        return true;
-    }
-    FirstCopy& f = it->second;
-    unsigned bit = 1u << from.index;
-    if (f.links & bit) return false;  // the same link again
-    f.links |= bit;
-    if (options.slow_link_ms > 0) {
-        if (std::popcount(f.links) == 2) sample(links[f.first], 0.0, now);  // the first link was on time
-        sample(from, (now - f.at) * 1000.0, now);
-    }
-    return false;
+void BookFeed::arrived(Link* link, int64_t key, int64_t recv_us) {
+    if (link != nullptr && links.size() > 1) link->lag.add(copies_.arrived(key, recv_us).second);
 }
 
-void BookFeed::sample(Link& link, double ms, double now) {
-    auto& w = link.behind;
-    w.emplace_back(now, ms);
-    while (!w.empty() && (w.front().first < now - SLOW_LINK_WINDOW_S || w.size() > SLOW_LINK_MAX_SAMPLES)) w.pop_front();
-    if (++link.since_check < 25 || w.size() < SLOW_LINK_MIN_SAMPLES) return;
-    link.since_check = 0;
-    double median = *behind(link);
-    if (median < options.slow_link_ms) {
-        link.slow_wait = 0.0;  // on time again: the next slow spell is reconnected at once
-        return;
-    }
-    if (!link.ws || !others_up(link) || now - link.connected_at < std::max(SLOW_LINK_MIN_S, link.slow_wait)) return;
-    std::string tag = std::format(" [link {}/{}]", link.index + 1, links.size());
-    log.warning("{} ms behind the other links over the last {} updates (median): reconnecting{}", std::lround(median), w.size(), tag);
-    ++link.slow_reconnects;
-    link.slow_wait = std::min(std::max(link.slow_wait * 2.0, SLOW_LINK_WINDOW_S), SLOW_LINK_WAIT_MAX_S);
-    w.clear();
-    link.ws->close();  // its loop reconnects it; the other links carry the stream meanwhile
+Link* BookFeed::check_links(std::optional<double> now) {
+    auto slow = slow_link(links, options.slow_link_ms, now);
+    if (!slow) return nullptr;
+    auto [link, median, n] = *slow;
+    log.warning("!!! link {}/{} slow: its copies {:.0f} ms behind the first at the median over the last {:.0f} s (n {}, over {:g} ms): reconnecting",
+                link->index + 1, links.size(), median, SLOW_LINK_WINDOW_S, n, options.slow_link_ms);
+    link->lag.dropped_for_slowness(now);
+    link->slow_drop = true;
+    link->ws->close();
+    return link;
 }
 
-std::optional<double> BookFeed::behind(const Link& link) const {
-    if (link.behind.empty()) return std::nullopt;
-    std::vector<double> ms;
-    ms.reserve(link.behind.size());
-    for (const auto& [t, v] : link.behind) ms.push_back(v);
-    auto mid = ms.begin() + static_cast<std::ptrdiff_t>(ms.size() / 2);
-    std::nth_element(ms.begin(), mid, ms.end());
-    return *mid;
+awaitable<void> BookFeed::watch_links() {
+    for (;;) {
+        co_await sleep(SLOW_LINK_CHECK_S);
+        check_links();
+    }
 }
 
 std::string BookFeed::links_status() const {
-    if (links.size() < 2) return "";
-    // which connection delivered updates first, as shares of all updates
+    // which connection delivered updates first, as shares of all updates, and how far behind the first copies
     int64_t total = 0;
     for (const auto& link : links) total += link.wins;
     if (!total) total = 1;
-    std::vector<std::string> shares, behinds;
-    bool measured = false;
+    std::vector<std::string> shares;
+    std::vector<const LinkLag*> lags;
     for (const auto& link : links) {
         shares.push_back(std::to_string(link.wins * 100 / total));
-        auto b = behind(link);
-        measured = measured || b.has_value();
-        behinds.push_back(b ? std::to_string(std::lround(*b)) : "-");
+        lags.push_back(&link.lag);
     }
-    std::string text = std::format("links {}/{} first {}%", links_up(), links.size(), join(shares, "/"));
-    if (measured) text += std::format(" behind {} ms", join(behinds, "/"));
-    int64_t slow = 0;
-    for (const auto& link : links) slow += link.slow_reconnects;
-    if (slow) text += std::format(" slow reconnects {}", slow);
-    return text;
+    return std::format("links {}/{} first {}% {}", links_up(), links.size(), join(shares, "/"), lag_summary(lags));
+}
+
+int64_t BookFeed::slow_drops() const {
+    int64_t drops = 0;
+    for (const auto& link : links) drops += link.lag.slow_drops;
+    return drops;
 }
 
 int BookFeed::links_up() const {
@@ -300,7 +270,7 @@ void SnapshotFeed::reset() {
 void SnapshotFeed::receive(const Json& update, Link* link) {
     Link& from = link != nullptr ? *link : links[0];
     from.last = ids(update).second;
-    copy(&from, *from.last * 2);  // how far behind the other links its link runs
+    arrived(&from, *from.last, now_us());
     if (book->synced) merge(update, &from);
     else buffer_update(update);
 }

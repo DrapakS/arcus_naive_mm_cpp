@@ -33,6 +33,8 @@ void BinanceSpotBookFeed::on_message(const Json& msg, int64_t recv_ts_us, Link* 
     const Json& event = data != nullptr ? *data : msg;  // unwrap combined-stream envelopes
     auto stream = jstr(msg, "stream");
     if (stream && ends_with(*stream, "@bookTicker")) {
+        if (const Json* u = jget(event, "u"); u != nullptr && u->is_int64())
+            arrived(link, -1 - u->as_int64(), recv_ts_us);  // ("bbo", u): negative, apart from the depth updates' ids
         on_book_ticker(event, link != nullptr ? *link : links[0]);
         return;
     }
@@ -46,7 +48,6 @@ void BinanceSpotBookFeed::on_book_ticker(const Json& ticker, Link& link) {
     // newer than the seeded update id is still the freshest top of book.
     // With several links only the first copy of a ticker is newer.
     const auto& t = ticker.as_object();
-    copy(&link, to_int(t.at("u")) * 2 + 1);  // odd: a ticker's id, apart from the depth updates' (even)
     if (book->apply_bbo(to_float(t.at("b")), to_float(t.at("B")), to_float(t.at("a")), to_float(t.at("A")), to_int(t.at("u")))) {
         ++link.wins;
         notify();

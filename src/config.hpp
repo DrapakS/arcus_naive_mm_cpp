@@ -340,10 +340,12 @@ struct AgentConfig {
     bool gc_tune = true;
     // The buy/sell price lines: at most one this often, ms; 0 = one on every change of a price.
     double quote_line_ms = 0.0;
-    // C++ only: a feed's connection that delivers its updates this far behind the other connections
-    // of the feed (median over the last 30 s) is reconnected; 0 = never. 19 Oct: an Arcus connection
-    // ran 73 ms behind another to the same address for a whole run, until it was made anew.
-    double slow_link_ms = 25.0;
+    // A stream on several connections (feeds with connections > 1; live, the Arcus trades on main and on the
+    // cancel lanes; paper, its two trades connections): each copy is timed against the first copy of the same
+    // update, and a connection whose copies come more than this far behind at the median over 2 min is
+    // reconnected (at most every 2 min each). A server can hand out a connection that stays late: 19 Oct, after
+    // a reconnect, one to the same Cloudflare address had every Arcus trade 73-78 ms late for an hour. 0 = never.
+    double slow_link_ms = 30.0;  // 30 from 19 Oct evening (was 20: paper and live reconnected links only 21-24 ms behind)
 };
 
 struct Config {

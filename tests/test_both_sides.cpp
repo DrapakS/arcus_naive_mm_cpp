@@ -296,11 +296,12 @@ TEST(BothSides, TheShippedTwoSidedConfigsAreTheirLongOnesButForTheDirectionLimit
     }
 }
 
-TEST(BothSides, TheShippedNvdaConfigsStartSmallAndDoubleTheMarkupOffHours) {
+TEST(BothSides, TheShippedNvdaConfigsQuote500AndDoubleTheMarkupOffHours) {
     Config both_cfg = load("config.nvda-both.toml"), long_cfg = load("config.nvda.toml");
     EXPECT_EQ(both_cfg.trading.direction, "both");
-    EXPECT_EQ(both_cfg.trading.max_position_usd, 100.0);
-    EXPECT_LT(long_cfg.trading.order_size * 214, 100);  // ~$98 orders
+    EXPECT_EQ(both_cfg.trading.max_position_usd, 500.0);
+    double usd = long_cfg.trading.order_size * 214;
+    EXPECT_TRUE(480 < usd && usd < 500) << usd;  // ~$500 orders (19 Oct): one fills the limit
     EXPECT_EQ(both_cfg.trading.off_hours_markup_factor, 2.0);
     EXPECT_EQ(long_cfg.trading.off_hours_markup_factor, 2.0);
     EXPECT_EQ(load("config.gld.toml").trading.off_hours_markup_factor, 1.0);

@@ -77,7 +77,7 @@ void BybitTickerFeed::on_message(const Json& msg, int64_t recv_ts_us, Link* link
     int64_t cts = truthy(cts_field) ? to_int(*cts_field) : 0;
     int64_t u = to_int(data.as_object().at("u"));
     std::pair<int64_t, int64_t> key {cts, u};
-    copy(link, cts * 1'000'003 + u);  // how far behind the other links its link runs
+    arrived(link, cts * 1'000'003 + u, recv_ts_us);  // (cts, u)
     if (key <= last) return;  // another link delivered it first, or it is older than the book
     last = key;
     ++(link != nullptr ? *link : links[0]).wins;

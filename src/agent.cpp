@@ -67,7 +67,11 @@ std::string status_line(const BookFeed& feed) {
     counts += std::format(" msgs {} resync {}", feed.message_count, feed.resync_count);
     if (feed.refresh_count) counts += std::format(" refresh {}", feed.refresh_count);
     parts.push_back(std::format("{} conn {}", counts, feed.connect_count));
-    if (feed.links.size() > 1) parts.push_back(feed.links_status());
+    if (feed.links.size() > 1) {
+        std::string links = feed.links_status();  // each link's median ms behind the first copies, and its slow reconnects
+        if (int64_t drops = feed.slow_drops()) links += std::format(" slow-reconnects {}", drops);
+        parts.push_back(links);
+    }
     return join(parts, "  ");
 }
 
@@ -438,10 +442,7 @@ awaitable<void> Agent::start_trading() {
     }
     auto changed = [this] { changed_.set(); };
     if (t.mode == "paper") {
-        auto paper = std::make_unique<PaperGateway>(market, config.arcus.ws_url, changed);
-        paper->trades_options.connections = config.arcus.connections;  // as many links as the Arcus book's
-        paper->trades_options.slow_link_ms = config.agent.slow_link_ms;
-        gateway = std::move(paper);
+        gateway = std::make_unique<PaperGateway>(market, config.arcus.ws_url, changed, config.arcus.connections, config.agent.slow_link_ms);
     } else {
         ArcusGateway::Options o;
         o.ws_url = config.arcus.ws_url;
@@ -450,6 +451,7 @@ awaitable<void> Agent::start_trading() {
         o.presign_cancel = t.presign_cancel_s;
         o.rest_url = config.arcus.rest_url;
         o.slow_reconnect_ms = t.slow_reconnect_ms;
+        o.slow_link_ms = config.agent.slow_link_ms;
         gateway = std::make_unique<ArcusGateway>(market, *credentials, o, changed);
     }
     gateway->on_fill = [this](const OrderPtr& order, const Decimal& size) { on_fill(order, size); };

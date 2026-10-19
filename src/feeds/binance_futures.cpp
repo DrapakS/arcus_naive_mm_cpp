@@ -24,7 +24,7 @@ void BinanceFuturesTickerFeed::on_message(const Json& msg, int64_t recv_ts_us, L
     const auto& t = ticker.as_object();
     if (!t.contains("u") || !t.contains("b")) return;  // subscription replies and the like
     int64_t update_id = to_int(t.at("u"));
-    copy(link, update_id);  // how far behind the other links its link runs
+    arrived(link, update_id, recv_ts_us);
     if (update_id <= last_id) return;  // another link delivered it first
     last_id = update_id;
     ++(link != nullptr ? *link : links[0]).wins;

@@ -339,6 +339,7 @@ void Conn::attach(std::shared_ptr<WsConnection> conn) {
     connected_at = monotonic();
     replies.clear();
     events.clear();
+    lag.connected();
 }
 
 std::optional<std::tuple<std::string, double, size_t>> Conn::slow(double now, double threshold_ms) const {
@@ -384,6 +385,17 @@ std::string ArcusGateway::status() const {
         if (!c->cancel_replies_ms.empty())
             replies.push_back(std::format("{} {:.0f} ms", c->name, median({c->cancel_replies_ms.begin(), c->cancel_replies_ms.end()})));
     if (!replies.empty()) text += "; cancel reply median " + join(replies, ", ");
+    if (!lanes.empty()) {
+        std::vector<std::string> behind;
+        int64_t drops = 0;
+        for (const Conn* c : conns) {
+            auto m = c->lag.median();
+            behind.push_back(c->name + " " + (m ? std::format("{:.0f}", m->first) : "-"));
+            drops += c->lag.slow_drops;
+        }
+        text += "; trades behind the first copy (ms) " + join(behind, ", ");
+        if (drops) text += std::format(", slow-reconnects {}", drops);
+    }
     return text;
 }
 
@@ -477,7 +489,7 @@ struct TaskGuard {
 
 awaitable<void> ArcusGateway::run() {
     for (auto& lane : lanes) lane_tasks_.push_back(Task::spawn(run_lane(lane.get()), "cancel-" + lane->name, log->name()));
-    if (opt.slow_reconnect_ms) lane_tasks_.push_back(Task::spawn(watch_slow(), "slow-watch", log->name()));
+    if (opt.slow_reconnect_ms || (opt.slow_link_ms && !lanes.empty())) lane_tasks_.push_back(Task::spawn(watch_slow(), "slow-watch", log->name()));
     TaskGuard guard {&lane_tasks_};
     co_await run_main();
 }
@@ -557,12 +569,21 @@ awaitable<void> ArcusGateway::run_lane(Conn* conn) {
             conn->attach(ws);
             log->info("cancel {} connected", conn->name);
             if (main_conn.ws == nullptr) pull_while_blind();  // main is still down: this lane is the way out
+            // the public trades here too: the first copy of each frame counts (main may be the late one)
+            send_frame(*conn, JsonObject {{"type", "subscribe"}, {"channel", "trades"}, {"id", market.symbol}});
             FrameParser parser;
             for (;;) {
                 auto text = co_await ws->read();
                 if (!text) break;
                 const Json& data = parser.parse(*text);
-                if (has_key(data, "method") && has_key(data, "id")) on_response(data, *conn);
+                if (has_key(data, "method") && has_key(data, "id")) {
+                    on_response(data, *conn);
+                } else if (field(data, "channel") == "trades" && field(data, "type") == "channel_data") {
+                    const Json* contents = jget(data, "contents");
+                    on_trades_copy(contents != nullptr && contents->is_array() ? contents->get_array() : JsonArray {}, *conn);
+                } else if (field(data, "type") == "error") {
+                    log->warning("cancel {}: server error: {}", conn->name, dump_json(data));
+                }
             }
             closed = true;
         } catch (...) {
@@ -597,15 +618,29 @@ Conn* ArcusGateway::check_slow(double now) {
     if (std::any_of(conns.begin(), conns.end(), [](Conn* c) { return c->ws == nullptr; }))
         return nullptr;  // one is reconnecting already: never two at once
     for (Conn* conn : conns) {
-        if (now - conn->connected_at < SLOW_WINDOW_S || now - conn->slow_reconnect_at < SLOW_RECONNECT_GAP_S ||
-            !conn->requests.empty())
+        if (!conn->requests.empty()) continue;
+        std::string what_;
+        double median_ms = 0.0, threshold = 0.0, window = 0.0;
+        size_t n = 0;
+        std::optional<std::tuple<std::string, double, size_t>> slow;
+        std::optional<std::pair<double, size_t>> late;
+        if (opt.slow_reconnect_ms && now - conn->connected_at >= SLOW_WINDOW_S && now - conn->slow_reconnect_at >= SLOW_RECONNECT_GAP_S &&
+            (slow = conn->slow(now, opt.slow_reconnect_ms))) {
+            std::tie(what_, median_ms, n) = *slow;
+            threshold = opt.slow_reconnect_ms;
+            window = SLOW_WINDOW_S;
+            conn->slow_reconnect_at = now;
+        } else if (!lanes.empty() && (late = conn->lag.judge(opt.slow_link_ms, now))) {
+            std::tie(median_ms, n) = *late;
+            threshold = opt.slow_link_ms;
+            window = SLOW_LINK_WINDOW_S;
+            what_ = "public trades behind another connection's copies,";
+            conn->lag.dropped_for_slowness(now);
+        } else {
             continue;
-        auto slow = conn->slow(now, opt.slow_reconnect_ms);
-        if (!slow) continue;
-        auto [what_, median_ms, n] = *slow;
+        }
         events->warning("!!! {} connection slow: {} median {:.0f} ms over the last {:.0f} s (n {}, over {:g} ms): reconnecting",
-                        conn->name, what_, median_ms, SLOW_WINDOW_S, n, opt.slow_reconnect_ms);
-        conn->slow_reconnect_at = now;
+                        conn->name, what_, median_ms, window, n, threshold);
         spawn(conn->ws->close_gracefully());
         return conn;
     }
@@ -1065,7 +1100,7 @@ void ArcusGateway::on_message(const Json& msg) {
         else if (kind == "channel_data") on_order_update(contents);
     } else if (channel == "trades" && kind == "channel_data") {
         const Json* contents = jget(msg, "contents");
-        on_public_trades(contents != nullptr && contents->is_array() ? contents->get_array() : JsonArray {});
+        on_trades_copy(contents != nullptr && contents->is_array() ? contents->get_array() : JsonArray {}, main_conn);
     } else if (channel == "positions" && (kind == "subscribed" || kind == "channel_data")) {
         on_positions(object_or_empty(jget(msg, "contents")));
         if (kind == "subscribed") {
@@ -1447,6 +1482,16 @@ void ArcusGateway::on_order_update(const Json& data, bool snapshot) {
     on_change();
 }
 
+void ArcusGateway::on_trades_copy(const JsonArray& trades, Conn& conn) {
+    if (trades.empty()) return;
+    if (!lanes.empty()) {
+        auto [first, behind] = trade_copies_.arrived(trade_frame_key(trades), now_us());
+        conn.lag.add(behind);
+        if (!first) return;  // another connection delivered it first
+    }
+    on_public_trades(trades);
+}
+
 void ArcusGateway::on_public_trades(const JsonArray& trades) {
     // Our fills, seen in the public trades: the maker is our order.
     bool changed = false;
@@ -1665,6 +1710,15 @@ void ArcusGateway::on_foreign_update(const Json& data, const std::optional<std::
     } else if (status == "OPEN") {
         cancel_stray(data);
     }
+}
+
+int64_t trade_frame_key(const JsonArray& trades) {
+    const Json& head = trades.front();
+    std::string key = truthy(jget(head, "tradeId"))
+                          ? "id " + field(head, "tradeId")
+                          : std::format("({}, {}, {})", py_repr(jget(head, "timestamp")), py_repr(jget(head, "price")), py_repr(jget(head, "size")));
+    key += std::format(" x{}", trades.size());
+    return static_cast<int64_t>(std::hash<std::string> {}(key));
 }
 
 }  // namespace nmm

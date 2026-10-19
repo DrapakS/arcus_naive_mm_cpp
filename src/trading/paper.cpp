@@ -1,44 +1,121 @@
 #include "trading/paper.hpp"
 
+#include <algorithm>
+#include <format>
+
 #include "net/net.hpp"
 
 namespace nmm {
 
-PaperGateway::PaperGateway(MarketSpec market_, std::string ws_url_, std::function<void()> on_change_)
-    : Gateway(std::move(market_), std::move(on_change_)), ws_url(std::move(ws_url_)) {
+PaperGateway::PaperGateway(MarketSpec market_, std::string ws_url_, std::function<void()> on_change_, int connections,
+                           double slow_link_ms_)
+    : Gateway(std::move(market_), std::move(on_change_)), ws_url(std::move(ws_url_)), slow_link_ms(slow_link_ms_) {
     name = "paper";
     orders_in_public_book = false;  // paper orders never reach the Arcus book
     log = &get_logger("naive_mm." + name);
+    links.resize(static_cast<size_t>(std::max(connections, 1)));
+    for (size_t i = 0; i < links.size(); ++i) links[i].index = static_cast<int>(i);
 }
 
 awaitable<void> PaperGateway::run() {
-    trades = std::make_unique<ArcusTradesFeed>(
-        market.symbol, ws_url, [this](const Json& msg) { on_message(msg); }, [this] { trades_up(); },
-        [this] { trades_down("trades feed lost"); }, trades_options);
-    std::exception_ptr error;
+    std::vector<Task> tasks;
+    for (auto& link : links) tasks.push_back(Task::spawn(run_link(link), "paper-trades", log->name()));
+    if (links.size() > 1 && slow_link_ms) tasks.push_back(Task::spawn(watch_links(), "paper-slow-watch", log->name()));
     try {
-        co_await trades->run();
+        Event forever;
+        co_await forever.wait();
     } catch (...) {
-        error = std::current_exception();
+        for (auto& task : tasks) task.cancel();
+        trades_lost("shutting down");
+        throw;
     }
-    trades_down("shutting down");  // the links wind down after this: nothing is left for them to cancel
-    trades->on_down = nullptr;
-    std::rethrow_exception(error);
 }
 
-void PaperGateway::trades_up() {
-    log->info("paper trading on {} trades", market.symbol);
-    ready = true;
-    on_change();
+awaitable<void> PaperGateway::run_link(Link& link) {
+    std::string tag = links.size() > 1 ? std::format(" [link {}/{}]", link.index + 1, links.size()) : "";
+    double backoff = 0.5;
+    for (;;) {
+        std::exception_ptr error;
+        bool closed = false;
+        int close_code = 0;
+        try {
+            auto ws = co_await WsConnection::connect(ws_url, 20.0);
+            link.ws = ws;
+            link.lag.connected();
+            ws->send(dump_json(JsonObject {{"type", "subscribe"}, {"channel", "trades"}, {"id", market.symbol}}));
+            log->info("paper trading on {} trades{}", market.symbol, tag);
+            ready = true;
+            on_change();
+            FrameParser parser;
+            for (;;) {
+                auto text = co_await ws->read();
+                if (!text) break;
+                on_message(parser.parse(*text), &link);
+            }
+            closed = true;
+            close_code = ws->close_code();
+        } catch (...) {
+            error = std::current_exception();
+        }
+        bool cancelled = false;
+        if (error) cancelled = co_await is_cancelled();
+        if (closed) {
+            if (link.slow_drop) log->info("closed a slow trades connection{}", tag);
+            else log->warning("trades connection closed by server (code={}){}", close_code ? std::to_string(close_code) : "None", tag);
+            backoff = 0.5;
+        } else if (!cancelled) {
+            log->warning("trades connection error{}: {}", tag, what(error));  // a missed heartbeat pong among them
+        }
+        if (link.ws) link.ws->close();
+        link.ws.reset();
+        link.slow_drop = false;
+        if (cancelled) std::rethrow_exception(error);  // run() cancels the orders
+        if (std::none_of(links.begin(), links.end(), [](const Link& other) { return other.up(); })) trades_lost("trades feed lost");
+        co_await sleep(backoff);
+        backoff = std::min(backoff * 2, 30.0);
+    }
 }
 
-void PaperGateway::trades_down(const std::string& reason) {
-    // Without trades we cannot tell whether the orders would have filled.
-    if (!ready) return;
+void PaperGateway::trades_lost(const std::string& reason) {
     ready = false;
-    if (reason != "shutting down") log->warning("trades feed lost: every connection is down");
     for (const auto& o : working()) finish(o, OrderState::CANCELED, reason);
     on_change();
+}
+
+Link* PaperGateway::check_links(std::optional<double> now) {
+    auto slow = slow_link(links, slow_link_ms, now);
+    if (!slow) return nullptr;
+    auto [link, median, n] = *slow;
+    events->warning("!!! trades link {}/{} slow: its copies {:.0f} ms behind the first at the median over the last {:.0f} s (n {}, over {:g} ms): reconnecting",
+                    link->index + 1, links.size(), median, SLOW_LINK_WINDOW_S, n, slow_link_ms);
+    link->lag.dropped_for_slowness(now);
+    link->slow_drop = true;
+    link->ws->close();
+    return link;
+}
+
+awaitable<void> PaperGateway::watch_links() {
+    for (;;) {
+        co_await sleep(SLOW_LINK_CHECK_S);
+        check_links();
+    }
+}
+
+std::string PaperGateway::status() const {
+    std::string text = Gateway::status();
+    if (links.size() > 1) {
+        int up = 0;
+        int64_t drops = 0;
+        std::vector<const LinkLag*> lags;
+        for (const auto& link : links) {
+            up += link.up();
+            drops += link.lag.slow_drops;
+            lags.push_back(&link.lag);
+        }
+        text += std::format("; trades links up {}/{} {}", up, links.size(), lag_summary(lags));
+        if (drops) text += std::format(" slow-reconnects {}", drops);
+    }
+    return text;
 }
 
 void PaperGateway::send_place(const OrderPtr& o) {
@@ -66,10 +143,18 @@ void PaperGateway::cancel_acts(const OrderPtr& o) {
     }
 }
 
-void PaperGateway::on_message(const Json& msg) {
-    if (jstr(msg, "channel") != "trades" || jstr(msg, "type") != "channel_data") return;
+void PaperGateway::on_message(const Json& msg, Link* link) {
+    if (jstr(msg, "channel") != "trades" || jstr(msg, "type") != "channel_data") {
+        if (jstr(msg, "type") == "error") log->warning("trades channel error: {}", dump_json(msg));
+        return;
+    }
     const Json* contents = jget(msg, "contents");
     if (contents == nullptr || !contents->is_array()) return;
+    if (link != nullptr && links.size() > 1 && !contents->get_array().empty()) {
+        auto [first, behind] = copies_.arrived(trade_frame_key(contents->get_array()), now_us());
+        link->lag.add(behind);
+        if (!first) return;  // another connection delivered it first
+    }
     for (const auto& trade : contents->get_array()) {
         for (const auto& o : working()) {  // a trade can fill only one side: below the buy or above the sell
             if (!o->resting() || printed_before(trade, *o)) continue;
