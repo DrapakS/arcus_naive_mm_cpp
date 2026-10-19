@@ -38,6 +38,8 @@ public:
     JsonObject& new_order(const std::string& client_id, const std::string& side, const std::string& price, const std::string& size);
     JsonObject& order_by_client_id(const std::string& client_id);
     void push_order(const std::string& client_id);
+    // An orders-channel event of `order` as given: a copy kept from before makes a late event.
+    void push(const JsonObject& order);
     // A fill of our order: in the public trades (`public_`), then on userFills (`user_fills`),
     // then on the orders channel (`push`), under one tradeId.
     void fill(const std::string& client_id, const std::string& size, bool push = true, bool public_ = true,
@@ -90,7 +92,6 @@ public:
     std::set<std::string> snapshot_hide;  // clientIds left out of the snapshot
 
 private:
-    void push(JsonObject& order);
     bool verify(const Json& request, const std::string& message) const;
     void on_post(const std::shared_ptr<ServerWs>& conn, int64_t request_id, const Json& request);
     void on_frame(const std::shared_ptr<ServerWs>& conn, const std::string& text);

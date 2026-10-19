@@ -150,7 +150,13 @@ void StepWindow::trim(double now) {
     // horizon_s), and rebase what is left on its first point and on the latest known price,
     // so the sums stay small however long the bot runs.
     long cut = bisect_right(t_, now - horizon_s) - 1;
-    if (cut < static_cast<long>(TRIM_EVERY / 2)) return;
+    if (cut < static_cast<long>(TRIM_EVERY / 2) || cut < static_cast<long>(t_.size()) - cut) {
+        // Not yet as many stale points as live ones: the rebuild below is O(points kept), so it
+        // runs once that many have gone by, O(1) a point. It ran each 128 points before: on futures
+        // (~1000 frames a second, a 30 s horizon: 30k points) a 30k rebuild each 0.13 s a series,
+        // the top place the loop stalls were caught in (paper BTC ML, 19 Oct: 128 of ~160).
+        return;
+    }
     t_.erase(t_.begin(), t_.begin() + cut);
     p_.erase(p_.begin(), p_.begin() + cut);
     area_.erase(area_.begin(), area_.begin() + cut);

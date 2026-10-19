@@ -953,6 +953,47 @@ TEST(TradingGateway, PlacementsRejectedInARowBackOff) {
     EXPECT_NE(log.text().find("placements rejected in a row: not placing for"), std::string::npos);
 }
 
+namespace {
+
+// A gateway that sends nothing (FakeGateway of tests/test_strategy.py): the test plays the exchange.
+class QuietGateway : public Gateway {
+public:
+    QuietGateway() : Gateway(btc_market()) { ready = true; }
+    using Gateway::finish;
+    double cooldown_left() const { return cooldown_until_ - monotonic(); }
+    awaitable<void> run() override { co_return; }
+
+protected:
+    void send_place(const OrderPtr&) override {}
+    void send_cancel(const OrderPtr&, const std::string&) override {}
+};
+
+}  // namespace
+
+TEST(TradingGateway, APostOnlyCrossRejectionIsPricedAgainAtOnceThreeTimesInARowThenBacksOff) {
+    // ETH, 19 Oct (never_lead off): 69 POST_ONLY_WOULD_CROSS rejections in 16 min, each 0.5 s with no
+    // quote on either side. The book moved onto the price: no pause for the first three in a row, then
+    // the pauses come back (a stale book cannot spin the bot); a rejection of another kind pauses as before.
+    boost::asio::io_context ioc;
+    set_loop(ioc);
+    QuietGateway gw;
+    for (int n = 1; n < 4; ++n) {
+        OrderPtr order = gw.place("BUY", D("99900"), D("0.001"));
+        gw.finish(order, OrderState::REJECTED, "POST_ONLY_WOULD_CROSS");
+        EXPECT_FALSE(gw.cooling_down()) << n;
+        EXPECT_FALSE(gw.busy()) << n;
+    }
+    OrderPtr order = gw.place("BUY", D("99900"), D("0.001"));
+    gw.finish(order, OrderState::REJECTED, "POST_ONLY_WOULD_CROSS");  // the 4th in a row: 0.5 s
+    EXPECT_TRUE(gw.cooling_down());
+    EXPECT_GT(gw.cooldown_left(), 0.4);
+    EXPECT_LE(gw.cooldown_left(), 0.5);
+    QuietGateway gw2;
+    order = gw2.place("SELL", D("100100"), D("0.001"));
+    gw2.finish(order, OrderState::REJECTED, "INSUFFICIENT_MARGIN");
+    EXPECT_TRUE(gw2.cooling_down());  // not a cross: the pause as before
+}
+
 TEST(TradingGateway, LiveBothOrdersRestFillApartAndBothGoAtShutdown) {
     Rig rig;
     rig.strategy = std::make_unique<QuoteStrategy>(

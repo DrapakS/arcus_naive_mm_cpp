@@ -58,6 +58,11 @@ class WsConnection;
 constexpr int64_t GOOD_TIL_US = 35LL * 86'400 * 1'000'000;  // Arcus wants goodTilTime at least a month out
 inline double PENDING_TIMEOUT_S = 10.0;  // a place/cancel without any answer for this long is re-cancelled
 inline double REJECT_COOLDOWN_S = 0.5;  // pause after a rejected order so a stale book cannot spin us
+// ... but none after a post-only order refused for crossing (the book moved onto its price: priced
+// again at once) while no more than REJECTS_BEFORE_BACKOFF came in a row: ETH, 19 Oct (never_lead
+// off), 69 of them in 16 min, each 0.5 s of no quotes on either side. Past that many in a row the
+// pauses come back, doubling: a stale book cannot spin us.
+inline const std::string CROSS_REJECT = "POST_ONLY_WOULD_CROSS";
 // Rejections in a row past this many double the pause each time, up to the maximum: a placement
 // the exchange keeps refusing (margin, a market gone offline) must not drain the order pool every
 // bot on the subaccount shares at two a second.
@@ -87,6 +92,7 @@ constexpr double OPEN_IN_BOOK_S = 0.02;
 // level: for this long the level is still taken to be ours.
 constexpr double STALE_LEVEL_S = 0.1;
 inline double POSITION_SETTLE_S = 1.0;  // a streaming position update is compared with ours once updates stop this long
+inline double POSITION_ADOPT_S = 5.0;  // a mismatch that holds this much longer, nothing changing: the exchange's position is taken
 inline double NOT_FOUND_GRACE_S = 2.0;  // a cancel that found nothing waits this long for the orders channel
 constexpr double OPEN_ORDERS_TIMEOUT_S = 5.0;  // GET /v1/openOrders, asked when a cancel of a resting order hears nothing
 // A reconnect snapshot that lists as OPEN an order we were cancelling: its cancel is sent again,
@@ -380,6 +386,7 @@ private:
     void on_foreign_update(const Json& data, const std::optional<std::string>& status);
     void on_positions(const Json& contents);
     void check_position();
+    void adopt_position(const Decimal& theirs, const Decimal& ours);
 
     std::set<std::string> snapshots_;
     std::map<std::string, Decimal> strays_;  // foreign open orders being cancelled -> filled
@@ -401,6 +408,7 @@ private:
     std::optional<Decimal> exchange_position_;  // the latest streaming position update
     TimerHandle position_check_;
     std::optional<std::pair<Decimal, Decimal>> position_warned_;
+    TimerHandle position_adopt_;
 };
 
 }  // namespace nmm
