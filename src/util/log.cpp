@@ -43,7 +43,8 @@ std::string format_record(const Record& record) {
 ThreadedHandler::ThreadedHandler(std::function<void(const std::string&)> write,
                                  std::function<std::string(const Record&)> format)
     : write_(std::move(write)), format_(std::move(format)) {
-    queue_ = std::make_unique<BackgroundQueue<Record>>([this](Record& r) { write_(format_(r)); });
+    // by value: a thread left stuck by stop() may write after the handler is gone
+    queue_ = std::make_unique<BackgroundQueue<Record>>([write = write_, format = format_](Record& r) { write(format(r)); });
 }
 
 ThreadedHandler::~ThreadedHandler() { stop(); }

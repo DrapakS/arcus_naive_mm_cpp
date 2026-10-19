@@ -29,8 +29,6 @@ using namespace nmm;
 
 namespace {
 
-constexpr double VERSION_EVERY_S = 600.0;  // the version line again this often, so any stretch of a log names its code
-
 const char* USAGE =
     "usage: naive_mm [-h] [--config CONFIG] [--ladder] [--log-level LOG_LEVEL] [--trade {off,quote,paper,live}]\n"
     "                [--credentials CREDENTIALS] [--orders-log ORDERS_LOG] [--color {auto,always,never}]\n"
@@ -125,15 +123,6 @@ bool use_color(const std::string& choice) {
     if (choice != "auto") return choice == "always";
     if (std::getenv("NO_COLOR") != nullptr || !isatty(STDERR_FILENO)) return false;
     return true;
-}
-
-awaitable<void> repeat_version(std::string version) {
-    Logger& log = get_logger(CONFIG_LOGGER);
-    double started = monotonic();
-    for (;;) {
-        co_await sleep(VERSION_EVERY_S);
-        log.info("naive_mm {}, up {:.1f} h", version, (monotonic() - started) / 3600);
-    }
 }
 
 }  // namespace

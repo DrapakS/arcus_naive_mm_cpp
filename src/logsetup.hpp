@@ -7,6 +7,7 @@
 #include <string>
 
 #include "config.hpp"
+#include "util/aio.hpp"
 #include "util/log.hpp"
 
 namespace nmm {
@@ -32,5 +33,10 @@ void stop_logging();
 // The version and every setting in effect, at the top of the console log and of the orders log, so a
 // log shows what produced it.
 void log_config(const Config& config, const std::optional<std::string>& source, const std::string& version);
+
+constexpr double VERSION_EVERY_S = 600.0;  // the version line again this often, so any stretch of a log names its code
+
+// The version line again every `every_s` while running, with the time up.
+awaitable<void> repeat_version(std::string version, double every_s = VERSION_EVERY_S);
 
 }  // namespace nmm
