@@ -520,7 +520,8 @@ awaitable<void> ArcusGateway::run_main() {
         }
         watchdog_.cancel();
         presigner_.cancel();
-        bool cancelled = error && co_await is_cancelled();
+        bool cancelled = false;
+        if (error) cancelled = co_await is_cancelled();
         if (closed) {
             backoff = 0.5;
             log->warning("trading connection closed (code={})", ws->close_code());
@@ -563,7 +564,8 @@ awaitable<void> ArcusGateway::run_lane(Conn* conn) {
         } catch (...) {
             error = std::current_exception();
         }
-        bool cancelled = error && co_await is_cancelled();
+        bool cancelled = false;
+        if (error) cancelled = co_await is_cancelled();
         if (closed) {
             backoff = 0.5;
             log->warning("cancel {} closed (code={})", conn->name, ws->close_code());
@@ -876,6 +878,8 @@ awaitable<bool> ArcusGateway::settle_if_gone(OrderPtr o, std::string why) {
     co_return true;
 }
 
+awaitable<void> ArcusGateway::settle_if_gone_later(OrderPtr o, std::string why) { co_await settle_if_gone(std::move(o), std::move(why)); }
+
 awaitable<void> ArcusGateway::check_strays() {
     // Leftover orders cancelled STRAY_CHECK_S ago and still not gone: forget those the exchange no
     // longer lists as open, cancel again those it does. Until then the gateway is not ready, so this
@@ -926,11 +930,15 @@ awaitable<std::optional<JsonArray>> ArcusGateway::open_orders() {
     HttpResponse resp;
     std::exception_ptr error;
     try {
-        resp = co_await http_get(url, {{"X-API-Key", creds.api_key}}, OPEN_ORDERS_TIMEOUT_S);
+        std::vector<std::pair<std::string, std::string>> headers {{"X-API-Key", creds.api_key}};
+        resp = co_await http_get(url, std::move(headers), OPEN_ORDERS_TIMEOUT_S);
     } catch (...) {
         error = std::current_exception();
     }
-    if (error && is_cancellation(error) && co_await is_cancelled()) std::rethrow_exception(error);
+    if (error && is_cancellation(error)) {
+        bool cancelled = co_await is_cancelled();
+        if (cancelled) std::rethrow_exception(error);
+    }
     std::optional<JsonArray> out;
     std::string failure = what(error);
     if (!error) {
@@ -1323,7 +1331,7 @@ void ArcusGateway::on_orders_snapshot(const Json& contents) {
             send_cancel(mine, "not listed after reconnect", false);
             OrderPtr order = mine;
             call_later(NOT_FOUND_GRACE_S, [this, order] {
-                spawn(settle_if_gone(order, "no snapshot list held it after the reconnect"));
+                spawn(settle_if_gone_later(order, "no snapshot list held it after the reconnect"));
             });
         }
     }
@@ -1424,7 +1432,7 @@ void ArcusGateway::on_order_update(const Json& data, bool snapshot) {
             if (snapshot) {  // a stale snapshot can list an order the exchange no longer has: ask it soon
                 OrderPtr order = o;
                 call_later(SNAPSHOT_RECHECK_S, [this, order] {
-                    spawn(settle_if_gone(order, "the snapshot after the reconnect listed it open and its cancel heard nothing since"));
+                    spawn(settle_if_gone_later(order, "the snapshot after the reconnect listed it open and its cancel heard nothing since"));
                 });
             }
         }

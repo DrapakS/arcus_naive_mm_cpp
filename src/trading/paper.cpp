@@ -32,7 +32,8 @@ awaitable<void> PaperGateway::run() {
         } catch (...) {
             error = std::current_exception();
         }
-        bool cancelled = error && co_await is_cancelled();
+        bool cancelled = false;
+        if (error) cancelled = co_await is_cancelled();
         if (closed) backoff = 0.5;
         else if (cancelled) reason = "shutting down";
         else log->warning("trades connection error: {}", what(error));

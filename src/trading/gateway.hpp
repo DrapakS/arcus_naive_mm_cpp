@@ -339,6 +339,7 @@ private:
     awaitable<void> check_pending_order(OrderPtr order);
     // Settle `order`, which we are cancelling, as cancelled if GET /v1/openOrders does not list it.
     awaitable<bool> settle_if_gone(OrderPtr order, std::string why);
+    awaitable<void> settle_if_gone_later(OrderPtr order, std::string why);  // the same, in the background
     awaitable<void> check_strays();
     // Run in the background, its failure logged.
     void spawn(awaitable<void> aw);
