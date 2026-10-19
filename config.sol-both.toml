@@ -114,6 +114,15 @@ min_takes = 20                # 1 s later pause nothing
 min_move = 0.00002
 score_ms = 1000
 
+[portfolio]                   # the crypto bots' positions across the host (BTC, ETH, SOL: 0.86-0.91 correlated over 1 min),
+enabled = true                # each bot still its own process on its own market: it writes its position to a file in
+asset_class = "crypto"        # dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of weight x position x
+weight = 1.7                  # mark (risk in BTC units: 1-min volatility over BTC's, 19 Oct: BTC 1.0, ETH 1.36, SOL
+                              # 1.70); u = exposure / limit_usd (-1..1). An order
+limit_usd = 1500              # adding to the class's lean: markup x (1 + 0.3 u), one taking it back x (1 - 0.3 u), on top
+factor = 0.3                  # of the own skew. 19 Oct, 6 h live: BTC and ETH the same way 26% of the time, at worst
+                              # $1670 together; a stopped bot's file is left out after 30 s
+
 [add_guard]                   # no adding past half the limit right after a futures move against the side (17 Oct: BTC
 window_s = 300                # added up to its limit after -4.8 bp in 5 min, just before -12 bp: -$0.72). Opening
 drawdown = 0.0008             # from flat still goes. 8 bp from the 5-minute high (a fall: buys) or low (a rally: sells)
@@ -124,6 +133,14 @@ limit_share = 0.5             # adding allowed up to 50% of max_position_usd whi
 window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
 drawdown = 0.005              # 50 bp under its 2-minute high: night of 14-15 Oct 6 pauses, 3.1% of 8.5 h, all 02:21-03:20;
 pause_s = 60                  # the 5 trips bought in them -$1.05 of the night's -$1.96
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
 
 [lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
 max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,

@@ -159,6 +159,8 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     std::string open_side = config.trading.direction == "long" ? "BUY" : config.trading.direction == "short" ? "SELL" : "both";
     if (tr.drawdown) trend_guard = std::make_unique<TrendGuard>(tr.window_s, tr.drawdown, tr.pause_s, open_side);
     trend_book = futures_book ? futures_book.get() : &reference_book;
+    const VolMarkupConfig& vm = config.vol_markup;  // [vol_markup]: the markup scaled by the reference's volatility
+    if (vm.enabled) vol_scale = std::make_unique<VolScale>(vm.short_s, vm.long_s, vm.low, vm.high, vm.warmup_s);
     // Both sides: after a move against a side, no adding there past a share of the limit (the
     // opening of a position from flat still goes). Not a pausing guard: it only cuts the size.
     const AddGuardConfig& ad = config.add_guard;
@@ -178,6 +180,10 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
         portfolio = std::make_unique<Portfolio>(expand_path(pf.dir) + "/" + (pf.group.empty() ? config.trading.mode : pf.group),
                                                 config.arcus.market, pf.asset_class, po);
     }
+    const OpenHaltConfig& oh = config.open_halt;  // [open_halt]: no trading at all around the US stock open
+    if (!oh.opens.empty())
+        open_halt = std::make_unique<OpenWindows>(strings(oh.opens), oh.tz, oh.before_s, oh.after_s, wall_time,
+                                                  "no trading: every order pulled, none placed", "", "trading again");
     // The futures mid's move over the last few seconds: a side it went against takes a wider markup
     // (drift.markup_factor; 1 = off), and every placement and fill logs it either way.
     const DriftConfig& dr = config.drift;
@@ -402,6 +408,8 @@ StrategyOptions Agent::strategy_options() {
     o.open_guard = open_guard.get();
     o.open_limit_share = config.open_guard.limit_share;
     o.portfolio = portfolio.get();
+    o.halt = open_halt.get();
+    o.vol = vol_scale.get();
     return o;
 }
 
@@ -453,6 +461,12 @@ awaitable<void> Agent::start_trading() {
         log_->warning("portfolio {}: {} weighs x{:g}; the class's lean over ${:g} moves the markups by up to {:.0f}%; positions shared through {}",
                       pf.asset_class, pf.market, pf.weight, pf.limit_usd, pf.factor * 100, pf.dir);
     }
+    if (open_halt) {
+        auto next = open_halt->next_open();
+        log_->warning("trading halts {}; the next: {}", open_halt->describe(),
+                      next ? std::format("{} ({} UTC)", next->first.text, utc_strftime(next->second, "%a %d %b %H:%M")) : "none");
+        open_halt->window();
+    }
     if (t.mode == "quote") {
         quote_strategy = std::make_unique<QuoteStrategy>(nullptr, market, strategy_options());
         quotes = std::make_unique<QuoteWatch>(*quote_strategy, config.agent.quote_line_ms / 1000);
@@ -497,6 +511,8 @@ void Agent::on_book_update(OrderBook& book) {
     if (auto it = tob_labels_.find(&book); it != tob_labels_.end()) log_tob(book, it->second);
     if (&book == &venue_book && take_guard && take_guard->scoring()) score_takers(book);
     if (&book == trend_book) {
+        if (vol_scale && book.is_ready())
+            if (auto mid = book.mid()) vol_scale->observe(*mid);
         watch_drift(book);
         if (add_guard) watch_adds(book);
     }
@@ -1280,6 +1296,7 @@ void Agent::log_status() {
     for (auto& feed : feeds) log_->info("{}", status_line(*feed));
     if (trades_feed) log_->info("{}", trades_feed->status());
     log_->info("basis arcus/binance mid: {}", basis_text(v->basis_bps()));
+    if (vol_scale) log_->info("{}", vol_scale->status());
     if (portfolio) {
         auto mid = arcus_mid();
         log_->info("{}", portfolio->status(Decimal::from_double(own_position()),

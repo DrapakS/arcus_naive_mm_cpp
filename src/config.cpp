@@ -122,6 +122,13 @@ template <class F> void fields(ArcusGuardConfig& c, F&& f) {
 template <class F> void fields(OpenGuardConfig& c, F&& f) {
     f("opens", c.opens); f("tz", c.tz); f("before_s", c.before_s); f("after_s", c.after_s); f("limit_share", c.limit_share);
 }
+template <class F> void fields(OpenHaltConfig& c, F&& f) {
+    f("opens", c.opens); f("tz", c.tz); f("before_s", c.before_s); f("after_s", c.after_s);
+}
+template <class F> void fields(VolMarkupConfig& c, F&& f) {
+    f("enabled", c.enabled); f("short_s", c.short_s); f("long_s", c.long_s); f("low", c.low); f("high", c.high);
+    f("warmup_s", c.warmup_s);
+}
 template <class F> void fields(PortfolioConfig& c, F&& f) {
     f("enabled", c.enabled); f("asset_class", c.asset_class); f("weight", c.weight); f("limit_usd", c.limit_usd);
     f("factor", c.factor); f("dir", c.dir); f("group", c.group); f("stale_s", c.stale_s); f("interval_ms", c.interval_ms);
@@ -152,8 +159,8 @@ template <class F> void sections(Config& c, F&& f) {
     f("binance", c.binance); f("arcus", c.arcus); f("pricing", c.pricing); f("ml", c.ml); f("trading", c.trading);
     f("guard", c.guard); f("futures", c.futures); f("trades", c.trades); f("bybit", c.bybit);
     f("okx", c.okx); f("arcus_guard", c.arcus_guard); f("takes", c.takes); f("trend", c.trend); f("add_guard", c.add_guard);
-    f("open_guard", c.open_guard); f("portfolio", c.portfolio); f("drift", c.drift); f("lag", c.lag); f("imbalance", c.imbalance);
-    f("agent", c.agent);
+    f("open_guard", c.open_guard); f("open_halt", c.open_halt); f("portfolio", c.portfolio); f("vol_markup", c.vol_markup);
+    f("drift", c.drift); f("lag", c.lag); f("imbalance", c.imbalance); f("agent", c.agent);
 }
 
 // Keys that changed meaning: a config still using them is stopped with the new name.
@@ -557,14 +564,24 @@ void Config::validate() const {
             "drift needs 0 < window_s <= 600, 0 < threshold < 0.01 (a fraction: 0.00002 = 0.2 bp), 0 <= hold_s <= 600 and "
             "markup_factor within 1..10 (1 = off)");
     const OpenGuardConfig& og = open_guard;
-    if (!og.opens.empty()) {
-        for (const auto& item : og.opens) Open::parse(item.is_string() ? item.text : item.repr);  // not a string: refused by its parse
-        if (!known_time_zone(og.tz))
-            throw std::invalid_argument(std::format("open_guard.tz {} is no time zone this host knows", pyrepr(std::string_view(og.tz))));
+    const OpenHaltConfig& oh = open_halt;
+    for (auto [name, opens, tz] : {std::tuple<const char*, const ConfigList*, const std::string*> {"open_guard", &og.opens, &og.tz},
+                                   {"open_halt", &oh.opens, &oh.tz}}) {
+        if (opens->empty()) continue;
+        for (const auto& item : *opens) Open::parse(item.is_string() ? item.text : item.repr);  // not a string: refused by its parse
+        if (!known_time_zone(*tz))
+            throw std::invalid_argument(std::format("{}.tz {} is no time zone this host knows", name, pyrepr(std::string_view(*tz))));
     }
     if (!(0 <= og.before_s && og.before_s <= 3600) || !(0 <= og.after_s && og.after_s <= 4 * 3600) ||
         !(0 <= og.limit_share && og.limit_share < 1))
         throw std::invalid_argument("open_guard needs before_s within 0..3600, after_s within 0..14400 and 0 <= limit_share < 1");
+    if (!(0 <= oh.before_s && oh.before_s <= 3600) || !(0 <= oh.after_s && oh.after_s <= 3600))
+        throw std::invalid_argument("open_halt needs before_s and after_s within 0..3600");
+    const VolMarkupConfig& vm = vol_markup;
+    if (vm.enabled && (!(1 <= vm.short_s && vm.short_s < vm.long_s && vm.long_s <= 86'400) ||
+                       !(0 < vm.low && vm.low <= 1 && 1 <= vm.high && vm.high <= 10) || !(0 <= vm.warmup_s && vm.warmup_s <= 86'400)))
+        throw std::invalid_argument("vol_markup needs 1 <= short_s < long_s <= 86400, 0 < low <= 1 <= high <= 10 "
+                                    "and warmup_s within 0..86400");
     const PortfolioConfig& pf = portfolio;
     if (pf.enabled) {
         if (!contains(ASSET_CLASSES, pf.asset_class))

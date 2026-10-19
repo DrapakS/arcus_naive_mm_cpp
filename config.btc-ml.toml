@@ -1,13 +1,14 @@
 # naive_mm config: Arcus BTC-USD priced by the ML model (README, "Прайсинг по ML-модели"), for a paper run next to
 # config.recommended.toml (--trade paper on both). Everything but the pricing is config.recommended.toml as it is:
-# the same markup, guards, size, tol and [lag]; [bybit] off as there.
-# The model: the owner's sparse linear model of 18 Oct evening on the notebook's 19 features (research/ml_pricing.ipynb,
-# BTC: r, d and basis features, the best-level imbalances, the basis bot's prediction basis_pred_ema30s; no Bybit)
-# and its target off futures, the mean Arcus mid over the next 30 s over the futures mid now ([ml] target_base =
-# "futures"), fit on StandardScaler-scaled features; 6 have a weight: the basis bot's prediction (most of it), the
-# futures, spot and Arcus best-level imbalances, the spot move over 1 s and the futures basis. A feature that stops
-# coming keeps its last value ([ml] skip_missing); only basis_pred_ema30s is required. [ml.mean] and [ml.scale] are
-# that scaler's mean_ and scale_.
+# the same markup, guards, size, tol and [lag]; [bybit] on for the model's features only (no guard, as there).
+# The model: the owner's linear model of 19 Oct evening for the BTC ML test on the notebook's 26 features
+# (research/ml_pricing.ipynb: r, d and basis features, the best-level imbalances and their 1 s means, the
+# Bybit perp's among them, the basis bot's prediction basis_pred_ema30s) and its target off futures, the mean
+# Arcus mid over the next 30 s over the futures mid now ([ml] target_base = "futures"), fit on StandardScaler-
+# scaled features; 21 have a weight, the basis bot's prediction most of it. [bybit] is on for those features
+# (one connection, drawdown 0: no Bybit guard, as on the basis bot). A feature that stops coming keeps its last
+# value ([ml] skip_missing); only basis_pred_ema30s is required. [ml.mean] and [ml.scale] are that scaler's
+# mean_ and scale_.
 # Use the latest code of branch claude/funny-wright-a95ao3 ([pricing] model and [ml] are new keys).
 log_level = "INFO"            # order events and price lines reach the orders log at any level
 
@@ -15,8 +16,10 @@ log_level = "INFO"            # order events and price lines reach the orders lo
 connections = 1               # ML bots: one connection (19 Oct; was 2): each spot frame parsed once
 
 [arcus]
-connections = 1               # ML bots: one connection (19 Oct; was 2: the second came first 0% of the time on ETH);
-                              # a dropped link drops the book until it is back (Arcus dropped all bots 09:44-09:58)
+connections = 2               # back to 2 (19 Oct, evening): a server can hand out a connection that stays late (paper
+                              # pair: an Arcus connection 74 ms behind another for an hour); with two, the other one's
+                              # copies come first and show it, and the late one is reconnected ([agent] slow_link_ms).
+                              # The Arcus book is a few frames a second: next to nothing for the loop
 stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected (a stream that stopped
                               # while the connection still answers pings; needs the 15 Oct code)
 
@@ -107,9 +110,11 @@ pause_ms = 200                # -0.3 bp); by 30 s those fills had lost $1.69, th
                               # the match on 30% of the fills, the bot in time on 4 of those 29: it read the others
                               # 84-579 ms late (median 232 ms: the host's loop stalls). Paused a side 2.5% of the time.
 
-[bybit]                       # OFF from 18 Oct evening, as on every basis bot: the model reads no Bybit feature
-enabled = false
+[bybit]                       # ON for the model's Bybit perp features (bybit_imb1, bybit_mid_r1s, the basis to it...),
+enabled = true                # not as a guard: drawdown 0, as on the BTC basis bot. One connection, as the other ML feeds
+connections = 1
 category = "linear"
+symbol = "BTCUSDT"
 drawdown = 0
 
 [arcus_guard]                 # Arcus mid vs its own 3 s mean: sweeps Binance does not show (was 100 updates / 0.5 bp / 300 ms)
@@ -122,6 +127,14 @@ window_s = 120                # sell back: no stop-loss, no taker, only fewer en
 drawdown = 0.003              # 30 bp under it, the buy is pulled and none is placed until 60 s after the last such price.
 pause_s = 60                  # Night of 14-15 Oct: 4 pauses, 2.3% of 8.8 h, all in the 02:20 UTC crash (BTC -1.8% in
                               # 30 min); the 8 trips bought in them made -$0.50 (-7 bp each) of the night's -$1.98
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
 
 [lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
 max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,
@@ -142,11 +155,11 @@ quote_line_ms = 1000          # the buy/sell price lines at most every 1 s (was 
                               # every 100 ms tick (paper ETH ML, 18-19 Oct: 981k lines in 7 h, a 351 MB orders log,
                               # against 124k for basis). A change within it shows on the first update after it.
 
-[ml]                          # the owner's model of 18 Oct evening (BTC) on the notebook's target off futures; keep these
-                              # as the notebook had them
+[ml]                          # the owner's model of 19 Oct evening for the BTC ML test, on the notebook's target off
+                              # futures; keep these as the notebook had them
 target_window_s = 30.0        # P_rel = P_next / f(t) - 1: the mean Arcus mid over the next 30 s over the futures mid now
 target_base = "futures"       # the model predicts that whole: fair mid = futures mid x (1 + prediction), fair bid = that
-                              # less the Arcus half spread now (intercept -10.6 bp: the usual basis)
+                              # less the Arcus half spread now (intercept -10.7 bp: the usual basis)
 target_price = "mid"
 max_gap_s = 10.0
 arcus_max_gap_s = 60.0
@@ -155,28 +168,74 @@ scaled = true                 # fit on StandardScaler-scaled features: [ml.mean]
 skip_missing = true           # a feature unknown now (a book silent, a window or mean not ready) keeps its last value
 required = ["basis_pred_ema30s"]  # ... but not the basis bot's own prediction: without it, no price
 
-[ml.weights]                  # coef_ of the owner's model (19 features, imbalance back, Bybit out, on scaled features) and
-                              # its intercept_; the 13 with a weight of 0 are left out: they change nothing
-intercept = -0.001055930748777277
-basis_pred_ema30s = 0.0002225669218235433
-binance_futures_imb1 = 1.7153268040134504e-05
-binance_imb1 = 8.561769931640475e-06
-binance_mid_r1s = 3.531306252541997e-06
-arcus_imb1 = 1.011883181881864e-06
-basis_binance_futures_mid_ema30s = -3.084973529616326e-05
+[ml.weights]                  # coef_ of the owner's model of 19 Oct evening (26 features, the Bybit perp's among them, on
+                              # scaled features) and its intercept_; the 5 with a weight of 0 are left out: they change
+                              # nothing (arcus_mid_r5s, binance_futures_mid_r5s, bybit_mid_r5s, bybit_mid_r10s, bybit_mid_d5s)
+intercept = -0.0010694854375297865
+basis_pred_ema30s = 0.00021756670639270378
+binance_imb1 = 2.897956222070009e-05
+binance_futures_imb1 = 1.9443424395594846e-05
+basis_bybit_mid_ema30s = 1.6113429831791728e-05
+binance_mid_r1s = 9.330982443752326e-06
+bybit_imb1 = 8.436838483549349e-06
+binance_futures_mid_r1s = 5.807619814508397e-06
+arcus_imb1_m1s = 4.966557578960756e-06
+binance_mid_r5s = 4.593264568989121e-06
+arcus_imb1 = 3.324151057351051e-06
+bybit_imb1_m1s = 2.3346045972710426e-06
+binance_mid_d5s = 2.160467228172897e-06
+binance_futures_mid_r10s = 2.0918441199815575e-06
+binance_futures_mid_d5s = -1.9811941354341207e-07
+binance_mid_r10s = -1.9314371801894245e-06
+arcus_mid_r1s = -3.8027302745729157e-06
+arcus_mid_r10s = -4.980701018432764e-06
+bybit_mid_r1s = -5.625274043918588e-06
+binance_futures_imb1_m1s = -1.0700355105511224e-05
+binance_imb1_m1s = -1.9386489386720452e-05
+basis_binance_futures_mid_ema30s = -4.698910061798811e-05
 
 [ml.mean]                     # the scaler's mean_ (fractions; the imbalances -1..1)
-basis_pred_ema30s = -0.0010571115726959485
-binance_futures_imb1 = -0.0006451181998599774
-binance_imb1 = 0.0007956236357301286
-binance_mid_r1s = -1.7185150848130238e-08
-arcus_imb1 = -0.02482997257491257
-basis_binance_futures_mid_ema30s = 1.0438424553576036e-07
+basis_pred_ema30s = -0.0010676064864663867
+binance_imb1 = -0.009126369115636544
+binance_futures_imb1 = -0.0033995112112701655
+basis_bybit_mid_ema30s = 2.2042732367722713e-08
+binance_mid_r1s = -1.3647344449709968e-08
+bybit_imb1 = 0.028358188712526437
+binance_futures_mid_r1s = -2.7157271609481366e-08
+arcus_imb1_m1s = -0.021858691046045476
+binance_mid_r5s = -7.19491735341875e-08
+arcus_imb1 = -0.021844152512594365
+bybit_imb1_m1s = 0.028380539669365223
+binance_mid_d5s = 1.1112511121622875e-08
+binance_futures_mid_r10s = -1.3238311986565672e-07
+binance_futures_mid_d5s = -9.022912626672948e-09
+binance_mid_r10s = -1.3161300521530621e-07
+arcus_mid_r1s = -1.6731585302596552e-08
+arcus_mid_r10s = -1.4429826366688449e-07
+bybit_mid_r1s = -2.3051782859416976e-08
+binance_futures_imb1_m1s = -0.003423614919907955
+binance_imb1_m1s = -0.00909089339169255
+basis_binance_futures_mid_ema30s = 8.678546941343657e-08
 
 [ml.scale]                    # the scaler's scale_
-basis_pred_ema30s = 0.00023363618153289084
-binance_futures_imb1 = 0.5938847293087552
-binance_imb1 = 0.6362484459104094
-binance_mid_r1s = 2.3637294719399246e-05
-arcus_imb1 = 0.8190579479570042
-basis_binance_futures_mid_ema30s = 4.9325802746137425e-05
+basis_pred_ema30s = 0.00021879248728476415
+binance_imb1 = 0.6427022898895396
+binance_futures_imb1 = 0.5935836144325176
+basis_bybit_mid_ema30s = 4.883805434116578e-05
+binance_mid_r1s = 2.310159344657084e-05
+bybit_imb1 = 0.6388334812321219
+binance_futures_mid_r1s = 2.553634991537977e-05
+arcus_imb1_m1s = 0.7744666085545863
+binance_mid_r5s = 5.9747187326944886e-05
+arcus_imb1 = 0.8265858068119908
+bybit_imb1_m1s = 0.595859115175924
+binance_mid_d5s = 3.001327169891911e-05
+binance_futures_mid_r10s = 9.365604420192305e-05
+binance_futures_mid_d5s = 3.229478417863506e-05
+binance_mid_r10s = 8.93140562888009e-05
+arcus_mid_r1s = 2.452807120768564e-05
+arcus_mid_r10s = 9.135797896949896e-05
+bybit_mid_r1s = 2.9350971602659976e-05
+binance_futures_imb1_m1s = 0.5648454244725853
+binance_imb1_m1s = 0.624658539672832
+basis_binance_futures_mid_ema30s = 4.6185351198352313e-05

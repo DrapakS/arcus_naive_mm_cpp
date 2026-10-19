@@ -76,8 +76,8 @@ order_size = 0.312            # ETH, ~$750 at $2405: the owner's $750 from 18 Oc
                               # 1 bp = ~$0.075 per fill. Must be worth >= $5 at the buy price (else the bot
                               # does not quote and logs an error): fine above ~$25. A partial fill worth under $5 is
                               # not sold alone: the buy keeps working until it is.
-never_lead = true             # join, never improve; pull when the book comes to the order. The ETH touch usually holds
-                              # $85-115k, so expect few fills (the order waits at the back of that queue)
+never_lead = false            # OFF from 19 Oct evening (was true: join, never improve; pull when the book comes to the
+                              # order): the order may be the best price alone, and is not pulled when the book comes to it
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
 dms_timeout_s = 60            # the exchange cancels our ETH order after 60 s of silence (per-market switch, re-armed
@@ -142,6 +142,15 @@ min_takes = 20                # NEW 18 Oct: quiet takers pause nothing. A taker 
 min_move = 0.00002            # moved the Arcus mid its way by under 0.2 bp on average 1 s later. Paused at 1000 ms with
 score_ms = 1000               # every taker counted, ETH 12:19-14:55: buys 18%, sells 17% of the time
 
+[portfolio]                   # the crypto bots' positions across the host (BTC, ETH, SOL: 0.86-0.91 correlated over 1 min),
+enabled = true                # each bot still its own process on its own market: it writes its position to a file in
+asset_class = "crypto"        # dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of weight x position x
+weight = 1.3                  # mark (risk in BTC units: 1-min volatility over BTC's, 19 Oct: BTC 1.0, ETH 1.36, SOL
+                              # 1.70); u = exposure / limit_usd (-1..1). An order
+limit_usd = 1500              # adding to the class's lean: markup x (1 + 0.3 u), one taking it back x (1 - 0.3 u), on top
+factor = 0.3                  # of the own skew. 19 Oct, 6 h live: BTC and ETH the same way 26% of the time, at worst
+                              # $1670 together; a stopped bot's file is left out after 30 s
+
 [add_guard]                   # no adding past half the limit right after a futures move against the side (17 Oct: BTC
 window_s = 300                # added up to its limit after -4.8 bp in 5 min, just before -12 bp: -$0.72). Opening
 drawdown = 0.0007             # from flat still goes. 7 bp from the 5-minute high (a fall: buys) or low (a rally: sells)
@@ -158,6 +167,14 @@ markup_factor = 2.5           # 1 = off: the move is still logged on every PLACE
 window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
 drawdown = 0.004              # 40 bp under its 2-minute high (BTC 30 bp): night of 14-15 Oct 7 pauses, 3.3% of 8.8 h; the
 pause_s = 60                  # 9 trips bought in them -$0.49 of -$2.77. At 30 bp: 7.5% of the time for -$0.30
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
 
 [lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
 max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,

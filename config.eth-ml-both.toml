@@ -3,10 +3,11 @@
 # and close_tol_away), only the pricing is the [ml] model at the end. Maker only: no taker, no stop-loss. For a paper
 # A/B next to config.eth-both.toml (bash scripts/paper_ab.sh start eth-basis-both eth-ml-both), as BTC's
 # config.btc-ml-both.toml next to config.btc-both.toml. Not next to another ETH bot on the same subaccount live.
-# The model: the owner's linear model of 18 Oct night (ETH) on the notebook's features (research/ml_pricing.ipynb: r, d
-# and basis features, best-level imbalances and their 1 s means, the basis bot's prediction basis_pred_ema30s; no Bybit),
+# The model: the owner's linear model of 19 Oct (ETH) on the notebook's features (research/ml_pricing.ipynb: r, d
+# and basis features, best-level imbalances and their 1 s means, the basis bot's prediction basis_pred_ema30s; the Bybit
+# perp among the venues again: [bybit] must stay on),
 # target off futures as BTC's (the mean Arcus mid over the next 30 s over the futures mid now), fit on
-# StandardScaler-scaled features: all 19 have a weight. A feature that stops coming keeps its last value
+# StandardScaler-scaled features: 26 of them. A feature that stops coming keeps its last value
 # ([ml] skip_missing); only basis_pred_ema30s is required. Use the latest code of branch claude/funny-wright-a95ao3.
 # Below: the notes of config.eth-both.toml.
 # ETH quoted on BOTH sides at once (direction = "both"): config.eth.toml with the direction, the limit and the inventory controls changed, orders ~$750 (0.312 ETH): two filled orders in a row put the position at the limit.
@@ -43,9 +44,14 @@ log_level = "INFO"            # order events and price lines reach the orders lo
 [binance]                     # spot: the spot guard, the price lines and the logs (pricing is off futures)
 symbol = "ETHUSDT"            # default endpoints (stream.binance.com / api.binance.com) work from Tokyo; behind a
                               # geo-block (HTTP 451) use wss://data-stream.binance.vision + https://data-api.binance.vision
+connections = 1               # ML bots: one connection (19 Oct; was 2): each spot frame parsed once
 
 [arcus]
 market = "ETH-USD"
+connections = 2               # back to 2 (19 Oct, evening): a server can hand out a connection that stays late (paper
+                              # pair: an Arcus connection 74 ms behind another for an hour); with two, the other one's
+                              # copies come first and show it, and the late one is reconnected ([agent] slow_link_ms).
+                              # The Arcus book is a few frames a second: next to nothing for the loop
 stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected (a stream that stopped
                               # while the connection still answers pings; needs the 15 Oct code)
 
@@ -77,7 +83,9 @@ tol = 0.000005                # 0.05 bp (was 0.03): a 1-tick move (0.04 bp) no l
                               # Under the closing sell's markup (0.125 bp x 0.7 = 0.0875 bp): a sell that drifts one
                               # step toward the market still keeps >= 0.04 bp (a tick). Run 16 (0.03 bp, a falling
                               # hour): 3474 placements/h; 0.05 bp would have saved only 0.5-1.5% there. Pools: far off.
-tol_away = 0.00015            # 1.5 bp (BTC 1 bp x ETH/BTC volatility ~1.5): a buy left deeper waits for a 1.5 bp gap
+tol_away = 0.000075           # 0.75 bp (19 Oct; was 1.5 bp): an opening order the market left re-placed at 0.75 bp. Paper
+                              # 08:36-11:20: with every guard off but OKX's the bot filled half as often, 47 of the 77
+                              # fills it missed found its order there but 0.45 bp further (the guards' pulls re-place it)
 close_tol_away = 0.00001      # 0.1 bp: a sell left above a target that fell is re-placed once it is 0.1 bp behind. Run 19
                               # at 1.5 bp: the exit sell sat behind its target 66% of the time and at the best ask 7%, while
                               # its target was at the best ask 54%. Run 20 at 0.05 bp: at its target all the time, at the
@@ -88,8 +96,8 @@ order_size = 0.312            # ETH, ~$750 at $2405: the owner's $750 from 18 Oc
                               # 1 bp = ~$0.075 per fill. Must be worth >= $5 at the buy price (else the bot
                               # does not quote and logs an error): fine above ~$25. A partial fill worth under $5 is
                               # not sold alone: the buy keeps working until it is.
-never_lead = true             # join, never improve; pull when the book comes to the order. The ETH touch usually holds
-                              # $85-115k, so expect few fills (the order waits at the back of that queue)
+never_lead = false            # OFF from 19 Oct evening (was true: join, never improve; pull when the book comes to the
+                              # order): the order may be the best price alone, and is not pulled when the book comes to it
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
 dms_timeout_s = 60            # the exchange cancels our ETH order after 60 s of silence (per-market switch, re-armed
@@ -105,6 +113,7 @@ pause_ms = 200
 
 [futures]                     # Binance USD-M futures bookTicker: leads 82% of ETH 1 bp moves, ~67 ms early
 enabled = true                # required: pricing.reference = "futures"
+connections = 1               # ML bots: one connection (19 Oct; was 2): each ticker parsed once. A dropped link leaves no price until it reconnects
 symbol = "ETHUSDT"
 stale_timeout_s = 5           # a silent link reconnects after 5 s (ETH futures ~157 msgs/s; the other link keeps the book)
 window_ms = 100               # 18 Oct (was 300 ms / 0.6 bp / 200 ms), as BTC: a smaller move pauses the side so the
@@ -114,6 +123,7 @@ pause_ms = 300                # after a 0.2 bp futures move >= 50 ms earlier 73%
 
 [trades]                      # NEW: Binance spot trades (<symbol>@aggTrade), the earliest sign of a sweep. A trade 0.3 bp
 enabled = true                # (7 ticks) under the high of the last 300 ms pulls the buy at once (over the low: the sell),
+connections = 1               # ML bots: one connection (19 Oct; was 2): each message parsed once, fewer loop stalls
 window_ms = 300               # no buy for 200 ms. Night of 14-15 Oct: 40% of ETH fills came >= 20 ms after such a trade
 drawdown = 0.00003            # (the takers hit ~80 ms after it), at -1.7 bp each 5 s later (the other fills -0.8, ~0 at
 pause_ms = 200                # 30 s); by 30 s those fills had lost $2.66, the whole night $2.87. Pauses a side ~4% of a
@@ -125,6 +135,7 @@ pause_ms = 200                # 30 s); by 30 s those fills had lost $2.66, the w
 
 [bybit]                       # ON, a guard: the perp's best bid vs its own 200 ms mean. The toxic ETH taker 0x5c82bbe3
 enabled = true                # took in its "predictive" mode (no Binance futures move first) after the Bybit perp moved
+connections = 1               # ML bots: one connection (19 Oct; was 2)
 category = "linear"           # first in 25% of its takes, the OKX swap in 21%, Binance in 6-8%; on the trades of both
 symbol = "ETHUSDT"            # perps (18 Oct 16:20-24:00, 200 ms / 0.2 bp / 300 ms, our 50-60 ms) the two guards would
 window_ms = 200               # have kept us out of 85 of its 152 fills and 13 others for +5.6% of the time paused a side.
@@ -133,6 +144,7 @@ pause_ms = 300
 
 [okx]                         # ON: the OKX swap's best bid (bbo-tbt), the same guard as Bybit's
 enabled = true
+connections = 1               # ML bots: one connection (19 Oct; was 2)
 inst_id = "ETH-USDT-SWAP"
 window_ms = 200
 drawdown = 0.00002
@@ -154,6 +166,15 @@ min_takes = 20                # NEW 18 Oct: quiet takers pause nothing. A taker 
 min_move = 0.00002            # moved the Arcus mid its way by under 0.2 bp on average 1 s later. Paused at 1000 ms with
 score_ms = 1000               # every taker counted, ETH 12:19-14:55: buys 18%, sells 17% of the time
 
+[portfolio]                   # the crypto bots' positions across the host (BTC, ETH, SOL: 0.86-0.91 correlated over 1 min),
+enabled = true                # each bot still its own process on its own market: it writes its position to a file in
+asset_class = "crypto"        # dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of weight x position x
+weight = 1.3                  # mark (risk in BTC units: 1-min volatility over BTC's, 19 Oct: BTC 1.0, ETH 1.36, SOL
+                              # 1.70); u = exposure / limit_usd (-1..1). An order
+limit_usd = 1500              # adding to the class's lean: markup x (1 + 0.3 u), one taking it back x (1 - 0.3 u), on top
+factor = 0.3                  # of the own skew. 19 Oct, 6 h live: BTC and ETH the same way 26% of the time, at worst
+                              # $1670 together; a stopped bot's file is left out after 30 s
+
 [add_guard]                   # no adding past half the limit right after a futures move against the side (17 Oct: BTC
 window_s = 300                # added up to its limit after -4.8 bp in 5 min, just before -12 bp: -$0.72). Opening
 drawdown = 0.0007             # from flat still goes. 7 bp from the 5-minute high (a fall: buys) or low (a rally: sells)
@@ -170,6 +191,14 @@ markup_factor = 2.5           # 1 = off: the move is still logged on every PLACE
 window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
 drawdown = 0.004              # 40 bp under its 2-minute high (BTC 30 bp): night of 14-15 Oct 7 pauses, 3.3% of 8.8 h; the
 pause_s = 60                  # 9 trips bought in them -$0.49 of -$2.77. At 30 bp: 7.5% of the time for -$0.30
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
 
 [lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
 max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,
@@ -194,15 +223,15 @@ sides = "open"                # the closing order, held further out by a lopside
                               # longer (BTC run 17: x5 put it 25 bp over the market a quarter of the time). "both" = old
 
 [agent]
-quote_line_ms = 250           # the buy/sell price lines at most every 250 ms: the ML fair moves on every frame and
+quote_line_ms = 1000          # the buy/sell price lines at most every 1 s (was 250 ms, 19 Oct: loop stalls): the ML fair moves on every frame and
                               # every 100 ms tick (paper ETH ML, 18-19 Oct: 981k lines in 7 h, a 351 MB orders log,
                               # against 124k for basis). A change within it shows on the first update after it.
 
-[ml]                          # the owner's ETH model of 18 Oct night on the notebook's target off futures; keep these as
+[ml]                          # the owner's ETH model of 19 Oct on the notebook's target off futures; keep these as
                               # the notebook had them (as config.btc-ml-both.toml)
 target_window_s = 30.0        # P_rel = P_next / f(t) - 1: the mean Arcus mid over the next 30 s over the futures mid now
 target_base = "futures"       # the model predicts that whole: fair mid = futures mid x (1 + prediction), fair bid = that
-                              # less the Arcus half spread now (intercept -9.1 bp: the usual ETH basis)
+                              # less the Arcus half spread now (intercept -9.4 bp: the usual ETH basis)
 target_price = "mid"
 max_gap_s = 10.0
 arcus_max_gap_s = 60.0
@@ -211,66 +240,88 @@ scaled = true                 # fit on StandardScaler-scaled features: [ml.mean]
 skip_missing = true           # a feature unknown now (a book silent, a window or mean not ready) keeps its last value
 required = ["basis_pred_ema30s"]  # ... but not the basis bot's own prediction: without it, no price
 
-[ml.weights]                  # coef_ of the owner's ETH model (19 features, on scaled features) and its intercept_
-intercept = -0.0009141798627643274
-basis_pred_ema30s = 0.0001365633299021058
-binance_imb1 = 3.8513751261341495e-05
-binance_mid_r10s = 3.353912704936818e-05
-binance_futures_imb1 = 2.536428857347803e-05
-binance_mid_r5s = 2.3646031129950072e-05
-binance_futures_mid_r10s = 1.787530109191925e-05
-binance_futures_mid_r1s = 1.0399997701869405e-05
-binance_mid_r1s = 1.0277386976136307e-05
-arcus_imb1_m1s = 8.979845544568102e-06
-binance_futures_mid_d5s = 5.210945381701846e-06
-arcus_imb1 = 4.393618936685556e-06
-binance_futures_imb1_m1s = -4.7674231498717565e-06
-binance_futures_mid_r5s = -5.09541194006012e-06
-binance_mid_d5s = -5.995058966579217e-06
-arcus_mid_r1s = -1.2149311298676219e-05
-arcus_mid_r5s = -1.4894612784068657e-05
-binance_imb1_m1s = -2.2817487590488413e-05
-arcus_mid_r10s = -5.099138672294239e-05
-basis_binance_futures_mid_ema30s = -9.52792170479581e-05
+[ml.weights]                  # coef_ of the owner's ETH model of 19 Oct, refit (26 features, Bybit perp among them;
+                              # on scaled features; nine weights are 0) and its intercept_
+intercept = -0.0009441347032520311
+basis_pred_ema30s = 0.0001530317785609053
+basis_bybit_mid_ema30s = 2.2130918970007062e-05
+binance_futures_imb1 = 1.892115078045165e-05
+binance_imb1 = 1.7113275893050593e-05
+bybit_imb1 = 1.5024280722537352e-05
+binance_futures_mid_r1s = 1.0248919004721126e-05
+binance_mid_d5s = 8.60666629227993e-06
+binance_mid_r1s = 6.2063988754653445e-06
+binance_futures_mid_d5s = 4.3492205724408e-06
+arcus_imb1_m1s = 4.315812261183358e-06
+arcus_imb1 = 3.362848815638685e-06
+binance_mid_r10s = 1.2554880680605483e-06
+arcus_mid_r5s = 0.0
+arcus_mid_r10s = 0.0
+binance_mid_r5s = 0.0
+binance_futures_mid_r5s = 0.0
+binance_futures_mid_r10s = 0.0
+bybit_mid_r5s = 0.0
+bybit_mid_r10s = 0.0
+bybit_mid_d5s = 0.0
+bybit_imb1_m1s = 0.0
+arcus_mid_r1s = -2.6601492985841733e-06
+bybit_mid_r1s = -4.5912510381983345e-06
+binance_futures_imb1_m1s = -5.845349807994015e-06
+binance_imb1_m1s = -9.613635697261926e-06
+basis_binance_futures_mid_ema30s = -8.374691881795145e-05
 
 [ml.mean]                     # the scaler's mean_ (fractions; the imbalances -1..1)
-basis_pred_ema30s = -0.0009145700443488699
-binance_imb1 = -0.029042014347407188
-binance_mid_r10s = 1.76454798649399e-08
-binance_futures_imb1 = 0.016432480322395276
-binance_mid_r5s = -2.7966242855224028e-09
-binance_futures_mid_r10s = 7.326767690060733e-08
-binance_futures_mid_r1s = 3.1364597200062714e-09
-binance_mid_r1s = -3.0237153373968985e-09
-arcus_imb1_m1s = -0.029910306861674587
-binance_futures_mid_d5s = 2.2736906264608717e-09
-arcus_imb1 = -0.029997366583983737
-binance_futures_imb1_m1s = 0.01634123178957766
-binance_futures_mid_r5s = 1.8220340151293243e-08
-binance_mid_d5s = -1.8743273810354772e-08
-arcus_mid_r1s = 1.1661561215816108e-09
-arcus_mid_r5s = 1.5946649524832372e-08
-binance_imb1_m1s = -0.02913493529045815
-arcus_mid_r10s = 4.073292895569038e-08
-basis_binance_futures_mid_ema30s = -4.40717250617005e-08
+basis_pred_ema30s = -0.0009445631368143833
+basis_bybit_mid_ema30s = 2.0884574648928813e-08
+binance_futures_imb1 = 0.016332333052615555
+binance_imb1 = -0.02960273961565971
+bybit_imb1 = 0.033359085195124746
+binance_futures_mid_r1s = 2.315263713406976e-09
+binance_mid_d5s = -1.7925310985624895e-08
+binance_mid_r1s = -3.73654493591806e-09
+binance_futures_mid_d5s = 4.4717173213702284e-11
+arcus_imb1_m1s = -0.03366938031597192
+arcus_imb1 = -0.033727463988720965
+binance_mid_r10s = 5.499585544898896e-09
+arcus_mid_r5s = 1.1146350156587328e-08
+arcus_mid_r10s = 2.9180251678665245e-08
+binance_mid_r5s = -6.778960829037566e-09
+binance_futures_mid_r5s = 1.119106732980103e-08
+binance_futures_mid_r10s = 5.145927740043259e-08
+bybit_mid_r5s = 5.013753362231695e-09
+bybit_mid_r10s = 2.4786094593643737e-08
+bybit_mid_d5s = -6.132596794355632e-09
+bybit_imb1_m1s = 0.03325825152336537
+arcus_mid_r1s = 9.071046420991389e-10
+bybit_mid_r1s = 1.4201647212350858e-09
+binance_futures_imb1_m1s = 0.016273447763024
+binance_imb1_m1s = -0.029669036941083308
+basis_binance_futures_mid_ema30s = -6.175228404799815e-08
 
 [ml.scale]                    # the scaler's scale_
-basis_pred_ema30s = 0.00013981826178598972
-binance_imb1 = 0.6340995124170269
-binance_mid_r10s = 0.0001523375288916968
-binance_futures_imb1 = 0.5748744515865765
-binance_mid_r5s = 0.00010434637264019277
-binance_futures_mid_r10s = 0.00015578309623940246
-binance_futures_mid_r1s = 4.4452181951912955e-05
-binance_mid_r1s = 4.200096067209842e-05
-arcus_imb1_m1s = 0.7298940492479904
-binance_futures_mid_d5s = 5.0965238783728485e-05
-arcus_imb1 = 0.8305955527651234
-binance_futures_imb1_m1s = 0.5196698732895011
-binance_futures_mid_r5s = 0.00010750443710657932
-binance_mid_d5s = 4.795237048515796e-05
-arcus_mid_r1s = 4.3797322122124304e-05
-arcus_mid_r5s = 0.0001070479021699487
-binance_imb1_m1s = 0.597447208057358
-arcus_mid_r10s = 0.00015510739475201203
-basis_binance_futures_mid_ema30s = 7.921840171202265e-05
+basis_pred_ema30s = 0.00015734634696404814
+basis_bybit_mid_ema30s = 5.1119917094290994e-05
+binance_futures_imb1 = 0.5753419450644196
+binance_imb1 = 0.6332924635511956
+bybit_imb1 = 0.643348965060004
+binance_futures_mid_r1s = 4.4248689643455665e-05
+binance_mid_d5s = 4.621511495688441e-05
+binance_mid_r1s = 4.1796515172070264e-05
+binance_futures_mid_d5s = 4.748737891576402e-05
+arcus_imb1_m1s = 0.7306161979765478
+arcus_imb1 = 0.833430536716605
+binance_mid_r10s = 0.00015121186584177133
+arcus_mid_r5s = 0.00010609423155953982
+arcus_mid_r10s = 0.00015372439175159895
+binance_mid_r5s = 0.00010355641657581691
+binance_futures_mid_r5s = 0.000106773798078394
+binance_futures_mid_r10s = 0.00015467189641842373
+bybit_mid_r5s = 0.00011235617639796734
+bybit_mid_r10s = 0.00015974893969546462
+bybit_mid_d5s = 4.449372525431488e-05
+bybit_imb1_m1s = 0.5593563884379787
+arcus_mid_r1s = 4.3496021849651826e-05
+bybit_mid_r1s = 4.879872608479366e-05
+binance_futures_imb1_m1s = 0.5203879114011485
+binance_imb1_m1s = 0.5960156536003182
+basis_binance_futures_mid_ema30s = 7.267760403515267e-05

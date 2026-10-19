@@ -37,6 +37,7 @@
 #include "trading/quotes.hpp"
 #include "trading/session.hpp"
 #include "trading/strategy.hpp"
+#include "trading/volatility.hpp"
 #include "util/aio.hpp"
 #include "view.hpp"
 
@@ -94,8 +95,9 @@ public:
     std::unique_ptr<PriceGuard> guard, futures_guard, bybit_guard, okx_guard, arcus_guard;
     std::unique_ptr<SweepGuard> trades_guard;
     std::unique_ptr<TrendGuard> trend_guard, add_guard;
-    std::unique_ptr<OpenWindows> open_guard;
+    std::unique_ptr<OpenWindows> open_guard, open_halt;
     std::unique_ptr<Portfolio> portfolio;  // [portfolio], live only: the asset class's lean across the bots of the host
+    std::unique_ptr<VolScale> vol_scale;  // [vol_markup]: the markup scaled by the reference's volatility
     std::unique_ptr<DriftWatch> drift;
     std::unique_ptr<LagGuard> lag_guard;
     std::unique_ptr<TakeGuard> take_guard;

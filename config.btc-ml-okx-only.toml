@@ -1,0 +1,283 @@
+# BTC priced by the ML model, BOTH sides, LIVE, with one guard only: the OKX swap's (BTC-USDT-SWAP, 200 ms / 0.2 bp /
+# 300 ms). config.btc-ml-both.toml with every other guard off: Binance spot, futures and trades, Bybit, Arcus mid,
+# trend, add, the late-data kill switch ([lag]), the Arcus take pause and the drift markup. The feeds stay (the
+# model and the pricing read them). Paper 19 Oct 13:58-15:43 next to config.btc-ml-both.toml (the same overrides):
+# this one 444 fills, $150.8k, +$6.79 (+0.45 bp), markout +0.81 bp at 60 s, paused 11-13% of the time; the
+# guarded one 236 fills, $71.5k, -$3.51, +0.37 bp, paused 28-31% (the fills its pauses cost marked out -0.05 bp).
+# 1 h 45 min of one market: a small sample. ETH paper the other way (the guards saved fills of -3.5 bp).
+# The model's scaler is the ETH model's of 19 Oct morning (see [ml]): trained on ETH, not on BTC.
+# Maker only: no taker, no stop-loss. Not next to another BTC bot on the same subaccount.
+log_level = "INFO"            # order events and price lines reach the orders log at any level
+
+[binance]
+connections = 1               # ML bots: one connection (19 Oct; was 2): each spot frame parsed once
+
+[arcus]
+connections = 2               # back to 2 (19 Oct, evening): a server can hand out a connection that stays late (paper
+                              # pair: an Arcus connection 74 ms behind another for an hour); with two, the other one's
+                              # copies come first and show it, and the late one is reconnected ([agent] slow_link_ms).
+                              # The Arcus book is a few frames a second: next to nothing for the loop
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected (a stream that stopped
+                              # while the connection still answers pings; needs the 15 Oct code)
+
+[pricing]
+model = "ml"                  # the [ml] model below prices; the keys of the basis pricing that follow are not used
+reference = "futures"         # fair = Binance futures mid x basis. Futures move first: in the night log the futures
+                              # fair told good fills from bad with AUC 0.82 (spot fair 0.63, run 13: 0.75 vs 0.56); its R2
+                              # to the next Arcus mid move is 2-3x spot's. Run 14 (priced off spot): at our fills the
+                              # futures fair stood -0.48 bp against the order (+0.05 at random moments, z -5.8), and
+                              # orders placed with futures already against them filled 5.3% of the time (others 0.9%):
+                              # priced off spot, the bot is filled exactly when futures say the price is about to go on.
+                              # Feed check over the 6 runs of 14 Oct (BTC 13, 14, 16, 17, ETH 12, 16): futures-vs-Arcus
+                              # gap vs the next 0.3 s Arcus mid move, corr 0.47-0.58 (spot 0.20-0.46, Bybit 0.32-0.37);
+                              # without futures the explained share drops 0.11-0.16, without spot or Bybit ~0.
+                              # "spot" with basis_s = 0 = the old pricing (window of samples off the
+                              # spot bid); "spot" with basis_s = 30 = this EWMA basis off the spot mid. Either way
+                              # the futures fair still goes to the logs.
+basis_s = 30                  # NEW: basis = EWMA over time of Arcus bid / futures mid; 30 s fitted best (5 s and 120 s
+                              # worse). A futures top older than [futures] max_book_age_s (2 s) is no price: quote pulled.
+window = 1000                 # used only with basis_s = 0
+min_samples = 100             # samples (any update of either book) before the first price: well under a second
+
+[trading]
+mode = "off"                  # the command line sets --trade live (or quote for a dry run)
+direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
+max_position_usd = 1500       # the owner's $1500 from 18 Oct afternoon (was $1000 with ~$500 orders; $3000 with ~$1000:
+                              # -$4.21 in 2 h); a side at the limit is not quoted. BTC: one 0.0092 order is ~$750, half of it
+max_position_resume = 0.95    # ... and comes back once the position on that side is under 95% of it
+skew_open = 1.0               # the order that adds to the position: markup x (1 + u), u = position / limit (x2 at it)
+skew_close = 1.0              # the order that closes it: its markup x (1 - u) (none at the limit): out sooner
+exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
+                              # joined the best price with no markup after 10 min). The closing order keeps its markup
+exit_loss = 0                 # OFF from 18 Oct as well (was 0.0005: the same once that far under water at the Arcus mid)
+markup = 0.000025             # 0.25 bp, the owner's choice (half the 0.5 bp the evidence below was for). With a 1-tick
+                              # spread this is a threshold: a buy joins the bid only when the fair is >= 0.25 bp above
+                              # it, else it rests deeper (~0.25 bp, ~20 ticks). Night run 11 at 0.05 bp: -0.35 bp at 1 s
+                              # per fill; runs 13/14/16 at 0.4-0.5 bp: about -0.2 bp. The queue-aware replay at 0.5 bp:
+                              # 3-6 filled orders/h, nearly all sweeps through the order, markouts within noise (+0.26
+                              # +/- 0.09 bp at 1 s on 6 fills). Expect more fills than at 0.5 bp, each a bit worse.
+                              # Not wider: run 17 at 5 bp got no fill in 41 min (the Arcus ask never came within
+                              # 2.5 bp under the fair), and in run 16 a 5 bp buy would have filled only in the
+                              # 12:30 crash (-71 and -93 bp 30 s later).
+close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.175 bp): out of a long sooner. Run 13: the
+                              # sell waited 0.8 bp over the mid (night 11: 0.35), median hold 149 s (64 s), and most of
+                              # the loss came from holding the long while the price fell. Run 17 replay of this exit:
+                              # median wait ~2.4 min at 0.35 bp (p90 ~9); at the owner's 5 bp it never sold in 41 min
+tol = 0.000005                # 0.05 bp from 18 Oct, as the basis config (was 0.15 bp for the creep of the ML fair with
+                              # its sliding windows): the paper A/B 12:27-17:37 at 0.15 bp, ML +$1.02 against basis +$4.29,
+                              # a quarter of its volume filled with the fair already against the order
+tol_away = 0.0001             # 1 bp (was 0.3 bp): an order left deeper waits for a 1 bp gap before it is lifted.
+                              # Same fills as 0.3 bp (and as 2-5 bp) in the queue replay, fewer placements. Note: a
+                              # deep order is not lifted for moves under 1 bp; the threshold applies to new placements.
+                              # For the buy only now: the sell has close_tol_away.
+close_tol_away = 0.000005     # 0.05 bp (= tol), as the basis config from 18 Oct
+                              # A sell left above a target that fell is re-placed past this. Run 19 at tol_away 1 bp: the exit sell sat behind its target 56%
+                              # of the time and at the best ask 10%, while its target was at the best ask 32%; trip #8
+                              # held 23 min (-27 bp) with 279 sells. Same price rule, not a stop: only no lag behind it.
+order_size = 0.0092           # BTC, ~$750 at $81.6k: the owner's $750 from 18 Oct afternoon (0.0061, ~$500, that morning;
+                              # 0.0122, ~$1000, from 16 Oct evening; 0.0012, ~$100, up to run 25; Arcus minimum 0.0001 BTC
+                              # and $5; step 1e-8). 1 bp = ~$0.075 per fill; at ~$500 (below) 1 bp = ~$0.05 per
+                              # fill: run 26's worst trip (-15 bp) would cost ~$0.75 at this size, run 16's 12:30 crash trip
+                              # (-102 bp) ~$5. A long already open (from an older run) is sold whole first: the sell is the position
+never_lead = true             # unchanged: join, never improve; pull when the book comes to the order
+came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
+                              # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
+dms_timeout_s = 60            # unchanged: the exchange cancels our order after 60 s of silence (re-armed every 30 s)
+cancel_lanes = 1              # unchanged: each cancel also goes out on a spare connection; the first copy wins
+presign_cancel_s = 1          # unchanged: cancel signed right after placing
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+# Guards: a rise pulls the sell, a drop the buy. Run 16: a sell pulled on a rise went back in +0.47 bp higher
+# (se 0.10, n 401) than the one pulled: the pulls pay for themselves, keep them.
+[guard]                       # Binance spot best bid vs its time-weighted mean (was window = 100 updates; key refused now)
+window_ms = 300               # same as the simulator's fast-futures set in every cell, and a backup when the futures
+drawdown = 0                  # OFF here: only the OKX guard
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: the earliest mover, main filter of toxic flow
+enabled = true
+connections = 1               # ML bots: one connection (19 Oct; was 2): each ticker parsed once. A dropped link leaves no price until it reconnects
+stale_timeout_s = 5           # was 30. A silent link reconnects after 5 s (normal flow ~190 msgs/s; the other link
+                              # keeps the book). Shortens the time this guard can be blind on a hung connection.
+window_ms = 100               # 18 Oct (was 300 ms / 0.5 bp / 200 ms): a smaller futures move pauses the side, so the
+drawdown = 0                  # OFF here: only the OKX guard
+pause_ms = 300                # Recording of 18 Oct: 45% of the Arcus takes >= $300 land in a pause (33% before), ~3%
+                              # of the time a side is paused (1.3% before)
+
+[trades]                      # NEW: Binance spot trades (<symbol>@aggTrade), the earliest sign of a sweep. A trade 0.3 bp
+enabled = true                # under the high of the last 300 ms pulls the buy at once (0.3 bp over the low: the sell)
+connections = 1               # ML bots: one connection (19 Oct; was 2): each message parsed once, fewer loop stalls
+window_ms = 300               # and no buy goes in for 200 ms. Night of 14-15 Oct: 32% of BTC fills came >= 20 ms after such
+drawdown = 0                  # OFF here: only the OKX guard
+pause_ms = 200                # -0.3 bp); by 30 s those fills had lost $1.69, the whole night $1.93. The book guards saw the
+                              # moves 50-80 ms late or not at all. Pauses a side ~2% of a calm hour (~20% in the crash).
+                              # Run 23 live: fills 5 s later -0.52 bp each (night -0.78); the 59% with no such trade
+                              # within 1 s of the match -0.03, the rest -1.23. The rule saw the trade >= 20 ms before
+                              # the match on 30% of the fills, the bot in time on 4 of those 29: it read the others
+                              # 84-579 ms late (median 232 ms: the host's loop stalls). Paused a side 2.5% of the time.
+
+[bybit]                       # ON for the model's Bybit perp features (bybit_imb1, bybit_mid_r1s, the basis to it...),
+enabled = true                # not as a guard: drawdown 0, as on the BTC basis bot. One connection, as the other ML feeds
+connections = 1
+category = "linear"
+symbol = "BTCUSDT"
+drawdown = 0                  # OFF here: only the OKX guard
+
+[okx]                         # the only guard: the OKX swap's best bid (bbo-tbt) vs its own 200 ms mean, 0.2 bp, pauses the
+enabled = true                # side 300 ms (as on ETH). One connection, as the other ML feeds
+connections = 1
+inst_id = "BTC-USDT-SWAP"
+window_ms = 200
+drawdown = 0.00002
+pause_ms = 300
+
+[arcus_guard]                 # Arcus mid vs its own 3 s mean: sweeps Binance does not show (was 100 updates / 0.5 bp / 300 ms)
+window_ms = 3000
+drawdown = 0                  # OFF here: only the OKX guard
+pause_ms = 300
+
+[takes]                       # Arcus taker waves. Any taker order (min_usd 0) in the Arcus public trades pulls our order
+min_usd = 0                   # on the side it hit and pauses that side 500 ms after the last such take. 18 Oct tape: 29-64%
+pause_ms = 0                  # OFF here: only the OKX guard
+min_takes = 20                # NEW 18 Oct: quiet takers pause nothing. A taker whose last takes (20 at least, 100 at most)
+min_move = 0.00002            # moved the Arcus mid its way by under 0.2 bp on average 1 s later. Paused at 1000 ms with
+score_ms = 1000               # every taker counted, BTC 12:19-14:55: buys 23%, sells 17% of the time (0x38bdc44a alone 10%)
+
+[portfolio]                   # the crypto bots' positions across the host (BTC, ETH, SOL: 0.86-0.91 correlated over 1 min),
+enabled = true                # each bot still its own process on its own market: it writes its position to a file in
+asset_class = "crypto"        # dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of weight x position x
+weight = 1.0                  # mark (risk in BTC units: 1-min volatility over BTC's, 19 Oct: BTC 1.0, ETH 1.36, SOL
+                              # 1.70); u = exposure / limit_usd (-1..1). An order
+limit_usd = 1500              # adding to the class's lean: markup x (1 + 0.3 u), one taking it back x (1 - 0.3 u), on top
+factor = 0.3                  # of the own skew. 19 Oct, 6 h live: BTC and ETH the same way 26% of the time, at worst
+                              # $1670 together; a stopped bot's file is left out after 30 s
+
+[add_guard]                   # no adding past half the limit right after a futures move against the side (17 Oct: BTC
+window_s = 300                # added up to its limit after -4.8 bp in 5 min, just before -12 bp: -$0.72). Opening
+drawdown = 0                  # OFF here: only the OKX guard
+pause_s = 60
+limit_share = 0.5             # adding allowed up to 50% of max_position_usd while it holds
+
+[drift]                       # as config.btc-both.toml: a side the futures mid moved against over the last 10 s takes
+window_s = 10                 # 2.5x its markup (0.2 bp or more; held 2 s past the last such reading)
+threshold = 0.00002
+hold_s = 2
+markup_factor = 1             # OFF here: only the OKX guard
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
+window_s = 120                # sell back: no stop-loss, no taker, only fewer entries. Its high over the last 2 minutes;
+drawdown = 0                  # OFF here: only the OKX guard
+pause_s = 60                  # Night of 14-15 Oct: 4 pauses, 2.3% of 8.8 h, all in the 02:20 UTC crash (BTC -1.8% in
+                              # 30 min); the 8 trips bought in them made -$0.50 (-7 bp each) of the night's -$1.98
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
+
+[lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
+max_ms = 0                    # OFF here: only the OKX guard
+pause_ms = 500                # and nothing is placed until 500 ms after the last such reading. 15 Oct from 13:35 UTC five
+                              # bots on one core read futures 2-45 s late for 4 h and kept quoting: 1089 orders refused as
+                              # crossing, -$3.80 in a rally. Fills read 100-200 ms late lost 1.0 bp 5 s later, 200-500 ms
+                              # 1.8-2.2 bp (under 100 ms: nothing). The health line gives the share of time it held placing.
+
+[imbalance]                   # OFF for BTC. Keep this section even so: without it the defaults apply (ratio 5, x5),
+levels = 5                    # as in run 17, where the book was 5x lopsided 69% of the time. On BTC (run 17) thin bids
+ratio = 0                     # led the mid down only 0.2-0.4 bp over 1-5 s, far under what x5 adds; ETH run 12 at 40:
+factor = 5                    # the flag flickered 738 times/h and its orders got none of the fills. ratio = 0 = off.
+hold_ms = 300
+sides = "open"                # when on, only the opening order is widened: the closing one keeps its markup
+
+[agent]
+quote_line_ms = 1000          # the buy/sell price lines at most every 1 s (was 250 ms, 19 Oct: loop stalls): the ML fair moves on every frame and
+                              # every 100 ms tick (paper ETH ML, 18-19 Oct: 981k lines in 7 h, a 351 MB orders log,
+                              # against 124k for basis). A change within it shows on the first update after it.
+
+[ml]                          # the owner's model of 19 Oct evening for the BTC ML test, on the notebook's target off
+                              # futures; keep these as the notebook had them
+target_window_s = 30.0        # P_rel = P_next / f(t) - 1: the mean Arcus mid over the next 30 s over the futures mid now
+target_base = "futures"       # the model predicts that whole: fair mid = futures mid x (1 + prediction), fair bid = that
+                              # less the Arcus half spread now (intercept -10.7 bp: the usual basis)
+target_price = "mid"
+max_gap_s = 10.0
+arcus_max_gap_s = 60.0
+eval_interval_ms = 100        # the notebook's grid: re-priced at least this often as the windows slide
+scaled = true                 # fit on StandardScaler-scaled features: [ml.mean] and [ml.scale] below
+skip_missing = true           # a feature unknown now (a book silent, a window or mean not ready) keeps its last value
+required = ["basis_pred_ema30s"]  # ... but not the basis bot's own prediction: without it, no price
+
+[ml.weights]                  # coef_ of the owner's model of 19 Oct evening (26 features, the Bybit perp's among them, on
+                              # scaled features) and its intercept_; the 5 with a weight of 0 are left out: they change
+                              # nothing (arcus_mid_r5s, binance_futures_mid_r5s, bybit_mid_r5s, bybit_mid_r10s, bybit_mid_d5s)
+intercept = -0.0010694854375297865
+basis_pred_ema30s = 0.00021756670639270378
+binance_imb1 = 2.897956222070009e-05
+binance_futures_imb1 = 1.9443424395594846e-05
+basis_bybit_mid_ema30s = 1.6113429831791728e-05
+binance_mid_r1s = 9.330982443752326e-06
+bybit_imb1 = 8.436838483549349e-06
+binance_futures_mid_r1s = 5.807619814508397e-06
+arcus_imb1_m1s = 4.966557578960756e-06
+binance_mid_r5s = 4.593264568989121e-06
+arcus_imb1 = 3.324151057351051e-06
+bybit_imb1_m1s = 2.3346045972710426e-06
+binance_mid_d5s = 2.160467228172897e-06
+binance_futures_mid_r10s = 2.0918441199815575e-06
+binance_futures_mid_d5s = -1.9811941354341207e-07
+binance_mid_r10s = -1.9314371801894245e-06
+arcus_mid_r1s = -3.8027302745729157e-06
+arcus_mid_r10s = -4.980701018432764e-06
+bybit_mid_r1s = -5.625274043918588e-06
+binance_futures_imb1_m1s = -1.0700355105511224e-05
+binance_imb1_m1s = -1.9386489386720452e-05
+basis_binance_futures_mid_ema30s = -4.698910061798811e-05
+
+[ml.mean]                     # the scaler's mean_ (fractions; the imbalances -1..1)
+basis_pred_ema30s = -0.0010676064864663867
+binance_imb1 = -0.009126369115636544
+binance_futures_imb1 = -0.0033995112112701655
+basis_bybit_mid_ema30s = 2.2042732367722713e-08
+binance_mid_r1s = -1.3647344449709968e-08
+bybit_imb1 = 0.028358188712526437
+binance_futures_mid_r1s = -2.7157271609481366e-08
+arcus_imb1_m1s = -0.021858691046045476
+binance_mid_r5s = -7.19491735341875e-08
+arcus_imb1 = -0.021844152512594365
+bybit_imb1_m1s = 0.028380539669365223
+binance_mid_d5s = 1.1112511121622875e-08
+binance_futures_mid_r10s = -1.3238311986565672e-07
+binance_futures_mid_d5s = -9.022912626672948e-09
+binance_mid_r10s = -1.3161300521530621e-07
+arcus_mid_r1s = -1.6731585302596552e-08
+arcus_mid_r10s = -1.4429826366688449e-07
+bybit_mid_r1s = -2.3051782859416976e-08
+binance_futures_imb1_m1s = -0.003423614919907955
+binance_imb1_m1s = -0.00909089339169255
+basis_binance_futures_mid_ema30s = 8.678546941343657e-08
+
+[ml.scale]                    # the scaler's scale_
+basis_pred_ema30s = 0.00021879248728476415
+binance_imb1 = 0.6427022898895396
+binance_futures_imb1 = 0.5935836144325176
+basis_bybit_mid_ema30s = 4.883805434116578e-05
+binance_mid_r1s = 2.310159344657084e-05
+bybit_imb1 = 0.6388334812321219
+binance_futures_mid_r1s = 2.553634991537977e-05
+arcus_imb1_m1s = 0.7744666085545863
+binance_mid_r5s = 5.9747187326944886e-05
+arcus_imb1 = 0.8265858068119908
+bybit_imb1_m1s = 0.595859115175924
+binance_mid_d5s = 3.001327169891911e-05
+binance_futures_mid_r10s = 9.365604420192305e-05
+binance_futures_mid_d5s = 3.229478417863506e-05
+binance_mid_r10s = 8.93140562888009e-05
+arcus_mid_r1s = 2.452807120768564e-05
+arcus_mid_r10s = 9.135797896949896e-05
+bybit_mid_r1s = 2.9350971602659976e-05
+binance_futures_imb1_m1s = 0.5648454244725853
+binance_imb1_m1s = 0.624658539672832
+basis_binance_futures_mid_ema30s = 4.6185351198352313e-05

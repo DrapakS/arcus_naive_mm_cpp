@@ -302,22 +302,21 @@ TEST(AgentMl, TheMlPaperConfigPricesOnWhenTheSpotAndBybitBooksGoQuiet) {
     EXPECT_APPROX(pred->fair_bid, 81'120.05 * (1 + y) - 0.1, 1e-6, 1e-12);
 }
 
-// config.eth-ml-both.toml (18 Oct night): config.eth-both.toml priced by the owner's ETH model, all
-// 19 weights set. With the Arcus, spot and futures books all live every feature is known (none
-// held), and the prediction is the scaled linear formula of the features the model saw.
-TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts19FeaturesWhenEveryBookRuns) {
+// config.eth-ml-both.toml (19 Oct): config.eth-both.toml priced by the owner's ETH model, 26 features
+// with the Bybit perp's. With the Arcus, spot, futures and Bybit books all live every feature is known
+// (none held), and the prediction is the scaled linear formula of the features the model saw.
+TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts26FeaturesWhenEveryBookRuns) {
     Config c = load_config(repo("config.eth-ml-both.toml"));
     EXPECT_EQ(c.pricing.model, "ml");
     EXPECT_EQ(c.arcus.market, "ETH-USD");
-    // guards only, not the model
-    EXPECT_TRUE(c.bybit.enabled && c.bybit.drawdown && c.okx.enabled && c.okx.drawdown);
+    EXPECT_TRUE(c.bybit.enabled && c.bybit.drawdown && c.okx.enabled && c.okx.drawdown);  // OKX: a guard only, not the model
     EXPECT_EQ(c.ml.target_base, "futures");
     EXPECT_EQ(c.ml.target_window_s, 30.0);
     EXPECT_TRUE(c.ml.skip_missing);
     EXPECT_EQ(strings(c.ml.required), (std::vector<std::string> {"basis_pred_ema30s"}));
     std::set<std::string> names = keys(c.ml.weights);
     names.erase("intercept");
-    EXPECT_EQ(names.size(), 19u);
+    EXPECT_EQ(names.size(), 26u);
     EXPECT_EQ(names, keys(c.ml.mean));
     EXPECT_EQ(names, keys(c.ml.scale));
     Bot b = ml_agent(c.ml.weights, [&](MlConfig& m) {
@@ -331,7 +330,8 @@ TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts19FeaturesWhenEveryBookRuns) {
     });
     Agent& agent = *b.agent;
     using Names = std::set<std::string>;
-    EXPECT_EQ(Names(agent.ml->venues.begin(), agent.ml->venues.end()), (Names {"arcus", "binance", "binance_futures"}));  // spot read, not waited for:
+    EXPECT_EQ(Names(agent.ml->venues.begin(), agent.ml->venues.end()),
+              (Names {"arcus", "binance", "binance_futures", "bybit"}));  // spot and Bybit read, not waited for:
     EXPECT_EQ(Names(agent.ml->needed_venues.begin(), agent.ml->needed_venues.end()),
               (Names {"arcus", "binance_futures"}));  // only the required one and the books
     for (int k = 0; k < 1000; ++k) {  // 100 s: the 30 s means warm up (90 s)
@@ -339,6 +339,7 @@ TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts19FeaturesWhenEveryBookRuns) {
         tick(agent, agent.venue_book, 2'400.0 + 0.01 * (k % 7), 2'400.05 + 0.01 * (k % 7));
         tick(agent, agent.reference_book, 2'403.0 + 0.02 * (k % 5), 2'403.01 + 0.02 * (k % 5));
         tick(agent, *agent.futures_book, 2'402.0 + 0.001 * k, 2'402.01 + 0.001 * k);
+        tick(agent, *agent.bybit_book, 2'401.9 + 0.01 * (k % 3), 2'401.91 + 0.01 * (k % 3));
     }
     auto pred = A::ml_prediction(agent);
     ASSERT_TRUE(pred.has_value());

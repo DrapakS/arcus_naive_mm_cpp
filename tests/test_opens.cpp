@@ -1,5 +1,6 @@
 // [open_guard]: no adding to the position around the moments the underlying opens (the windows
-// themselves; the strategy and the config sides of tests/test_opens.py are elsewhere).
+// themselves, and the same windows as [open_halt]; the strategy and the config sides of tests/test_opens.py
+// are in test_both_sides.cpp and test_config.cpp).
 #include <gtest/gtest.h>
 
 #include <ctime>
@@ -107,7 +108,8 @@ TEST(Opens, TheStartAndTheEndOfAWindowAreLoggedAndTheNextOpenIsKnown) {
 
 TEST(Opens, DescribeAndTheTimeZone) {
     Windows t(SUNDAY_REOPEN);
-    EXPECT_EQ(t.w.describe(), "Sun 18:00, Mon-Thu 18:00 America/New_York: no adding from 60 s before to 900 s after each");
+    EXPECT_EQ(t.w.describe(),
+              "Sun 18:00, Mon-Thu 18:00 America/New_York: no adding to the position from 60 s before to 900 s after each");
     EXPECT_TRUE(nmm::known_time_zone("America/New_York"));
     EXPECT_TRUE(nmm::known_time_zone("UTC"));
     EXPECT_FALSE(nmm::known_time_zone("Mars/Olympus"));
@@ -125,4 +127,22 @@ TEST(Opens, ASkippedLocalTimeTakesTheOffsetBeforeTheChange) {
     EXPECT_EQ(nmm::local_to_unix(zone, local(2026, 3, 8, 2, 30)), utc(2026, 3, 8, 7, 30));
     // 1 Nov 2026, 01:30 happens twice: the first (EDT)
     EXPECT_EQ(nmm::local_to_unix(zone, local(2026, 11, 1, 1, 30)), utc(2026, 11, 1, 5, 30));
+}
+
+TEST(Opens, AHaltSaysWhatItsWindowHoldsInItsLines) {
+    // [open_halt]: the same windows, what they hold told by the start, the end and the start-up lines
+    Capture capture;
+    const double us_open = utc(2026, 10, 19, 13, 30);  // Monday 09:30 New York (EDT)
+    auto now = std::make_shared<double>(us_open - 3600);
+    OpenWindows w({"Mon-Fri 09:30"}, "America/New_York", 60.0, 120.0, [now] { return *now; },
+                  "no trading: every order pulled, none placed", "", "trading again");
+    EXPECT_EQ(w.describe(), "Mon-Fri 09:30 America/New_York: no trading: every order pulled, none placed from 60 s before to 120 s "
+                            "after each");
+    *now = us_open - 59;
+    EXPECT_TRUE(w.active());
+    EXPECT_EQ(capture.messages().back(), "--- market open Mon-Fri 09:30 America/New_York (Mon 13:30 UTC): no trading: every order "
+                                         "pulled, none placed until Mon 13:32 UTC");
+    *now = us_open + 121;
+    EXPECT_FALSE(w.active());
+    EXPECT_EQ(capture.messages().back(), "--- market open window over: trading again");
 }

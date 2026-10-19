@@ -1,7 +1,8 @@
 // Ported from tests/test_both_sides.py (direction = "both"), and the strategy tests of
-// test_opens.py, test_session.py and test_drift.py.
+// test_opens.py ([open_guard] and [open_halt]), test_session.py and test_drift.py.
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <boost/asio/io_context.hpp>
 #include <chrono>
 
@@ -25,10 +26,21 @@ namespace {
 using Actions = std::vector<Action>;
 
 bool contains(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
+bool contains(const std::vector<std::string>& lines, const std::string& line) {
+    return std::find(lines.begin(), lines.end(), line) != lines.end();
+}
 
 std::vector<std::string> sides_of(const Actions& actions) {
     std::vector<std::string> out;
     for (const auto& a : actions) out.push_back(a.side);
+    return out;
+}
+
+// "place BUY", "cancel SELL": what was asked on which side, sorted.
+std::vector<std::string> moves(const Actions& actions) {
+    std::vector<std::string> out;
+    for (const auto& a : actions) out.push_back(a.kind + " " + a.side);
+    std::sort(out.begin(), out.end());
     return out;
 }
 
@@ -78,6 +90,14 @@ const double SUNDAY_REOPEN = utc(2026, 10, 18, 22, 0);  // Sunday 18:00 New York
 std::unique_ptr<OpenWindows> windows(const FakeClock& clock, std::vector<std::string> opens = {"Sun 18:00", "Mon-Thu 18:00"},
                                      double before_s = 60.0, double after_s = 900.0) {
     return std::make_unique<OpenWindows>(std::move(opens), "America/New_York", before_s, after_s, clock.fn());
+}
+
+const double US_OPEN = utc(2026, 10, 19, 13, 30);  // Monday 09:30 New York (EDT)
+
+// [open_halt] as the stock configs have it: from 60 s before to 2 min after the 09:30 open, nothing trades.
+std::unique_ptr<OpenWindows> halt(const FakeClock& clock) {
+    return std::make_unique<OpenWindows>(std::vector<std::string> {"Mon-Fri 09:30"}, "America/New_York", 60.0, 120.0, clock.fn(),
+                                         "no trading: every order pulled, none placed", "", "trading again");
 }
 
 double new_york(int y, int mo, int d, int h, int mi) {
@@ -301,8 +321,8 @@ TEST(BothSides, TheShippedNvdaConfigsQuote500AndDoubleTheMarkupOffHours) {
     Config both_cfg = load("config.nvda-both.toml"), long_cfg = load("config.nvda.toml");
     EXPECT_EQ(both_cfg.trading.direction, "both");
     EXPECT_EQ(both_cfg.trading.max_position_usd, 500.0);
-    double usd = long_cfg.trading.order_size * 214;
-    EXPECT_TRUE(480 < usd && usd < 500) << usd;  // ~$500 orders (19 Oct): one fills the limit
+    double usd = long_cfg.trading.order_size * 214;  // ~$500 orders (19 Oct): one fills the limit
+    EXPECT_TRUE(480 < usd && usd < 500) << usd;
     EXPECT_EQ(both_cfg.trading.off_hours_markup_factor, 2.0);
     EXPECT_EQ(long_cfg.trading.off_hours_markup_factor, 2.0);
     EXPECT_EQ(load("config.gld.toml").trading.off_hours_markup_factor, 1.0);
@@ -335,13 +355,32 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     Config eth_ml = load("config.eth-ml-both.toml"), eth = load("config.eth-both.toml");
     EXPECT_EQ(eth_ml.pricing.model, "ml");
     EXPECT_EQ(eth.pricing.model, "basis");
-    EXPECT_EQ(eth_ml.agent.quote_line_ms, 250);  // the ML fair moves on every frame
+    EXPECT_EQ(eth_ml.agent.quote_line_ms, 1000);  // the ML fair moves on every frame
     EXPECT_EQ(eth.agent.quote_line_ms, 0);
+    // ML bots read Binance spot trades, Bybit and OKX over one connection each (19 Oct: loop stalls), basis over two
+    for (const Config* c : {&eth_ml, &eth}) {
+        int n = c == &eth_ml ? 1 : 2;
+        EXPECT_EQ(c->futures.connections, n);
+        EXPECT_EQ(c->trades.connections, n);
+        EXPECT_EQ(c->bybit.connections, n);
+        EXPECT_EQ(c->okx.connections, n);
+    }
+    EXPECT_EQ(eth_ml.trading.tol_away, 0.000075);  // ML: 0.75 bp (19 Oct)
+    EXPECT_EQ(eth.trading.tol_away, 0.00015);
     Config replaced = eth_ml;
+    replaced.trading.tol_away = eth.trading.tol_away;
     replaced.pricing.model = "basis";
     replaced.ml = eth.ml;
     replaced.agent = eth.agent;
+    replaced.trades = eth.trades;
+    replaced.bybit = eth.bybit;
+    replaced.okx = eth.okx;
+    replaced.futures.connections = 2;
+    replaced.binance.connections = 2;
     EXPECT_EQ(text(replaced), text(eth));
+    // the Arcus book over two even on ML (19 Oct, evening): a late connection shows against the other one's copies
+    EXPECT_EQ(eth_ml.binance.connections, 1);
+    EXPECT_EQ(eth_ml.arcus.connections, 2);
 }
 
 TEST(BothSides, TheQuoteLinesTakeTheLoopsPricesAndACancelCheckPricesOnlySidesWithAnOrder) {
@@ -425,6 +464,48 @@ TEST(BothSides, OneSidedLongAroundAnOpenBuysNothingButSellsWhatItHolds) {
     auto sent = actions(gw);
     ASSERT_EQ(sent.size(), 1u);
     EXPECT_EQ(sent[0].kind + " " + sent[0].side, "place SELL");
+}
+
+TEST(BothSides, AtTheUsStockOpenNothingTradesTheClosingOrderTooThenTradingAgain) {
+    // NVDA, 19 Oct 13:30 UTC: -50 bp in the first 30 s of the open; its closing sell was hit at 217.15
+    // against a 218.54 buy. From 60 s before to 2 min after the open every order is pulled, none placed.
+    LogCapture log(ORDERS_LOGGER);
+    FakeClock clock(US_OPEN - 120);
+    auto w = halt(clock);
+    auto [gw, s] = both(0.001, 0.0002, SIZE, 1000.0, [&](StrategyOptions& o) { o.halt = w.get(); });
+    s->evaluate(view(100'000.0));
+    EXPECT_EQ(moves(actions(*gw)), (std::vector<std::string> {"place BUY", "place SELL"}));  // 2 min before: as usual
+    gw->ack("BUY");
+    gw->ack("SELL");
+    gw->fill("BUY", "0.004");  // a long: its closing sell is working
+    clock.set(US_OPEN - 59);
+    s->check_cancel(view(100'000.0));  // the per-frame check pulls both at once, the closing one too
+    EXPECT_EQ(moves(actions(*gw)), (std::vector<std::string> {"cancel BUY", "cancel SELL"}));
+    EXPECT_EQ(gw->why, "market open: no trading");
+    EXPECT_TRUE(contains(log.messages(), "--- market open Mon-Fri 09:30 America/New_York (Mon 13:30 UTC): no trading: every order "
+                                         "pulled, none placed until Mon 13:32 UTC"));
+    gw->orders.clear();
+    for (double at : {US_OPEN, US_OPEN + 119}) {
+        clock.set(at);
+        s->evaluate(view(100'000.0));
+        EXPECT_EQ(actions(*gw), Actions {}) << at - US_OPEN;
+    }
+    clock.set(US_OPEN + 121);  // over: both sides again
+    s->evaluate(view(100'000.0));
+    EXPECT_EQ(moves(actions(*gw)), (std::vector<std::string> {"place BUY", "place SELL"}));
+    EXPECT_TRUE(contains(log.messages(), "--- market open window over: trading again"));
+}
+
+TEST(BothSides, OneSidedTheHaltPullsTheSellOfWhatItHoldsToo) {
+    FakeClock clock(US_OPEN + 30);
+    auto w = halt(clock);
+    FakeGateway gw;
+    gw.set_position(D("0.001"));
+    StrategyOptions o = options(0.001, 0.0002, 0.001);
+    o.halt = w.get();
+    QuoteStrategy s(&gw, btc_spec(), o);
+    s.evaluate(view(100'000.0));
+    EXPECT_EQ(actions(gw), Actions {});
 }
 
 // ------------------------------------------------------------- from test_session.py

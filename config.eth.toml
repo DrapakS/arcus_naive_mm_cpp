@@ -55,8 +55,8 @@ order_size = 0.41             # ETH, ~$1000 at $2445: the owner's $1000 from 16 
                               # ~$500, in run 26; 0.041, ~$100, up to run 25). 1 bp = ~$0.10 per fill. Must be worth >= $5 at the buy price (else the bot
                               # does not quote and logs an error): fine above ~$25. A partial fill worth under $5 is
                               # not sold alone: the buy keeps working until it is.
-never_lead = true             # join, never improve; pull when the book comes to the order. The ETH touch usually holds
-                              # $85-115k, so expect few fills (the order waits at the back of that queue)
+never_lead = false            # OFF from 19 Oct evening (was true: join, never improve; pull when the book comes to the
+                              # order): the order may be the best price alone, and is not pulled when the book comes to it
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
 dms_timeout_s = 60            # the exchange cancels our ETH order after 60 s of silence (per-market switch, re-armed
@@ -113,6 +113,14 @@ pause_ms = 300                # time (ETH spreads open and close more often); 1.
 window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
 drawdown = 0.004              # 40 bp under its 2-minute high (BTC 30 bp): night of 14-15 Oct 7 pauses, 3.3% of 8.8 h; the
 pause_s = 60                  # 9 trips bought in them -$0.49 of -$2.77. At 30 bp: 7.5% of the time for -$0.30
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
 
 [lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
 max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,

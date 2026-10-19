@@ -248,6 +248,11 @@ sides = "open"
 [agent]
 depth = 10
 status_interval_s = 5
+# A stream on several connections ([binance]/[arcus]/... connections > 1, the Arcus trades on the trading
+# connection and its cancel lanes, the paper trades): each copy is timed against the first copy of the same
+# update, and a connection whose copies come more than this many ms behind at the median over 2 min is
+# reconnected (19 Oct: an Arcus connection 74 ms behind another for an hour). 0 = never.
+slow_link_ms = 30
 # The health line in the console and the orders log, this often: the event loop's lag, how late
 # each exchange-stamped stream was read (Binance futures tickers, Binance spot trades, Arcus order
 # events) and the CPU share. A lag of 100 ms or more also gets a line of its own. 0 turns it off.

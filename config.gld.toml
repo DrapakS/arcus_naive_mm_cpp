@@ -105,10 +105,24 @@ before_s = 60                 # the bot sold seven times in a row into the move,
 after_s = 900                 # the night. From 60 s before to 15 min after each: no order that opens or adds to the
 limit_share = 0               # position (flat: nothing quoted); the closing order as usual, but not through zero
 
+[open_halt]                   # no trading at all at the US stock open (09:30 New York, daylight saving time followed): from
+opens = ["Mon-Fri 09:30"]     # 60 s before to 2 min after it every order is pulled, the closing one too, and none placed.
+tz = "America/New_York"       # NVDA, 19 Oct 13:30 UTC: -50 bp in the first 30 s, 284 trades in them; its closing sell
+before_s = 60                 # was hit at 217.15 against a 218.54 buy. [open_guard] above still holds adding for its
+after_s = 120                 # 15 min after
+
 [trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
 window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
 drawdown = 0.0015             # 15 bp under its 2-minute high (BTC 30 bp x 0.5). On XAUT over 14-16 Oct it would have paused
 pause_s = 60                  # 2.0% of the time in 24 episodes (10 bp: 6.1%, 20 bp: 0.95%)
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
 
 [lag]                         # market data read late = quoting blind: as BTC
 max_ms = 200
