@@ -111,8 +111,9 @@ bool bypass(const std::string& host) {
 std::optional<Proxy> proxy_for(const Url& target) {
     if (bypass(target.host)) return std::nullopt;
     std::vector<const char*> names;
-    if (target.scheme == "wss") names = {"WSS_PROXY", "wss_proxy", "HTTPS_PROXY", "https_proxy"};
-    else if (target.scheme == "ws") names = {"WS_PROXY", "ws_proxy", "HTTP_PROXY", "http_proxy"};
+    // as aiohttp with trust_env: a websocket takes WSS_PROXY / WS_PROXY only, not HTTPS_PROXY
+    if (target.scheme == "wss") names = {"WSS_PROXY", "wss_proxy"};
+    else if (target.scheme == "ws") names = {"WS_PROXY", "ws_proxy"};
     else if (target.scheme == "https") names = {"HTTPS_PROXY", "https_proxy"};
     else names = {"HTTP_PROXY", "http_proxy"};
     for (const char* name : names) {

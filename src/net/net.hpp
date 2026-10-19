@@ -1,8 +1,8 @@
 // Websockets and HTTPS GET over Boost.Beast: ws:// and wss://, http:// and
-// https://, through the HTTP proxy the environment names (as aiohttp with
-// trust_env: WSS_PROXY / HTTPS_PROXY for wss, HTTPS_PROXY for https, the
-// plain ones for ws / http; NO_PROXY and localhost go direct). TCP_NODELAY on
-// every socket; no compression.
+// https://, through the HTTP proxy the environment names, as aiohttp with
+// trust_env: WSS_PROXY for wss (not HTTPS_PROXY: behind a proxy set both),
+// HTTPS_PROXY for https, WS_PROXY / HTTP_PROXY for ws / http; NO_PROXY and
+// localhost go direct. TCP_NODELAY on every socket; no compression.
 #pragma once
 
 #include <functional>

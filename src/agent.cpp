@@ -1,6 +1,9 @@
 #include "agent.hpp"
 
 #include <algorithm>
+#include <boost/asio/post.hpp>
+#include <boost/asio/this_coro.hpp>
+#include <boost/asio/use_awaitable.hpp>
 #include <cmath>
 #include <format>
 
@@ -1061,6 +1064,13 @@ void Agent::print_ladders(OrderBook& updated) {
 awaitable<void> Agent::market_data_loop() {
     for (;;) {
         co_await changed_.wait();
+        // the frames already read come first: a burst is evaluated once, on the book it settles to (as
+        // under asyncio, where a feed reads every frame its socket holds before this loop gets its turn)
+        for (int turn = 0; turn < 64; ++turn) {
+            changed_.clear();
+            co_await asio::post(co_await asio::this_coro::executor, asio::use_awaitable);
+            if (!changed_.is_set()) break;
+        }
         changed_.clear();
         view = build_view();
         on_market_data(*view);
