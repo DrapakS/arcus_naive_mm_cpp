@@ -50,8 +50,9 @@ public:
     struct State;
 
     // Start `aw` on the loop now; a failure other than cancellation is logged
-    // ("task <name> failed: ...") to the logger `log_name`.
-    static Task spawn(awaitable<void> aw, std::string name = "", std::string log_name = "naive_mm");
+    // ("task <name> failed: ...") to the logger `log_name`, then `on_failure` is called.
+    static Task spawn(awaitable<void> aw, std::string name = "", std::string log_name = "naive_mm",
+                      std::function<void(std::exception_ptr)> on_failure = {});
 
 private:
     std::shared_ptr<State> state_;

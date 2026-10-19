@@ -24,7 +24,15 @@ target_compile_definitions(nmm PUBLIC BOOST_ASIO_NO_DEPRECATED BOOST_BEAST_USE_S
 target_compile_options(nmm PUBLIC -Wall -Wextra -Wno-unused-parameter)
 target_link_libraries(nmm PUBLIC Boost::json OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
 
-add_executable(naive_mm ${CMAKE_SOURCE_DIR}/src/main.cpp)
+# The git commit and a fingerprint of the sources, refreshed on every build.
+add_custom_target(nmm_version
+  COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR} -DOUTPUT=${CMAKE_BINARY_DIR}/version.cpp
+          -P ${CMAKE_SOURCE_DIR}/cmake/version.cmake
+  BYPRODUCTS ${CMAKE_BINARY_DIR}/version.cpp
+  COMMENT "Version of the sources")
+
+add_executable(naive_mm ${CMAKE_SOURCE_DIR}/src/main.cpp ${CMAKE_BINARY_DIR}/version.cpp)
+add_dependencies(naive_mm nmm_version)
 target_link_libraries(naive_mm PRIVATE nmm)
 
 if(NMM_TESTS)

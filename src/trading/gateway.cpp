@@ -923,25 +923,31 @@ awaitable<std::optional<JsonArray>> ArcusGateway::open_orders() {
     std::string url = with_params(opt.rest_url + "/v1/openOrders",
                                   {{"address", creds.address}, {"accountIndex", std::to_string(creds.account_index)},
                                    {"market", std::to_string(market.market_id)}, {"status", "OPEN"}});
-    std::optional<JsonArray> out;
-    std::string failure;
+    HttpResponse resp;
+    std::exception_ptr error;
     try {
-        HttpResponse resp = co_await http_get(url, {{"X-API-Key", creds.api_key}}, OPEN_ORDERS_TIMEOUT_S);
-        resp.raise_for_status(url);
-        Json body = parse_json(resp.body);
-        const Json* orders_ = jget(body, "orders");
-        if (orders_ == nullptr || !orders_->is_array())
-            throw std::invalid_argument("no list of orders in " + resp.body.substr(0, 200));
-        out.emplace();
-        for (const auto& o : orders_->get_array())
-            if (o.is_object()) out->push_back(o);
-    } catch (const boost::system::system_error& err) {
-        if (err.code() == asio::error::operation_aborted) throw;
-        failure = err.what();
-    } catch (const std::exception& err) {
-        failure = err.what();
+        resp = co_await http_get(url, {{"X-API-Key", creds.api_key}}, OPEN_ORDERS_TIMEOUT_S);
+    } catch (...) {
+        error = std::current_exception();
     }
-    if (!failure.empty()) {
+    if (error && is_cancellation(error) && co_await is_cancelled()) std::rethrow_exception(error);
+    std::optional<JsonArray> out;
+    std::string failure = what(error);
+    if (!error) {
+        try {
+            resp.raise_for_status(url);
+            Json body = parse_json(resp.body);
+            const Json* listed = jget(body, "orders");
+            if (listed == nullptr || !listed->is_array()) throw std::invalid_argument("no list of orders in " + resp.body.substr(0, 200));
+            out.emplace();
+            for (const auto& o : listed->get_array())
+                if (o.is_object()) out->push_back(o);
+        } catch (const std::exception& err) {
+            failure = err.what();
+            out.reset();
+        }
+    }
+    if (!out) {
         events->info("--- GET /v1/openOrders failed: {}", failure);
         co_return std::nullopt;
     }

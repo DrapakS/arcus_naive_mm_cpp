@@ -87,22 +87,17 @@ bool is_cancellation(const std::exception_ptr& e) {
     }
 }
 
-Task Task::spawn(awaitable<void> aw, std::string name, std::string log_name) {
+Task Task::spawn(awaitable<void> aw, std::string name, std::string log_name, std::function<void(std::exception_ptr)> on_failure) {
     Task task;
     task.state_ = std::make_shared<State>();
     task.state_->name = std::move(name);
     auto state = task.state_;
     asio::co_spawn(loop(), std::move(aw),
-                   asio::bind_cancellation_slot(state->signal.slot(), [state, log_name](std::exception_ptr e) {
+                   asio::bind_cancellation_slot(state->signal.slot(), [state, log_name, on_failure](std::exception_ptr e) {
                        state->done = true;
                        if (!e || is_cancellation(e)) return;
-                       try {
-                           std::rethrow_exception(e);
-                       } catch (const std::exception& err) {
-                           get_logger(log_name).error("task {} failed: {}", state->name, err.what());
-                       } catch (...) {
-                           get_logger(log_name).error("task {} failed", state->name);
-                       }
+                       get_logger(log_name).error("task {} failed: {}", state->name, what(e));
+                       if (on_failure) on_failure(e);
                    }));
     return task;
 }
