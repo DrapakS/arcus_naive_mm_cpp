@@ -15,7 +15,8 @@ spent in the server's and the bot's queues: how far behind the bot runs.
     curl -s 127.0.0.1:8765/stats     # frames sent so far, per stream
 
 Needs aiohttp (the Python bot's requirements have it). The rate scales every stream;
-1.0 is a busy BTC minute (about 740 frames a second over all streams).
+1.0 is a busy BTC minute (about 730 frames a second over all streams). /stats counts every frame
+delivered: a bot with two links on a feed gets that feed twice (config.btc-both.toml: ~1400 a second).
 """
 
 from __future__ import annotations
