@@ -90,7 +90,9 @@ void stop_logging() {
         }
         get_logger(QUOTES_LOGGER).set_propagate(true);
     }
-    if (orders_file && orders_fh != nullptr) {
+    // a writer stuck on the file still holds it: writing to or closing it under that thread would
+    // hang or pull it away mid-write, so it stays open (the process is on its way out)
+    if (orders_file && orders_fh != nullptr && !orders_file->left_behind()) {
         if (size_t dropped = orders_file->dropped()) {
             logging::Record r {logging::WARNING, std::string(ORDERS_LOGGER),
                                std::format("!!! orders log: {} lines dropped (the writer was far behind)", dropped), now_us()};

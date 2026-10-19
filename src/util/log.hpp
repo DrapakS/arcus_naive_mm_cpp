@@ -78,12 +78,13 @@ public:
     }
 
     // Write out what is held (up to `timeout_s`) and stop the thread; a thread
-    // stuck on a dead disk is left behind rather than waited for.
-    void stop(double timeout_s = 2.0) {
+    // stuck on a dead disk is left behind rather than waited for. Whether the
+    // thread is done (false: left behind, and it may still write).
+    bool stop(double timeout_s = 2.0) {
         State& s = *s_;
         {
             std::unique_lock lock(s.mutex);
-            if (!thread_.joinable()) return;
+            if (!thread_.joinable()) return s.exited || !s.stopping;
             s.idle.wait_for(lock, std::chrono::duration<double>(timeout_s), [&s] { return s.pending == 0; });
             s.stopping = true;
         }
@@ -95,6 +96,7 @@ public:
         }
         if (done) thread_.join();
         else thread_.detach();
+        return done;
     }
 
 private:
@@ -154,11 +156,14 @@ public:
     void flush(double timeout_s = 2.0) override;
     void stop() override;
     size_t dropped() const;
+    // Whether stop() left the writer thread behind, stuck in a write: what it writes to must stay open.
+    bool left_behind() const { return left_behind_; }
 
 private:
     std::function<void(const std::string&)> write_;
     std::function<std::string(const Record&)> format_;
     std::unique_ptr<BackgroundQueue<Record>> queue_;
+    bool left_behind_ = false;
 };
 
 // Records into a vector (tests).

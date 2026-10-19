@@ -53,7 +53,7 @@ void ThreadedHandler::handle(const Record& record) { queue_->push(record); }
 
 void ThreadedHandler::flush(double timeout_s) { queue_->flush(timeout_s); }
 
-void ThreadedHandler::stop() { queue_->stop(); }
+void ThreadedHandler::stop() { left_behind_ = !queue_->stop() || left_behind_; }
 
 size_t ThreadedHandler::dropped() const { return queue_->dropped(); }
 

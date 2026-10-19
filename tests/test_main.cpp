@@ -297,6 +297,15 @@ TEST(OrdersLogWriter, LinesItDroppedAreCountedAtTheEnd) {
         << text.substr(text.size() > 200 ? text.size() - 200 : 0);
 }
 
+TEST(OrdersLogWriter, StopSaysWhetherTheThreadIsDone) {
+    std::vector<std::string> out;
+    logging::BackgroundQueue<std::string> records([&out](std::string& s) { out.push_back(s); });
+    records.push("a");
+    EXPECT_TRUE(records.stop());
+    EXPECT_TRUE(records.stop());
+    EXPECT_EQ(out, std::vector<std::string> {"a"});
+}
+
 TEST(OrdersLogWriter, AWriterStuckOnItsDiskDoesNotHangTheShutdown) {
     std::promise<void> release;
     std::shared_future<void> stuck = release.get_future().share();
@@ -312,8 +321,9 @@ TEST(OrdersLogWriter, AWriterStuckOnItsDiskDoesNotHangTheShutdown) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         records.push("b");  // the queue is full now
         auto started = std::chrono::steady_clock::now();
-        records.stop(0.1);
+        EXPECT_FALSE(records.stop(0.1));  // left behind: what it writes to must stay open
         EXPECT_LT(elapsed_since(started), 1.0);
+        EXPECT_FALSE(records.stop(0.1));
     }  // and gone, while its thread is still stuck
     release.set_value();
     for (int i = 0; i < 1000 && written < 2; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
