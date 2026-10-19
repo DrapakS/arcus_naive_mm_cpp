@@ -12,6 +12,7 @@
 #include "fake_server.hpp"
 #include "fakes.hpp"
 #include "feed_helpers.hpp"
+#include "util/pyfmt.hpp"
 
 using namespace nmm;
 using namespace nmm::test;
