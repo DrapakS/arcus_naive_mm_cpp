@@ -201,3 +201,16 @@ TEST(SessionConfig, TheMarketSpecReadsTheHours) {
     EXPECT_EQ(btc_spec().hours, std::nullopt);
     EXPECT_EQ(btc_spec().outside_rth, std::nullopt);
 }
+
+// C++ only: --set with an inline table keeps its keys in the order written, as Python's dict does
+// (the settings lines, and the order of an ML model's features).
+TEST(ConfigOverrides, AnInlineTableKeepsItsKeysInTheOrderWritten) {
+    Config c = load_config(std::nullopt, {"ml.weights={intercept = 0.1, binance_futures_mid_r1s = 1.0, arcus_imb1 = 2.0}"});
+    std::vector<std::string> keys;
+    for (const auto& [k, v] : numbers(c.ml.weights)) keys.push_back(k);
+    EXPECT_EQ(keys, (std::vector<std::string> {"intercept", "binance_futures_mid_r1s", "arcus_imb1"}));
+    bool found = false;
+    for (const auto& line : describe(c))
+        if (line.starts_with("[ml] weights={'intercept': 0.1, 'binance_futures_mid_r1s': 1.0, 'arcus_imb1': 2.0} ")) found = true;
+    EXPECT_TRUE(found);
+}

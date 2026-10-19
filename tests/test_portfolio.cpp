@@ -258,7 +258,7 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_TRUE(pf.enabled) << name;
         EXPECT_EQ(pf.asset_class, "crypto") << name;
         EXPECT_EQ(pf.weight, weight) << name;
-        EXPECT_EQ(pf.limit_usd, 1500.0) << name;
+        EXPECT_EQ(pf.limit_usd, name == "eth-ml-both" ? 2500.0 : 1500.0) << name;  // the live ETH: with its $2500 limit (19 Oct evening)
         EXPECT_EQ(pf.factor, 0.3) << name;
         EXPECT_EQ(pf.interval_ms, 100.0) << name;
     }

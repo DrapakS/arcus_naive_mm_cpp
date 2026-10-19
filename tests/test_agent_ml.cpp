@@ -309,7 +309,8 @@ TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts26FeaturesWhenEveryBookRuns) {
     Config c = load_config(repo("config.eth-ml-both.toml"));
     EXPECT_EQ(c.pricing.model, "ml");
     EXPECT_EQ(c.arcus.market, "ETH-USD");
-    EXPECT_TRUE(c.bybit.enabled && c.bybit.drawdown && c.okx.enabled && c.okx.drawdown);  // OKX: a guard only, not the model
+    EXPECT_TRUE(c.bybit.enabled && !c.bybit.drawdown);  // Bybit: the model's feed, no guard (19 Oct evening)
+    EXPECT_TRUE(c.okx.enabled && c.okx.drawdown);  // OKX: a guard only, not the model
     EXPECT_EQ(c.ml.target_base, "futures");
     EXPECT_EQ(c.ml.target_window_s, 30.0);
     EXPECT_TRUE(c.ml.skip_missing);

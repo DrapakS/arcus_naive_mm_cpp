@@ -43,7 +43,7 @@ close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.35 bp,
 off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New York, Mon-Fri; holidays by Arcus
                               # isOutsideRth) both sides take twice the markup: 1 bp, ~2 ticks
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
-tol_away = 0.0001             # 1 bp (BTC's): a buy left deeper keeps its place in the queue until 2 ticks off
+tol_away = 0.00005            # 0.5 bp (19 Oct evening, the owner's; was 1 bp): a buy left that far behind is placed again
 close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
 order_size = 2.3              # NVDA, ~$500 at $217 (19 Oct; was 0.46, ~$98). Arcus minimum 0.01 NVDA and $5; step 0.01
 never_lead = true             # join, never improve; pull when the book comes to the order

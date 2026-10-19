@@ -349,7 +349,7 @@ toml::table override_table(const std::string& item) {
         node->insert_or_assign(path[i], toml::table {});
         node = (*node)[path[i]].as_table();
     }
-    if (ok) node->insert_or_assign(path.back(), *parsed.get("v"));
+    if (ok) node->insert_or_assign(path.back(), std::move(*parsed.get("v")));  // moved: a copy loses where each key stood (an inline table's order)
     else node->insert_or_assign(path.back(), text);
     return root;
 }

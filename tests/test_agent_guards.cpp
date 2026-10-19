@@ -295,10 +295,11 @@ TEST(AgentTakes, TheAgentLogsAQuietTakerAndFeedsTheMid) {
 }
 
 TEST(AgentTakes, TheBtcAndEthConfigsTurnItOn) {
-    for (std::string name : {"btc-both", "eth-both", "btc-ml-both", "eth-ml-both", "sol-both", "sol"}) {
+    for (std::string name : {"btc-both", "eth-both", "btc-ml-both", "eth-ml-both", "btc-ml-okx-only", "sol-both", "sol"}) {
         Config c = load_config(repo("config." + name + ".toml"));
+        bool live_ml = name == "eth-ml-both" || name == "btc-ml-okx-only";  // 300 ms from 19 Oct evening
         EXPECT_EQ(c.takes.min_usd, 0.0) << name;
-        EXPECT_EQ(c.takes.pause_ms, 500.0) << name;
+        EXPECT_EQ(c.takes.pause_ms, live_ml ? 300.0 : 500.0) << name;
         EXPECT_EQ(c.takes.min_takes, 20) << name;
         EXPECT_EQ(c.takes.min_move, 0.00002) << name;
         EXPECT_EQ(c.takes.score_ms, 1000.0) << name;
@@ -371,8 +372,10 @@ TEST(AgentDrift, TheDriftSectionAndSetOverrides) {
     }
     EXPECT_LOAD_ERROR(std::nullopt, {"drift.markup_factor"}, "section.key=value");
     EXPECT_LOAD_ERROR(std::nullopt, {"drift.nope=1"}, "unknown config key");
-    for (std::string name : {"btc-both", "eth-both", "btc-ml-both", "eth-ml-both"})  // on for BTC and ETH, x2.5 from 18 Oct
+    for (std::string name : {"btc-both", "eth-both", "btc-ml-both"})  // on for BTC and ETH, x2.5 from 18 Oct
         EXPECT_EQ(load_config(repo("config." + name + ".toml")).drift.markup_factor, 2.5) << name;
+    for (std::string name : {"eth-ml-both", "btc-ml-okx-only"})  // the live ML bots: x2 from 19 Oct evening
+        EXPECT_EQ(load_config(repo("config." + name + ".toml")).drift.markup_factor, 2.0) << name;
 }
 
 // --------------------------------------------------------------- futures

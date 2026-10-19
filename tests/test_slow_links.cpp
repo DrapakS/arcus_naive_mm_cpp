@@ -245,22 +245,3 @@ TEST(SlowLinkConfigs, ConfigsReconnectLateLinksAndTheMlArcusBookIsOnTwo) {
         EXPECT_EQ(cfg.arcus.connections, 2) << name;
     }
 }
-
-// config.btc-ml-okx-only.toml: config.btc-ml-both.toml with every guard off but OKX's, exactly the
-// paper btc-ml-okx-only run (scripts/paper_ab.sh) of 19 Oct 13:58-15:43.
-TEST(SlowLinkConfigs, TheLiveBtcMlOkxOnlyConfigIsThePaperRunOf19Oct) {
-    std::string repo = NMM_SOURCE_DIR;
-    Config live = load_config(repo + "/config.btc-ml-okx-only.toml");
-    Config paper = load_config(repo + "/config.btc-ml-both.toml",
-                               {"guard.drawdown=0", "futures.drawdown=0", "trades.drawdown=0", "bybit.drawdown=0", "arcus_guard.drawdown=0",
-                                "trend.drawdown=0", "add_guard.drawdown=0", "lag.max_ms=0", "takes.pause_ms=0", "drift.markup_factor=1",
-                                "okx.enabled=true", "okx.connections=1"});
-    EXPECT_EQ(describe(live), describe(paper));
-    EXPECT_TRUE(live.okx.enabled);
-    EXPECT_EQ(live.okx.inst_id, "BTC-USDT-SWAP");
-    EXPECT_EQ(live.okx.window_ms, 200.0);
-    EXPECT_EQ(live.okx.drawdown, 0.00002);
-    EXPECT_EQ(live.okx.pause_ms, 300.0);
-    EXPECT_EQ(live.pricing.model, "ml");
-    EXPECT_EQ(live.trading.direction, "both");
-}

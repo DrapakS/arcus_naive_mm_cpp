@@ -367,17 +367,14 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     }
     EXPECT_EQ(eth_ml.trading.tol_away, 0.000075);  // ML: 0.75 bp (19 Oct)
     EXPECT_EQ(eth.trading.tol_away, 0.00015);
-    Config replaced = eth_ml;
-    replaced.trading.tol_away = eth.trading.tol_away;
-    replaced.pricing.model = "basis";
-    replaced.ml = eth.ml;
-    replaced.agent = eth.agent;
-    replaced.trades = eth.trades;
-    replaced.bybit = eth.bybit;
-    replaced.okx = eth.okx;
-    replaced.futures.connections = 2;
-    replaced.binance.connections = 2;
-    EXPECT_EQ(text(replaced), text(eth));
+    // From 19 Oct evening the live ETH ML config goes its own way (test_live_19oct.cpp); the rest as eth-both
+    auto section = [](const Config& c, const std::string& name) {
+        for (const auto& line : describe(c))
+            if (line.starts_with("[" + name + "] ")) return line;
+        return std::string();
+    };
+    for (std::string name : {"arcus", "imbalance", "open_guard", "open_halt", "vol_markup"})
+        EXPECT_EQ(section(eth_ml, name), section(eth, name)) << name;
     // the Arcus book over two even on ML (19 Oct, evening): a late connection shows against the other one's copies
     EXPECT_EQ(eth_ml.binance.connections, 1);
     EXPECT_EQ(eth_ml.arcus.connections, 2);
