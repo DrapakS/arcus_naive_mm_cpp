@@ -195,6 +195,8 @@ namespace nmm {
 struct ArcusGatewayTestAccess {
     static void on_positions(ArcusGateway& gw, const Json& contents) { gw.on_positions(contents); }
     static void on_order_update(ArcusGateway& gw, const Json& data) { gw.on_order_update(data); }
+    static bool position_check(const ArcusGateway& gw) { return static_cast<bool>(gw.position_check_); }
+    static bool position_adopt(const ArcusGateway& gw) { return static_cast<bool>(gw.position_adopt_); }
 };
 }  // namespace nmm
 

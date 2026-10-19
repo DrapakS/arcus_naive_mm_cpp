@@ -106,7 +106,7 @@ void FakeArcusTrading::broadcast(const std::string& text) {
         if (!s->closed()) s->send(text);
 }
 
-void FakeArcusTrading::push(JsonObject& order) {
+void FakeArcusTrading::push(const JsonObject& order) {
     if (quiet_orders) return;
     seq += 1;
     JsonObject event = order;

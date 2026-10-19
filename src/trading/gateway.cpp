@@ -279,11 +279,18 @@ void Gateway::finish(const OrderPtr& order, OrderState state, std::optional<std:
     stats[state_value(state)] += 1;
     if (state == OrderState::REJECTED) {
         rejects_ += 1;
-        double cooldown = std::min(REJECT_COOLDOWN_S * std::pow(2.0, std::max(rejects_ - REJECTS_BEFORE_BACKOFF, 0)), REJECT_COOLDOWN_MAX_S);
+        bool crossed = reason && reason->find(CROSS_REJECT) != std::string::npos;
+        double cooldown;
+        if (crossed && rejects_ <= REJECTS_BEFORE_BACKOFF)
+            cooldown = 0.0;  // the book moved onto it: priced again at once
+        else if (crossed)
+            cooldown = std::min(REJECT_COOLDOWN_S * std::pow(2.0, rejects_ - REJECTS_BEFORE_BACKOFF - 1), REJECT_COOLDOWN_MAX_S);
+        else
+            cooldown = std::min(REJECT_COOLDOWN_S * std::pow(2.0, std::max(rejects_ - REJECTS_BEFORE_BACKOFF, 0)), REJECT_COOLDOWN_MAX_S);
         cooldown_until_ = monotonic() + cooldown;
         call_later(cooldown, [this] { on_change(); });
-        if (cooldown > REJECT_COOLDOWN_S)
-            events->warning("!!! {} placements rejected in a row: not placing for {:.0f}s", rejects_, cooldown);
+        if (cooldown > REJECT_COOLDOWN_S || (crossed && cooldown > 0))
+            events->warning("!!! {} placements rejected in a row: not placing for {:.1f}s", rejects_, cooldown);
     }
     if (is_working(o)) orders.erase(o->side);
     forget_recent(o->client_id);
@@ -438,6 +445,7 @@ void ArcusGateway::on_positions(const Json& contents) {
         round_trips->sync(position(), size ? entry : std::nullopt);
         found_position(size ? entry : std::nullopt);
         position_check_.cancel();  // what streamed before the reconnect is stale
+        position_adopt_.cancel();
         exchange_position_.reset();
         position_warned_.reset();
     } else if (!ours.empty()) {
@@ -445,6 +453,7 @@ void ArcusGateway::on_positions(const Json& contents) {
         // compare only once the updates have stopped for POSITION_SETTLE_S.
         exchange_position_ = size;
         position_check_.cancel();
+        position_adopt_.cancel();  // a new update: judged again once updates stop
         position_check_ = call_later(POSITION_SETTLE_S, [this] { check_position(); });
     }
 }
@@ -461,6 +470,24 @@ void ArcusGateway::check_position() {
         position_warned_ = key;
         events->warning("!!! exchange reports position {}, tracked {}", fmt(*exchange_position_), fmt(ours));
     }
+    if (!position_adopt_) {
+        Decimal theirs = *exchange_position_;
+        position_adopt_ = call_later(POSITION_ADOPT_S, [this, theirs, ours] { adopt_position(theirs, ours); });
+    }
+}
+
+void ArcusGateway::adopt_position(const Decimal& theirs, const Decimal& ours) {
+    // The mismatch held POSITION_ADOPT_S with no update and no fill of ours: the exchange's position
+    // is the one (a fill counted twice or missed); the limits and the closing order go by it from now.
+    position_adopt_ = TimerHandle();
+    if (exchange_position_ != theirs || position() != ours || theirs == ours)
+        return;  // something moved meanwhile: the next update is judged again
+    snapshot_position_ += theirs - ours;
+    position_warned_.reset();
+    events->warning("!!! taking the exchange's position {} (tracked {} for {:.0f} s)", fmt(theirs), fmt(ours),
+                    POSITION_SETTLE_S + POSITION_ADOPT_S);
+    round_trips->sync(position());
+    on_change();
 }
 
 // -------------------------------------------------------------- transport
@@ -1403,8 +1430,11 @@ void ArcusGateway::on_order_update(const Json& data, bool snapshot) {
     }
     if (terminal(o->state)) {
         // A late event of an order we have settled: its fills count, and if it is resting after
-        // all (a placement that landed late), pull it.
-        if (status == "OPEN") {
+        // all (a placement that landed late), pull it. Not one we saw filled whole (public trades,
+        // userFills): its OPEN came after those, the order is done (19 Oct ETH: a fill 69 ms after
+        // placing, its OPEN 12 ms later taken for a stray, the userFills of it counted again: the
+        // tracked position 0.312 off).
+        if (status == "OPEN" && o->state != OrderState::FILLED) {
             forget_recent(o->client_id);
             cancel_stray(data);
         }
