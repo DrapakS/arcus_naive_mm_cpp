@@ -239,13 +239,14 @@ public:
     std::optional<double> extreme(std::optional<double> now = {}, std::optional<std::string> side = {});
     // Add one price; a Trip when it is that far from the window's extreme. With both
     // sides watched, a price that far from both (a range over twice the drawdown) pauses both;
-    // the trip returned is the buy's, and the strategy pulls an order on a paused side.
+    // the trip returned is the buy's, `tripped` has both.
     std::optional<Trip> observe(double price);
     void reset() override;
 
     double drawdown;
     std::string side;
     std::vector<std::string> sides;
+    std::vector<Trip> tripped;  // every trip of the last price: both sides at once in a wide range
     // side -> (time, price) of the prices that can still be the window's high (BUY) or low
     // (SELL): each newer one lower (higher) than the one before, so the first is the extreme
     std::map<std::string, std::deque<std::pair<double, double>>> windows;

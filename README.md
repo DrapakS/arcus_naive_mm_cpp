@@ -2,9 +2,10 @@
 
 [arcus_naive_mm](https://github.com/DrapakS/arcus_naive_mm), переписанный на C++20: тот же наивный
 маркетмейкер для перпов [Arcus](https://docs.arcus.xyz) — котирует рынок Arcus по стакану и сделкам
-Binance (спот, фьючерс), Bybit и самого Arcus, режимы `off`/`quote`/`paper`/`live`.
+Binance (спот, фьючерс), Bybit, OKX и самого Arcus, режимы `off`/`quote`/`paper`/`live`.
 
-Порт сделан с Python-версии на коммите `ffb2bc9` и повторяет её поведение один в один: те же
+Порт сделан с Python-версии на коммите `2ab7fbe` (лента OKX swap для защиты, правки по ревью
+19 октября) и повторяет её поведение один в один: те же
 конфиги (они лежат здесь же, `config*.toml`), те же ключи командной строки, те же формулы, тики и
 округления, те же защиты, те же строки в логах — вплоть до текста. Поэтому всё, что README
 Python-версии рассказывает о прайсинге, защитах, торговле, ML, ключах и логах, верно и здесь;
@@ -20,7 +21,7 @@ Python-версии рассказывает о прайсинге, защита
 sudo apt install g++-13 cmake ninja-build libboost-all-dev libssl-dev libgtest-dev   # Ubuntu 24.04
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-./build/nmm_tests            # 396 тестов, ~45 с
+./build/nmm_tests            # 410 тестов, ~50 с
 ```
 
 Версия бота (коммит, ветка, есть ли незакоммиченные правки, отпечаток исходников) вшивается при
@@ -48,6 +49,8 @@ build/naive_mm --config config.toml --check                  # только пр
 - Прокси — как у aiohttp с `trust_env`: `https://` идёт через `HTTPS_PROXY`, `wss://` — только
   через `WSS_PROXY` (не `HTTPS_PROXY`), `ws://`/`http://` — через `WS_PROXY`/`HTTP_PROXY`;
   `NO_PROXY` соблюдается.
+- OKX (`[okx]`, в ETH-конфигах включён) по умолчанию идёт на порт 8443; если он закрыт,
+  `--set okx.ws_url='"wss://ws.okx.com"'` — тот же поток на 443.
 - Binance с HTTP 451 — те же зеркала: `--set binance.ws_url='"wss://data-stream.binance.vision"'
   --set binance.rest_url='"https://data-api.binance.vision"'` (или в конфиге).
 - ML-модели: LightGBM читается без библиотеки LightGBM — из текстового формата или из pickle
@@ -79,7 +82,7 @@ Python считает во `float`, C++ считает в `double`, а печа�
 | `pricing.py`                | `pricing.*`                                              |
 | `ml.py`, `lgbm.py`          | `ml.*`, `lgbm.*`                                         |
 | `health.py`                 | `health.*`                                               |
-| `feeds/*.py`                | `feeds/*` (базовая лента, Binance спот/фьючерс/сделки, Bybit, Arcus) |
+| `feeds/*.py`                | `feeds/*` (базовая лента, Binance спот/фьючерс/сделки, Bybit, OKX, Arcus) |
 | `trading/*.py`              | `trading/*` (шлюз Arcus и бумажный, стратегия, защиты, сессии, round trips, подпись) |
 | aiohttp, orjson, PyNaCl     | `net/net.*` (Beast + OpenSSL), `util/json.*` (Boost.JSON), `trading/signing.*` (OpenSSL Ed25519) |
 | asyncio, logging            | `util/aio.*`, `util/log.*`, `util/pyfmt.*` (форматирование как в Python) |

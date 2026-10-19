@@ -58,7 +58,7 @@ std::optional<bool> SessionClock::by_clock(double now) {
 
 bool SessionClock::outside() {
     double now = clock();
-    if (cached_ && now - cached_->first < 1.0) return cached_->second;
+    if (cached_ && 0 <= now - cached_->first && now - cached_->first < 1.0) return cached_->second;  // a clock stepped back works it out again
     auto open = by_clock(now);
     bool closed = (open.has_value() && !*open) || (reported_outside.has_value() && *reported_outside)
                   || (!open.has_value() && !reported_outside.has_value());

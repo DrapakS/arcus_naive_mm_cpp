@@ -126,6 +126,10 @@ awaitable<Json> ArcusBookFeed::fetch_snapshot() {
     HttpResponse resp = co_await http_get(url, {}, 10.0);
     resp.raise_for_status(url);
     Json data = parse_json(resp.body);
+    if (!data.is_object() || !data.as_object().contains("lastSequenceId")) {
+        // an error body with status 200: no book to sync to, so a failed request (retried)
+        throw std::invalid_argument("snapshot without lastSequenceId: " + to_str(data).substr(0, 200));
+    }
     (void)to_int(data.as_object().at("lastSequenceId"));  // what the sync reads: a malformed answer is a failed request
     co_return data;
 }

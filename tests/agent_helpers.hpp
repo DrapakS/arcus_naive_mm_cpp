@@ -40,6 +40,9 @@ struct AgentTestAccess {
     static std::string pricing_summary(Agent& a) { return a.pricing_summary(); }
     static std::unique_ptr<BinanceTradesFeed> make_trades_feed(Agent& a) { return a.make_trades_feed(); }
     static awaitable<void> exchange_watch(Agent& a) { return a.exchange_watch(); }
+    static void watch_moves(Agent& a, Pauses& g, OrderBook& book, const std::string& label, double max_age = 0.0, bool mid = false) {
+        a.watch_moves(g, book, label, max_age, mid);
+    }
 };
 
 namespace test::agent {
@@ -214,12 +217,13 @@ inline void evaluate(Agent& agent) {
 // An agent with a working order on `order_side` and a full guard window at 100000 behind each
 // price guard (test_agent._guarded_agent). The guards read the bot's clock, which only moves
 // when a test moves it.
-inline Bot guarded_agent(const std::string& order_side) {
+inline Bot guarded_agent(const std::string& order_side, bool okx = false) {
     Config c;
     c.pricing.window = c.pricing.min_samples = 1;
-    for (auto* g : {&c.guard.window_ms, &c.futures.window_ms, &c.bybit.window_ms, &c.arcus_guard.window_ms}) *g = 10;
-    c.guard.drawdown = c.futures.drawdown = c.bybit.drawdown = c.arcus_guard.drawdown = 0.0001;
-    c.guard.pause_ms = c.futures.pause_ms = c.bybit.pause_ms = c.arcus_guard.pause_ms = 50;
+    c.okx.enabled = okx;
+    for (auto* g : {&c.guard.window_ms, &c.futures.window_ms, &c.bybit.window_ms, &c.okx.window_ms, &c.arcus_guard.window_ms}) *g = 10;
+    c.guard.drawdown = c.futures.drawdown = c.bybit.drawdown = c.okx.drawdown = c.arcus_guard.drawdown = 0.0001;
+    c.guard.pause_ms = c.futures.pause_ms = c.bybit.pause_ms = c.okx.pause_ms = c.arcus_guard.pause_ms = 50;
     Bot b;
     b.agent = std::make_unique<Agent>(c);
     for (Pauses* g : b->guards) g->clock = b.clock.fn();

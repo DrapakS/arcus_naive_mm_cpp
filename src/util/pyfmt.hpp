@@ -54,6 +54,8 @@ std::string join(const std::vector<std::string>& parts, std::string_view sep);
 
 // Python's str.split() with no argument: on runs of whitespace.
 std::vector<std::string> split_ws(std::string_view s);
+// Python's str.split(sep): every piece, empty ones included.
+std::vector<std::string> split(std::string_view s, char sep);
 
 // Hex of bytes, lower case.
 std::string to_hex(const unsigned char* data, size_t n);

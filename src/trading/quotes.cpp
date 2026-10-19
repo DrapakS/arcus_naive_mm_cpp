@@ -110,6 +110,7 @@ std::string QuoteWatch::line(const MarketView& view, const std::string& tail) {
     if (view.reference) parts.push_back("binance " + pyrepr(view.reference->best_bid()) + "/" + pyrepr(view.reference->best_ask()));
     if (view.futures) parts.push_back("futures " + pyrepr(view.futures->best_bid()) + "/" + pyrepr(view.futures->best_ask()));
     if (view.bybit) parts.push_back("bybit " + pyrepr(view.bybit->best_bid()) + "/" + pyrepr(view.bybit->best_ask()));
+    if (view.okx) parts.push_back("okx " + pyrepr(view.okx->best_bid()) + "/" + pyrepr(view.okx->best_ask()));
     if (!tail.empty()) parts.push_back(tail);
     const auto& guards = strategy.guards;
     if (std::any_of(guards.begin(), guards.end(), [](Pauses* g) { return dynamic_cast<LagGuard*>(g) && g->paused("BUY"); }))

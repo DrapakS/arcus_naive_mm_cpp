@@ -144,10 +144,14 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     const BybitConfig& y = config.bybit;
     if (y.enabled) bybit_book = std::make_unique<OrderBook>("bybit-" + y.category, y.symbol);
     if (y.enabled && y.drawdown) bybit_guard = std::make_unique<PriceGuard>(y.window_ms / 1000, y.drawdown, y.pause_ms / 1000);
+    const OkxConfig& o = config.okx;  // the OKX perpetual's best bid/ask: one more guard input, nothing else reads it
+    if (o.enabled) okx_book = std::make_unique<OrderBook>("okx-swap", upper(o.inst_id));
+    if (o.enabled && o.drawdown) okx_guard = std::make_unique<PriceGuard>(o.window_ms / 1000, o.drawdown, o.pause_ms / 1000);
     // [agent] tob_lines: the label of each book whose best bid gets a line when its price changes
     if (config.agent.tob_lines) {
         for (auto [book, label] : {std::pair<const OrderBook*, const char*> {futures_book.get(), "BINANCE FUTURES"},
-                                   {&reference_book, "BINANCE SPOT"}, {bybit_book.get(), "BYBIT"}, {&venue_book, "ARCUS"}})
+                                   {&reference_book, "BINANCE SPOT"}, {bybit_book.get(), "BYBIT"}, {okx_book.get(), "OKX"},
+                                   {&venue_book, "ARCUS"}})
             if (book != nullptr) tob_labels_[book] = label;
     }
     const ArcusGuardConfig& a = config.arcus_guard;
@@ -177,7 +181,8 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     if (k.pause_ms)
         take_guard = std::make_unique<TakeGuard>(k.min_usd, k.pause_ms / 1000, monotonic, k.min_takes, k.min_move, k.score_ms / 1000);
     for (Pauses* gp : std::initializer_list<Pauses*> {guard.get(), futures_guard.get(), trades_guard.get(), bybit_guard.get(),
-                                                      arcus_guard.get(), trend_guard.get(), lag_guard.get(), take_guard.get()})
+                                                      okx_guard.get(), arcus_guard.get(), trend_guard.get(), lag_guard.get(),
+                                                      take_guard.get()})
         if (gp != nullptr) guards.push_back(gp);
     // the event loop's lag and the CPU share, for the health line; each lag is a reading of the lag guard
     std::function<void(double)> on_lag;
@@ -255,6 +260,9 @@ awaitable<void> Agent::run() {
     if (bybit_book)
         feeds.push_back(std::make_unique<BybitTickerFeed>(*bybit_book, cfg.bybit.category, cfg.bybit.symbol, cfg.bybit.ws_url,
                                                           options(cfg.bybit.stale_timeout_s, cfg.bybit.connections)));
+    if (okx_book)
+        feeds.push_back(std::make_unique<OkxTickerFeed>(*okx_book, cfg.okx.inst_id, cfg.okx.ws_url,
+                                                        options(cfg.okx.stale_timeout_s, cfg.okx.connections)));
     std::vector<Task> tasks;
     auto on_failure = [this](std::exception_ptr e) { fail(e); };
     auto spawn = [&](awaitable<void> aw, std::string name) { tasks.push_back(Task::spawn(std::move(aw), std::move(name), "naive_mm.agent", on_failure)); };
@@ -497,6 +505,10 @@ void Agent::on_book_update(OrderBook& book) {
         if (bybit_guard) watch_moves(*bybit_guard, book, "Bybit " + config.bybit.category);
         return;
     }
+    if (&book == okx_book.get()) {  // and for OKX: its guard only
+        if (okx_guard) watch_moves(*okx_guard, book, "OKX swap");
+        return;
+    }
     if (&book == &venue_book && futures_pricer) update_futures_fair(true);
     bool shadow_spot = spot_pricer != pricer;
     auto fair_before = fair_bid;
@@ -545,6 +557,8 @@ void Agent::on_ml_update(OrderBook& book) {
         if (lag_guard && book.exchange_ts_us && *book.exchange_ts_us && cfg.lag.bybit_max_ms)
             read_late(book.local_ts_us, *book.exchange_ts_us, "Bybit ticker", cfg.lag.bybit_max_ms);
         if (bybit_guard) watch_moves(*bybit_guard, book, "Bybit " + cfg.bybit.category);
+    } else if (&book == okx_book.get()) {
+        if (okx_guard) watch_moves(*okx_guard, book, "OKX swap");
     } else if (&book == &reference_book) {
         if (guard) watch_moves(*guard, book, "Binance", cfg.binance.max_book_age_s);
         if (&book == trend_book && trend_guard)  // [futures] off: spot it is
@@ -642,19 +656,24 @@ void Agent::watch_moves(Pauses& g, OrderBook& book, const std::string& label, do
     }
     double price = mid ? *book.mid() : book.best_bid()->first;
     std::optional<Trip> trip;
+    auto* trend = dynamic_cast<TrendGuard*>(&g);
     if (auto* pg = dynamic_cast<PriceGuard*>(&g)) trip = pg->observe(price);
-    else if (auto* tg = dynamic_cast<TrendGuard*>(&g)) trip = tg->observe(price);
+    else if (trend) trip = trend->observe(price);
     if (!trip) return;
-    std::string why = std::format("{} {} {} is {:.2f} bp {} its {} {}", label, mid ? "mid" : "bid", guard_px(price),
-                                  std::abs(price / trip->mean - 1) * 1e4, trip->drop() ? "under" : "over", g.reference_of(trip->side),
-                                  guard_px(trip->mean));
     // how late the frame was read, from the exchange's stamp on it: each ticker of Binance futures
-    // (and Bybit) carries one; the spot top comes from tickers without, the Arcus deltas have none
-    bool stamped = book.exchange_ts_us && *book.exchange_ts_us && (&book == futures_book.get() || &book == bybit_book.get());
+    // (and Bybit, OKX) carries one; the spot top comes from tickers without, the Arcus deltas have none
+    bool stamped = book.exchange_ts_us && *book.exchange_ts_us &&
+                   (&book == futures_book.get() || &book == bybit_book.get() || &book == okx_book.get());
     std::string seen = stamped ? std::format(" (read {:.0f} ms after the exchange's event)",
                                              static_cast<double>(book.local_ts_us - *book.exchange_ts_us) / 1e3)
                                : "";
-    tripped(g, *trip, label, why, seen);
+    // a two-sided trend guard in a range wider than twice its drawdown trips both sides at once
+    for (const Trip& each : trend ? trend->tripped : std::vector<Trip> {*trip}) {
+        std::string why = std::format("{} {} {} is {:.2f} bp {} its {} {}", label, mid ? "mid" : "bid", guard_px(price),
+                                      std::abs(price / each.mean - 1) * 1e4, each.drop() ? "under" : "over",
+                                      g.reference_of(each.side), guard_px(each.mean));
+        tripped(g, each, label, why, seen);
+    }
 }
 
 void Agent::watch_drift(OrderBook& book) {
@@ -927,6 +946,7 @@ void Agent::on_fill(const OrderPtr& order, const Decimal& size) {
     for (auto [label, g, book, mid] : {std::tuple<const char*, PriceGuard*, OrderBook*, bool> {"binance bid", guard.get(), &reference_book, false},
                                        {"futures bid", futures_guard.get(), futures_book.get(), false},
                                        {"bybit bid", bybit_guard.get(), bybit_book.get(), false},
+                                       {"okx bid", okx_guard.get(), okx_book.get(), false},
                                        {"arcus mid", arcus_guard.get(), &venue_book, true}}) {
         if (g == nullptr || book == nullptr || !book->is_ready()) continue;
         auto mean = g->mean();
@@ -1092,6 +1112,7 @@ MarketViewPtr Agent::build_view() {
     v->venue = venue_book.is_ready(cfg.arcus.max_book_age_s) ? venue_book.top(depth) : nullptr;
     v->futures = futures_book && futures_book->is_ready() ? futures_book->top(1) : nullptr;
     v->bybit = bybit_book && bybit_book->is_ready() ? bybit_book->top(1) : nullptr;
+    v->okx = okx_book && okx_book->is_ready() ? okx_book->top(1) : nullptr;
     if (ml) {  // the model's price as of now: its windows slide with time
         auto prediction = ml_prediction();
         fair_bid = prediction ? std::optional(prediction->fair_bid) : std::nullopt;
@@ -1220,8 +1241,8 @@ void Agent::log_status() {
         }
     }
     for (auto [name, g] : {std::pair<const char*, Pauses*> {"guard", guard.get()}, {"futures guard", futures_guard.get()},
-                           {"trades guard", trades_guard.get()}, {"bybit guard", bybit_guard.get()}, {"arcus guard", arcus_guard.get()},
-                           {"trend guard", trend_guard.get()}, {"take guard", take_guard.get()}}) {
+                           {"trades guard", trades_guard.get()}, {"bybit guard", bybit_guard.get()}, {"okx guard", okx_guard.get()},
+                           {"arcus guard", arcus_guard.get()}, {"trend guard", trend_guard.get()}, {"take guard", take_guard.get()}}) {
         if (g == nullptr) continue;
         std::vector<std::string> pausing;
         for (auto [s, verb] : {std::pair<const char*, const char*> {"BUY", "buying"}, {"SELL", "selling"}})

@@ -221,7 +221,7 @@ protected:
     virtual void add_position(const Decimal& delta, std::optional<int64_t> seq);
     void track_entry(const Decimal& before, const Decimal& price);
     // `fresh`: the event is happening now, not a snapshot's record of one.
-    void finish(const OrderPtr& order, OrderState state, std::optional<std::string> reason = {}, bool fresh = true);
+    virtual void finish(const OrderPtr& order, OrderState state, std::optional<std::string> reason = {}, bool fresh = true);
     // Note that `source` shows `order` filled `filled`; how long after the other sources showed as much, or "first".
     std::string seen(Order& order, const std::string& source, const Decimal& filled);
     // A finished order by clientId (the last RECENT_ORDERS), or null.

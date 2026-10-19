@@ -66,6 +66,8 @@ public:
     // `msg` carries market data (not an ack, a greeting or an app-level pong):
     // only such frames keep a link from going stale.
     virtual bool carries_data(const Json& msg) const { return true; }
+    // A frame that is no JSON message at all (OKX's bare "pong"): skipped, neither parsed nor counted.
+    virtual bool skips(std::string_view text) const { return false; }
     // Send `payload` on `link` (the first link when null); throws when it is down.
     virtual void send_json(const Json& payload, Link* link = nullptr);
     // Called after each (re)connect of a link, before its first message is read.

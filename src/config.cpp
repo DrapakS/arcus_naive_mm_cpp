@@ -106,6 +106,10 @@ template <class F> void fields(BybitConfig& c, F&& f) {
     f("stale_timeout_s", c.stale_timeout_s); f("connections", c.connections); f("window_ms", c.window_ms);
     f("drawdown", c.drawdown); f("pause_ms", c.pause_ms);
 }
+template <class F> void fields(OkxConfig& c, F&& f) {
+    f("enabled", c.enabled); f("inst_id", c.inst_id); f("ws_url", c.ws_url); f("stale_timeout_s", c.stale_timeout_s);
+    f("connections", c.connections); f("window_ms", c.window_ms); f("drawdown", c.drawdown); f("pause_ms", c.pause_ms);
+}
 template <class F> void fields(TakesConfig& c, F&& f) {
     f("min_usd", c.min_usd); f("pause_ms", c.pause_ms); f("min_takes", c.min_takes); f("min_move", c.min_move);
     f("score_ms", c.score_ms);
@@ -140,7 +144,7 @@ template <class F> void fields(AgentConfig& c, F&& f) {
 template <class F> void sections(Config& c, F&& f) {
     f("binance", c.binance); f("arcus", c.arcus); f("pricing", c.pricing); f("ml", c.ml); f("trading", c.trading);
     f("guard", c.guard); f("futures", c.futures); f("trades", c.trades); f("bybit", c.bybit);
-    f("arcus_guard", c.arcus_guard); f("takes", c.takes); f("trend", c.trend); f("add_guard", c.add_guard);
+    f("okx", c.okx); f("arcus_guard", c.arcus_guard); f("takes", c.takes); f("trend", c.trend); f("add_guard", c.add_guard);
     f("open_guard", c.open_guard); f("drift", c.drift); f("lag", c.lag); f("imbalance", c.imbalance); f("agent", c.agent);
 }
 
@@ -420,13 +424,21 @@ void Config::validate() const {
                 "(another asset only when listed in arcus.feed_assets)",
                 feed.name, pyrepr(std::string_view(feed.symbol)), join(assets, " or "), pyrepr(std::string_view(arcus.market))));
     }
+    if (okx.enabled) {
+        std::vector<std::string> parts = split(upper(okx.inst_id), '-');
+        if (parts.size() != 3 || !contains(assets, parts[0]) || !contains(DOLLAR_QUOTES, parts[1]) || parts[2] != "SWAP")
+            throw std::invalid_argument(std::format(
+                "okx.inst_id = {} is not the {} perpetual against the dollar (\"{}-USDT-SWAP\"), but arcus.market = {}",
+                pyrepr(std::string_view(okx.inst_id)), join(assets, " or "), base, pyrepr(std::string_view(arcus.market))));
+    }
     // Fractions of the price: 0.00001 = 0.1 bp. One over 1% is a value meant in bp.
     const TradingConfig& t = trading;
     for (auto [key, value] : std::initializer_list<std::pair<const char*, double>> {
              {"trading.markup", t.markup}, {"trading.tol", t.tol}, {"trading.tol_away", t.tol_away},
              {"trading.close_tol_away", t.close_tol_away}, {"guard.drawdown", guard.drawdown},
              {"futures.drawdown", futures.drawdown}, {"trades.drawdown", trades.drawdown},
-             {"bybit.drawdown", bybit.drawdown}, {"arcus_guard.drawdown", arcus_guard.drawdown}}) {
+             {"bybit.drawdown", bybit.drawdown}, {"okx.drawdown", okx.drawdown},
+             {"arcus_guard.drawdown", arcus_guard.drawdown}}) {
         if (value > MAX_FRACTION)
             throw std::invalid_argument(std::format("{} = {} is {} bp: it is a fraction of the price (0.00001 = 0.1 bp), at most {}",
                                                     key, g(value), g(value * 1e4), g(MAX_FRACTION)));
@@ -435,7 +447,8 @@ void Config::validate() const {
              {"binance.stale_timeout_s", binance.stale_timeout_s}, {"binance.max_book_age_s", binance.max_book_age_s},
              {"arcus.stale_timeout_s", arcus.stale_timeout_s}, {"arcus.max_book_age_s", arcus.max_book_age_s},
              {"futures.stale_timeout_s", futures.stale_timeout_s}, {"futures.max_book_age_s", futures.max_book_age_s},
-             {"trades.stale_timeout_s", trades.stale_timeout_s}, {"bybit.stale_timeout_s", bybit.stale_timeout_s}}) {
+             {"trades.stale_timeout_s", trades.stale_timeout_s}, {"bybit.stale_timeout_s", bybit.stale_timeout_s},
+             {"okx.stale_timeout_s", okx.stale_timeout_s}}) {
         if (value < 0) throw std::invalid_argument(std::format("{} must be >= 0 (0 = off)", key));
     }
     if (!(agent.status_interval_s >= 0.5)) throw std::invalid_argument("agent.status_interval_s must be at least 0.5");
@@ -499,6 +512,9 @@ void Config::validate() const {
     if (!(1 <= bybit.connections && bybit.connections <= 4)) throw std::invalid_argument("bybit.connections must be within 1..4");
     if (!guard_ok(bybit.drawdown, bybit.window_ms, bybit.pause_ms))
         throw std::invalid_argument("bybit needs 0 < window_ms <= 600000, 0 <= drawdown < 1, pause_ms within 0..60000");
+    if (!(1 <= okx.connections && okx.connections <= 4)) throw std::invalid_argument("okx.connections must be within 1..4");
+    if (!guard_ok(okx.drawdown, okx.window_ms, okx.pause_ms))
+        throw std::invalid_argument("okx needs 0 < window_ms <= 600000, 0 <= drawdown < 1, pause_ms within 0..60000");
     if (!guard_ok(arcus_guard.drawdown, arcus_guard.window_ms, arcus_guard.pause_ms))
         throw std::invalid_argument("arcus_guard needs 0 < window_ms <= 600000, 0 <= drawdown < 1, pause_ms within 0..60000");
     const TakesConfig& k = takes;

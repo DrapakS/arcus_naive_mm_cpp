@@ -221,6 +221,20 @@ struct BybitConfig {
     double pause_ms = 100.0;
 };
 
+struct OkxConfig {
+    // OKX V5 best bid/ask (bbo-tbt, pushed every 10 ms) of the perpetual `inst_id`, one more input of
+    // the price guard: same rule as [guard] with its own window (ms), drawdown and pause; drawdown 0
+    // keeps the feed (shown on the price lines) without the guard. Off unless enabled.
+    bool enabled = false;
+    std::string inst_id = "BTC-USDT-SWAP";
+    std::string ws_url = "wss://ws.okx.com:8443";  // port 443 works too: wss://ws.okx.com
+    double stale_timeout_s = 30.0;  // reconnect after this long without a message; 0 = off
+    int connections = 2;  // same stream over this many connections; the first copy of each snapshot wins
+    double window_ms = 200.0;
+    double drawdown = 0.00002;
+    double pause_ms = 300.0;
+};
+
 struct TakesConfig {
     // Arcus taker waves: a taker order of `min_usd` or more in the Arcus public trades pulls our
     // order on the side it hit and no order goes there for `pause_ms` after the last such take.
@@ -329,6 +343,7 @@ struct Config {
     FuturesConfig futures;
     TradesConfig trades;
     BybitConfig bybit;
+    OkxConfig okx;
     ArcusGuardConfig arcus_guard;
     TakesConfig takes;
     TrendConfig trend;

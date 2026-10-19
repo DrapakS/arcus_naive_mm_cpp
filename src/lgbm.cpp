@@ -93,7 +93,8 @@ Tree read_tree(std::string_view block, int n_features, size_t index) {
     std::string where = std::format("tree {} of the LightGBM model", index);
     auto get = [&](std::string_view key) -> const std::string& {
         auto it = kv.find(key);
-        if (it == kv.end()) throw std::invalid_argument(std::format("{} is malformed: no {}", where, key));
+        // a tree without one of its lines: a cut or edited file
+        if (it == kv.end()) throw std::invalid_argument(std::format("a tree of the LightGBM model has no {} line", key));
         return it->second;
     };
     auto get_or = [&](std::string_view key, std::string_view fallback) {

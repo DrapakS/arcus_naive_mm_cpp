@@ -24,6 +24,7 @@
 #include "feeds/binance_futures.hpp"
 #include "feeds/binance_trades.hpp"
 #include "feeds/bybit.hpp"
+#include "feeds/okx.hpp"
 #include "health.hpp"
 #include "ml.hpp"
 #include "orderbook.hpp"
@@ -79,6 +80,7 @@ public:
     OrderBook venue_book;
     std::unique_ptr<OrderBook> futures_book;
     std::unique_ptr<OrderBook> bybit_book;
+    std::unique_ptr<OrderBook> okx_book;
     std::vector<std::unique_ptr<BookFeed>> feeds;
     std::unique_ptr<BinanceTradesFeed> trades_feed;
     MarketViewPtr view;
@@ -86,7 +88,7 @@ public:
     Clock ml_clock = monotonic;  // the model's time: when each frame came, and "now" for its windows
     std::shared_ptr<Pricer> pricer, futures_pricer, spot_pricer;
     std::optional<double> fair_bid, futures_fair_bid, spot_fair_bid;
-    std::unique_ptr<PriceGuard> guard, futures_guard, bybit_guard, arcus_guard;
+    std::unique_ptr<PriceGuard> guard, futures_guard, bybit_guard, okx_guard, arcus_guard;
     std::unique_ptr<SweepGuard> trades_guard;
     std::unique_ptr<TrendGuard> trend_guard, add_guard;
     std::unique_ptr<OpenWindows> open_guard;

@@ -71,7 +71,9 @@ void BybitTickerFeed::on_message(const Json& msg, int64_t recv_ts_us, Link* link
     const Json* bids = jget(data, "b");
     const Json* asks = jget(data, "a");
     if (!truthy(bids) || !truthy(asks)) return;  // one side empty: keep the last full top
+    // no engine time: the push time, so the top still moves
     const Json* cts_field = jget(msg, "cts");
+    if (!truthy(cts_field)) cts_field = jget(msg, "ts");
     int64_t cts = truthy(cts_field) ? to_int(*cts_field) : 0;
     int64_t u = to_int(data.as_object().at("u"));
     std::pair<int64_t, int64_t> key {cts, u};

@@ -223,7 +223,7 @@ TEST_F(OrdersLog, TheSettingsInEffectOpenIt) {
         }
     // every section, so a log shows all it ran with
     EXPECT_EQ(sections, (std::set<std::string> {"binance", "arcus", "pricing", "ml", "trading", "guard", "futures", "trades", "bybit",
-                                                "arcus_guard", "takes", "trend", "add_guard", "open_guard", "drift", "lag", "imbalance",
+                                                "okx", "arcus_guard", "takes", "trend", "add_guard", "open_guard", "drift", "lag", "imbalance",
                                                 "agent"}));
 }
 
@@ -295,6 +295,47 @@ TEST(OrdersLogWriter, LinesItDroppedAreCountedAtTheEnd) {
     while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) text.pop_back();
     EXPECT_TRUE(ends_with(text, std::format("!!! orders log: {} lines dropped (the writer was far behind)", dropped)))
         << text.substr(text.size() > 200 ? text.size() - 200 : 0);
+}
+
+// test_review_19oct.test_7: a writer still stuck on its file after stop_logging's timeouts keeps
+// the file: no line is written beside its own, and the file is not closed under it.
+TEST(OrdersLogWriter, AWriterStillStuckAfterItsTimeoutKeepsItsFile) {
+    RootLevel root_level;
+    StderrCapture console;
+    OrdersPipe pipe;  // a page: the writer is stuck once it is full, until the test reads
+    auto handler = setup_logging(logging::WARNING, pipe.path());
+    ASSERT_NE(handler, nullptr);
+    Logger& orders = get_logger(ORDERS_LOGGER);
+    const size_t n = logging::QUEUE_SIZE + 500;
+    for (size_t i = 0; i < n; ++i) orders.info("filler {}", i);
+    size_t dropped = handler->dropped();
+    ASSERT_GT(dropped, 0u);  // a "lines dropped" line is due, if the file could take one
+    auto started = std::chrono::steady_clock::now();
+    stop_logging();  // two seconds to write out what is held, two more to end: then it is left behind
+    EXPECT_LT(elapsed_since(started), 6.0);
+    EXPECT_TRUE(handler->left_behind());
+    // once the file takes lines again the writer writes all it held: whole, in order, nothing beside them
+    fcntl(pipe.fd, F_SETPIPE_SZ, 1 << 20);
+    const std::string last = std::format("filler {}\n", n - dropped - 1);
+    std::string got;
+    bool eof = false;
+    std::vector<char> buf(1 << 16);
+    auto reading = std::chrono::steady_clock::now();
+    while (elapsed_since(reading) < 20.0 && !ends_with(got, last)) {
+        ssize_t r = ::read(pipe.fd, buf.data(), buf.size());
+        if (r > 0) {
+            got.append(buf.data(), static_cast<size_t>(r));
+        } else if (r == 0) {
+            eof = true;  // the file closed under the writer
+            break;
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
+    EXPECT_FALSE(eof);
+    EXPECT_TRUE(ends_with(got, last)) << got.substr(got.size() > 200 ? got.size() - 200 : 0);
+    EXPECT_EQ(got.find("lines dropped"), std::string::npos);
+    EXPECT_EQ(static_cast<size_t>(std::count(got.begin(), got.end(), '\n')), n - dropped);
 }
 
 TEST(OrdersLogWriter, StopSaysWhetherTheThreadIsDone) {

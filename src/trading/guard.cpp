@@ -255,11 +255,11 @@ std::optional<double> TrendGuard::extreme(std::optional<double> now_, std::optio
 
 std::optional<Trip> TrendGuard::observe(double price) {
     double now = clock();
-    std::vector<Trip> tripped;
+    std::vector<Trip> trips;
     for (const auto& s : sides) {
         auto ext = extreme(now, s);
         if (ext && (s == "BUY" ? price < *ext * (1.0 - drawdown) : price > *ext * (1.0 + drawdown)))
-            tripped.push_back(trip(s, *ext, now));
+            trips.push_back(trip(s, *ext, now));
         auto& window = windows[s];
         if (s == "BUY") {
             while (!window.empty() && window.back().second <= price) window.pop_back();
@@ -268,8 +268,9 @@ std::optional<Trip> TrendGuard::observe(double price) {
         }
         window.emplace_back(now, price);
     }
-    if (tripped.empty()) return std::nullopt;
-    return tripped.front();
+    tripped = trips;
+    if (trips.empty()) return std::nullopt;
+    return trips.front();
 }
 
 void TrendGuard::reset() {

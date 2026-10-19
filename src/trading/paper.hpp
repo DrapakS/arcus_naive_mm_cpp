@@ -30,10 +30,13 @@ public:
     void on_message(const Json& msg);
 
     std::string ws_url;
+    // The orders whose placement time is kept: those a trade can still fill (tests).
+    size_t placements_kept() const { return placed_us_.size(); }
 
 protected:
     void send_place(const OrderPtr& order) override;
     void send_cancel(const OrderPtr& order, const std::string& why = "") override;
+    void finish(const OrderPtr& order, OrderState state, std::optional<std::string> reason = {}, bool fresh = true) override;
 
 private:
     void cancel_acts(const OrderPtr& order);

@@ -128,6 +128,7 @@ awaitable<void> BookFeed::run_link(Link& link) {
             for (;;) {
                 auto text = co_await ws->read();
                 if (!text) break;
+                if (skips(*text)) continue;
                 const Json& data = parser.parse(*text);
                 if (carries_data(data)) {  // a greeting or an ack is no sign of health
                     received = true;

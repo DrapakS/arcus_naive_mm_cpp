@@ -111,12 +111,20 @@ pause_ms = 200                # 30 s); by 30 s those fills had lost $2.66, the w
                               # the match on 29% of the fills, the bot in time on 7 of those 25: it read the others
                               # 69-331 ms late (median 164 ms: the host's loop stalls). Paused a side 4.2% of the time.
 
-[bybit]                       # OFF: its guard was off (drawdown 0) and it fed only the price lines, at the cost of two
-enabled = false               # connections parsed all night (14 Oct feed check: nothing over futures, ~40 ms behind
-                              # Binance from Tokyo). Fewer messages for a loop that ran 50-190 ms behind (BTC p75-p90).
-category = "linear"
-symbol = "ETHUSDT"
-drawdown = 0                  # 0 = no Bybit guard
+[bybit]                       # ON, a guard: the perp's best bid vs its own 200 ms mean. The toxic ETH taker 0x5c82bbe3
+enabled = true                # took in its "predictive" mode (no Binance futures move first) after the Bybit perp moved
+category = "linear"           # first in 25% of its takes, the OKX swap in 21%, Binance in 6-8%; on the trades of both
+symbol = "ETHUSDT"            # perps (18 Oct 16:20-24:00, 200 ms / 0.2 bp / 300 ms, our 50-60 ms) the two guards would
+window_ms = 200               # have kept us out of 85 of its 152 fills and 13 others for +5.6% of the time paused a side.
+drawdown = 0.00002            # 0.2 bp. On their best bids (recorded 19 Oct): the same time paused, the same episodes.
+pause_ms = 300
+
+[okx]                         # ON: the OKX swap's best bid (bbo-tbt), the same guard as Bybit's
+enabled = true
+inst_id = "ETH-USDT-SWAP"
+window_ms = 200
+drawdown = 0.00002
+pause_ms = 300
 
 [arcus_guard]                 # Arcus mid vs its own 3 s mean: a safety net for sweeps Binance does not show
 window_ms = 3000

@@ -17,6 +17,7 @@ struct MarketView {
     std::optional<double> futures_fair_bid;  // the fair bid priced off futures (for the logs when pricing off spot)
     std::optional<double> spot_fair_bid;  // the fair bid priced off spot (for the logs when pricing off futures)
     BookTopPtr bybit;  // Bybit best bid/ask, when that feed is on and ready
+    BookTopPtr okx;  // OKX perpetual best bid/ask, when that feed is on and ready
     // (futures fair / spot fair - 1) in bp now, and its change over the last GAP_WINDOW_S: how far
     // futures (which move first) have pulled away from spot; for the logs
     std::optional<double> fair_gap_bps;

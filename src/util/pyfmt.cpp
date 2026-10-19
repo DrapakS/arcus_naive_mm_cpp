@@ -183,6 +183,16 @@ std::vector<std::string> split_ws(std::string_view s) {
     return out;
 }
 
+std::vector<std::string> split(std::string_view s, char sep) {
+    std::vector<std::string> out;
+    for (size_t start = 0;;) {
+        size_t at = s.find(sep, start);
+        out.emplace_back(s.substr(start, at == std::string_view::npos ? std::string_view::npos : at - start));
+        if (at == std::string_view::npos) return out;
+        start = at + 1;
+    }
+}
+
 std::string to_hex(const unsigned char* data, size_t n) {
     static const char* digits = "0123456789abcdef";
     std::string out;

@@ -60,6 +60,12 @@ void PaperGateway::send_cancel(const OrderPtr& o, const std::string& why) {
     call_later(CANCEL_LATENCY_S, [this, o] { cancel_acts(o); });
 }
 
+void PaperGateway::finish(const OrderPtr& order, OrderState state, std::optional<std::string> reason, bool fresh) {
+    const OrderPtr o = order;  // a copy: finishing may destroy what `order` refers to
+    Gateway::finish(o, state, std::move(reason), fresh);
+    if (terminal(o->state)) placed_us_.erase(o->client_id);  // no trade can fill it any more
+}
+
 void PaperGateway::cancel_acts(const OrderPtr& o) {
     if (o->state == OrderState::PENDING_CANCEL) {  // not filled meanwhile
         finish(o, OrderState::CANCELED);
