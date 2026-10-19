@@ -12,6 +12,12 @@
 #   bash scripts/paper_ab.sh start basis-both ml-both            BTC: basis vs ML, both sides
 #   bash scripts/paper_ab.sh start eth-basis-both eth-ml-both    ETH: the same A/B
 #   bash scripts/paper_ab.sh start basis-both basis-both-nodrift    the drift guard A/B
+#   bash scripts/paper_ab.sh start eth-ml-both eth-ml-okx-only   ETH ML as live vs the same with every guard off but OKX's
+#                                            (Binance spot/futures/trades, Bybit, Arcus, trend, add, lag, takes guards and
+#                                            the drift markup off; the Bybit feed stays, the model reads it)
+#   bash scripts/paper_ab.sh start ml-both btc-ml-okx-only       BTC the same: config.btc-ml-both.toml (the guards of the
+#                                            live BTC bot) vs the same with every guard off but an OKX one (BTC-USDT-SWAP,
+#                                            200 ms / 0.2 bp / 300 ms, one connection: the live BTC bot has no OKX guard)
 # Logs of an earlier run are kept: renamed with the time they were moved aside (paper-basis.20261016-2030.log).
 # Each bot wants a CPU core of its own: with more bots than cores (live ones included) it warns, as the event
 # loops then stall each other and the comparison measures the host rather than the pricing.
@@ -25,12 +31,14 @@ cd "$(dirname "$0")/.."
 ALL="basis:config.recommended.toml ml:config.btc-ml.toml gld:config.gld.toml
      basis-both:config.btc-both.toml ml-both:config.btc-ml-both.toml
      basis-both-nodrift:config.btc-both.toml@drift.markup_factor=1
-     eth-basis-both:config.eth-both.toml eth-ml-both:config.eth-ml-both.toml"
+     eth-basis-both:config.eth-both.toml eth-ml-both:config.eth-ml-both.toml
+     eth-ml-okx-only:config.eth-ml-both.toml@guard.drawdown=0@futures.drawdown=0@trades.drawdown=0@bybit.drawdown=0@arcus_guard.drawdown=0@trend.drawdown=0@add_guard.drawdown=0@lag.max_ms=0@takes.pause_ms=0@drift.markup_factor=1
+     btc-ml-okx-only:config.btc-ml-both.toml@guard.drawdown=0@futures.drawdown=0@trades.drawdown=0@bybit.drawdown=0@arcus_guard.drawdown=0@trend.drawdown=0@add_guard.drawdown=0@lag.max_ms=0@takes.pause_ms=0@drift.markup_factor=1@okx.enabled=true@okx.connections=1"
 cmd=${1:-start}
 [ $# -gt 0 ] && shift
 names="$*"
 if [ -z "$names" ]; then
-    if [ "$cmd" = start ]; then names="basis ml"; else names="basis ml gld basis-both ml-both basis-both-nodrift eth-basis-both eth-ml-both"; fi
+    if [ "$cmd" = start ]; then names="basis ml"; else names="basis ml gld basis-both ml-both basis-both-nodrift eth-basis-both eth-ml-both eth-ml-okx-only btc-ml-okx-only"; fi
 fi
 RUNS=""
 for name in $names; do
@@ -39,7 +47,7 @@ for name in $names; do
         if [ "${run%%:*}" = "$name" ]; then match=$run; fi
     done
     if [ -z "$match" ]; then
-        echo "unknown run $name: basis, ml, gld, basis-both, ml-both, basis-both-nodrift, eth-basis-both or eth-ml-both" >&2; exit 2
+        echo "unknown run $name: basis, ml, gld, basis-both, ml-both, basis-both-nodrift, eth-basis-both, eth-ml-both, eth-ml-okx-only or btc-ml-okx-only" >&2; exit 2
     fi
     RUNS="$RUNS $match"
 done
@@ -62,8 +70,12 @@ start)
     new=0
     for run in $RUNS; do
         name=${run%%:*} config=${run#*:}
-        sets=()  # name:config@section.key=value: that config with the value overridden (--set)
-        if [ "${config#*@}" != "$config" ]; then sets=(--set "${config#*@}"); config=${config%%@*}; fi
+        sets=()  # name:config@section.key=value[@...]: that config with each value overridden (--set)
+        if [ "${config#*@}" != "$config" ]; then
+            IFS=@ read -r -a overrides <<< "${config#*@}"
+            for o in "${overrides[@]}"; do sets+=(--set "$o"); done
+            config=${config%%@*}
+        fi
         if pid=$(running "$name"); then
             echo "paper-$name already running (pid $pid)"
             continue
@@ -107,7 +119,7 @@ stop)
     done
     ;;
 *)
-    echo "usage: bash scripts/paper_ab.sh [start|status|stop] [basis ml gld basis-both ml-both eth-basis-both eth-ml-both]" >&2
+    echo "usage: bash scripts/paper_ab.sh [start|status|stop] [basis ml gld basis-both ml-both eth-basis-both eth-ml-both eth-ml-okx-only]" >&2
     exit 2
     ;;
 esac

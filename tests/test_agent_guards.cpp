@@ -316,9 +316,11 @@ TEST(AgentTakes, TheBtcAndEthConfigsTurnItOn) {
 TEST(AgentTakes, TheTwoSidedConfigsHoldThePriceTheBookCameTo) {
     for (std::string name : {"btc-both", "eth-both", "btc-ml-both", "eth-ml-both", "sol-both", "nvda-both", "gld-both"}) {
         Config c = load_config(repo("config." + name + ".toml"));
-        EXPECT_TRUE(c.trading.never_lead) << name;
+        EXPECT_EQ(c.trading.never_lead, !name.starts_with("eth")) << name;
         EXPECT_EQ(c.trading.came_hold_ms, 300.0) << name;
     }
+    for (std::string name : {"eth", "eth-both", "eth-ml-both"})  // ETH: never_lead off from 19 Oct evening
+        EXPECT_FALSE(load_config(repo("config." + name + ".toml")).trading.never_lead) << name;
     EXPECT_EQ(Config().trading.came_hold_ms, 0);  // off by default
     for (std::string name : {"nvda-both", "gld-both"}) {  // a quiet perp top off hours is still the price
         Config c = load_config(repo("config." + name + ".toml"));

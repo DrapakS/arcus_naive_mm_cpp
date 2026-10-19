@@ -229,18 +229,35 @@ TEST_P(AgentMlEndToEnd, TheMlPricingRunsOverTheFeeds) {
 
 INSTANTIATE_TEST_SUITE_P(Kinds, AgentMlEndToEnd, ::testing::Values("linear", "lightgbm"));
 
-// config.btc-ml-both.toml (18 Oct evening): off futures, imbalances, skip_missing. The spot book
-// never ready holds its features (here at their means: never known), the price comes from Arcus,
-// futures and the basis bot's prediction; a log line names what is held.
-TEST(AgentMl, TheMlPaperConfigPricesOnWhenTheSpotBookGoesQuiet) {
+// config.btc-ml-both.toml (19 Oct evening): off futures, 21 features with the Bybit perp's,
+// skip_missing. The spot and Bybit books never ready hold their features (here at their means: never
+// known), the price comes from Arcus, futures and the basis bot's prediction; a log line names what
+// is held. Bybit is on for the model only.
+TEST(AgentMl, TheMlPaperConfigPricesOnWhenTheSpotAndBybitBooksGoQuiet) {
     LogCapture log(ORDERS_LOGGER);
     Config c = load_config(repo("config.btc-ml-both.toml"));
     EXPECT_EQ(c.ml.target_base, "futures");
     EXPECT_EQ(c.ml.target_window_s, 30.0);
     EXPECT_TRUE(c.ml.skip_missing);
     EXPECT_EQ(strings(c.ml.required), (std::vector<std::string> {"basis_pred_ema30s"}));
-    EXPECT_FALSE(c.bybit.enabled);
+    EXPECT_TRUE(c.bybit.enabled);  // a feed, not a guard
+    EXPECT_EQ(c.bybit.symbol, "BTCUSDT");
+    EXPECT_FALSE(c.bybit.drawdown);
     EXPECT_EQ(c.trading.tol, 0.000005);
+    const ConfigTable &w = c.ml.weights, &mean = c.ml.mean, &scale = c.ml.scale;
+    std::vector<std::string> names;
+    std::set<std::string> name_set, mean_set, scale_set;
+    for (const auto& [n, v] : numbers(w))
+        if (n != "intercept") {
+            names.push_back(n);
+            name_set.insert(n);
+            EXPECT_NE(v, 0.0) << n;
+        }
+    for (const auto& [n, v] : numbers(mean)) mean_set.insert(n);
+    for (const auto& [n, v] : numbers(scale)) scale_set.insert(n);
+    EXPECT_EQ(names.size(), 21u);
+    EXPECT_EQ(name_set, mean_set);
+    EXPECT_EQ(name_set, scale_set);
     Bot b = ml_agent(c.ml.weights, [&](MlConfig& m) {
         m.target_base = "futures";
         m.target_window_s = 30.0;
@@ -253,7 +270,8 @@ TEST(AgentMl, TheMlPaperConfigPricesOnWhenTheSpotBookGoesQuiet) {
     Agent& agent = *b.agent;
     EXPECT_EQ(std::set<std::string>(agent.ml->needed_venues.begin(), agent.ml->needed_venues.end()),
               (std::set<std::string> {"arcus", "binance_futures"}));
-    EXPECT_EQ(agent.ml->venues, (Venues {"arcus", "binance", "binance_futures"}));
+    EXPECT_EQ(std::set<std::string>(agent.ml->venues.begin(), agent.ml->venues.end()),
+              (std::set<std::string> {"arcus", "binance", "binance_futures", "bybit"}));
     for (int k = 0; k < 1000; ++k) {  // 100 s: the 30 s means warm up (90 s)
         b.clock.advance(0.1);
         tick(agent, agent.venue_book, 81'000.0, 81'000.2);
@@ -261,22 +279,24 @@ TEST(AgentMl, TheMlPaperConfigPricesOnWhenTheSpotBookGoesQuiet) {
     }
     auto pred = A::ml_prediction(agent);
     ASSERT_TRUE(pred.has_value());
-    EXPECT_EQ(std::set<std::string>(pred->skipped.begin(), pred->skipped.end()),
-              (std::set<std::string> {"binance_imb1", "binance_mid_r1s"}));
+    std::set<std::string> quiet;
+    for (const auto& n : names)
+        if (starts_with(n, "binance_imb") || starts_with(n, "binance_mid") || starts_with(n, "bybit_") || starts_with(n, "basis_bybit_"))
+            quiet.insert(n);
+    EXPECT_EQ(std::set<std::string>(pred->skipped.begin(), pred->skipped.end()), quiet);
     auto messages = log.messages();
     EXPECT_TRUE(std::any_of(messages.begin(), messages.end(), [](const std::string& m) {
-        return has(m, "--- ml: binance_imb1, binance_mid_r1s unknown now: held at the last value");
+        return has(m, "--- ml: ") && has(m, "unknown now: held at the last value");
     }));
-    // standing prices: basis_pred is the Arcus mid over the futures mid (-14.8 bp), the imbalances
-    // and the basis deviation 0, the spot ones held at their means
-    const ConfigTable &w = c.ml.weights, &mean = c.ml.mean, &scale = c.ml.scale;
-    std::vector<std::pair<std::string, double>> x {
-        {"basis_pred_ema30s", 81'000.1 / 81'120.05 - 1}, {"binance_futures_imb1", 0.0}, {"arcus_imb1", 0.0},
-        {"basis_binance_futures_mid_ema30s", 0.0},       {"binance_imb1", number_of(mean, "binance_imb1")},
-        {"binance_mid_r1s", number_of(mean, "binance_mid_r1s")}};
+    // basis_pred is the Arcus mid over the futures mid (-14.8 bp); the held ones count at their means (nothing)
+    EXPECT_NEAR(pred->feature("basis_pred_ema30s"), 81'000.1 / 81'120.05 - 1, 1e-9);
     double y = number_of(w, "intercept");
-    for (const auto& [n, v] : x) y += number_of(w, n) * (v - number_of(mean, n)) / number_of(scale, n);
-    EXPECT_NEAR(pred->feature("basis_pred_ema30s"), x[0].second, 1e-9);
+    for (const auto& n : names) {
+        double x = number_of(mean, n);
+        for (const auto& [f, v] : pred->features)
+            if (f == n) x = v;
+        y += number_of(w, n) * (x - number_of(mean, n)) / number_of(scale, n);
+    }
     EXPECT_NEAR(pred->value, y, 1e-9);
     EXPECT_APPROX(pred->fair_bid, 81'120.05 * (1 + y) - 0.1, 1e-6, 1e-12);
 }
