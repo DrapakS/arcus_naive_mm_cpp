@@ -679,15 +679,15 @@ std::vector<RequestPtr> ArcusGateway::post(const std::string& method, const Json
             request->failed = true;
             call_soon([this, conn, request_id, request] { on_send_done(*conn, request_id, request, conn->name + " connection is down"); });
         } else {
-            bool started = conn->ws->send(dump_json(envelope), [this, conn, request_id, request, mark_sent](const std::string& error) {
+            conn->ws->send(dump_json(envelope), [this, conn, request_id, request](const std::string& error) {
                 if (!error.empty()) {
                     request->failed = true;
                     on_send_done(*conn, request_id, request, error);
-                } else if (!request->sent) {
-                    mark_sent();
                 }
             });
-            if (started) mark_sent();  // on its way to the socket already
+            // Handed to the connection: on the wire at once, or right behind the frame being written
+            // (as aiohttp counts a frame sent once its transport has it).
+            if (!request->failed) mark_sent();
         }
         copies.emplace_back(conn, request_id);
         requests.push_back(request);

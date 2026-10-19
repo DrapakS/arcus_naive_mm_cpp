@@ -53,9 +53,10 @@ namespace nmm {
 
 class WsConnection;
 
+// The timeouts below that are `inline double` rather than constexpr: tests shorten them.
 constexpr int64_t GOOD_TIL_US = 35LL * 86'400 * 1'000'000;  // Arcus wants goodTilTime at least a month out
-constexpr double PENDING_TIMEOUT_S = 10.0;  // a place/cancel without any answer for this long is re-cancelled
-constexpr double REJECT_COOLDOWN_S = 0.5;  // pause after a rejected order so a stale book cannot spin us
+inline double PENDING_TIMEOUT_S = 10.0;  // a place/cancel without any answer for this long is re-cancelled
+inline double REJECT_COOLDOWN_S = 0.5;  // pause after a rejected order so a stale book cannot spin us
 // Rejections in a row past this many double the pause each time, up to the maximum: a placement
 // the exchange keeps refusing (margin, a market gone offline) must not drain the order pool every
 // bot on the subaccount shares at two a second.
@@ -64,7 +65,7 @@ constexpr double REJECT_COOLDOWN_MAX_S = 30.0;
 // A leftover order we cancelled that has not gone away this long is looked up in GET
 // /v1/openOrders: Arcus answers 202 to a cancel of an order it no longer has, and a snapshot
 // after a reconnect can list as OPEN an order cancelled long since.
-constexpr double STRAY_CHECK_S = 5.0;
+inline double STRAY_CHECK_S = 5.0;
 constexpr double RECONNECT_RESET_S = 10.0;  // a connection that lived this long reconnects at once, however it ended
 // A connection whose answers come slow (cancel replies; on main also the orders channel and
 // userFills events, from the exchange's stamp) is reconnected: after an Arcus-wide reconnect some
@@ -84,13 +85,13 @@ constexpr double OPEN_IN_BOOK_S = 0.02;
 // The orders channel can report our order CANCELED a moment before the public book drops its
 // level: for this long the level is still taken to be ours.
 constexpr double STALE_LEVEL_S = 0.1;
-constexpr double POSITION_SETTLE_S = 1.0;  // a streaming position update is compared with ours once updates stop this long
-constexpr double NOT_FOUND_GRACE_S = 2.0;  // a cancel that found nothing waits this long for the orders channel
+inline double POSITION_SETTLE_S = 1.0;  // a streaming position update is compared with ours once updates stop this long
+inline double NOT_FOUND_GRACE_S = 2.0;  // a cancel that found nothing waits this long for the orders channel
 constexpr double OPEN_ORDERS_TIMEOUT_S = 5.0;  // GET /v1/openOrders, asked when a cancel of a resting order hears nothing
 // A reconnect snapshot that lists as OPEN an order we were cancelling: its cancel is sent again,
 // and if nothing has come of it this long after, GET /v1/openOrders is asked at once rather than
 // after PENDING_TIMEOUT_S (Arcus has sent stale snapshots of orders a lane had already cancelled).
-constexpr double SNAPSHOT_RECHECK_S = 1.0;
+inline double SNAPSHOT_RECHECK_S = 1.0;
 constexpr size_t RECENT_ORDERS = 16;  // finished orders whose late orders-channel events still count
 
 enum class OrderState { PENDING_NEW, OPEN, PENDING_CANCEL, FILLED, CANCELED, REJECTED };
