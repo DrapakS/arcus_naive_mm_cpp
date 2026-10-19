@@ -117,6 +117,9 @@ def parse(path: str, start: float | None, end: float | None) -> Run:
             if logger == "naive_mm.config" and message.startswith("naive_mm ") and not run.version:
                 run.version = message[len("naive_mm "):]
                 continue
+            if message.startswith("=== AT EXIT"):  # the last word of a run, whenever the other one stopped
+                run.at_exit = message
+                continue
             if (start is not None and t < start) or (end is not None and t > end):
                 continue
             run.start = t if run.start is None else run.start
@@ -139,8 +142,6 @@ def parse(path: str, start: float | None, end: float | None) -> Run:
             elif message.startswith("=== ROUND TRIP"):
                 if (trip := TRIP.search(message)) is not None:
                     run.trips.append((float(trip[1]), float(trip[2]), float(trip[3]), int(trip[4])))
-            elif message.startswith("=== AT EXIT"):
-                run.at_exit = message
             elif message.startswith("!!! "):
                 word = message.split()[1]
                 if word in GUARDS:

@@ -1065,13 +1065,19 @@ awaitable<void> Agent::market_data_loop() {
     for (;;) {
         co_await changed_.wait();
         // the frames already read come first: a burst is evaluated once, on the book it settles to (as
-        // under asyncio, where a feed reads every frame its socket holds before this loop gets its turn)
-        for (int turn = 0; turn < 64; ++turn) {
-            changed_.clear();
-            co_await asio::post(co_await asio::this_coro::executor, asio::use_awaitable);
-            if (!changed_.is_set()) break;
-        }
+        // under asyncio, where a feed reads every frame its socket holds before this loop gets its turn).
+        // A frame held by TLS or Beast takes a turn or two of the queue to come out: three quiet turns
+        // in a row, and nothing more is waiting.
         changed_.clear();
+        for (int turn = 0, quiet = 0; turn < 64 && quiet < 3; ++turn) {
+            co_await asio::post(co_await asio::this_coro::executor, asio::use_awaitable);
+            if (changed_.is_set()) {
+                changed_.clear();
+                quiet = 0;
+            } else {
+                ++quiet;
+            }
+        }
         view = build_view();
         on_market_data(*view);
     }
