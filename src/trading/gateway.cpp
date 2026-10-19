@@ -264,7 +264,9 @@ void Gateway::forget_recent(const std::string& client_id) {
     std::erase_if(recent_, [&](const auto& kv) { return kv.first == client_id; });
 }
 
-void Gateway::finish(const OrderPtr& o, OrderState state, std::optional<std::string> reason, bool fresh) {
+void Gateway::finish(const OrderPtr& order, OrderState state, std::optional<std::string> reason, bool fresh) {
+    // A copy: `order` may be the map entry that leaving `orders` destroys below.
+    const OrderPtr o = order;
     if (terminal(o->state)) return;
     if (state == OrderState::CANCELED && fresh && (!reason || *reason == "margin_canceled") && o->remaining() > 0 &&
         (o->seen_open || o->acked_at)) {
