@@ -1,0 +1,104 @@
+# naive_mm live config: Arcus NEAR-USD from the Tokyo host. Use the latest code of branch claude/funny-wright-a95ao3
+# (5789db9 or later: [lag] is a new key, and older code refuses keys it does not know).
+# First values from Binance 1-minute closes (14 Oct) and the Arcus book of that evening, scaled from the
+# ETH config by volatility and tick size. Live since the night of 14-15 Oct (10 trips, -$2.35;
+# one 2-hour hold in a slide lost $3.84; the [trades] guard stays off here, see below). Then runs 22 (3 trips,
+# +$0.42) and 23 (2 trips, -$0.67, held 14 and 43 min while NEAR fell 2.8%): 15 trips, -$2.60 in all, set by
+# the market's direction rather than the markup. Not worth a CPU core the BTC, ETH and SOL bots need: on a
+# host without a free core per bot, leave this bot off (README, "Хост").
+# Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
+# Every symbol below must stay NEAR (the bot refuses to start when an enabled feed's symbol is not the arcus.market
+# asset). This file never trades by itself: the command line passes --trade quote / paper / live.
+# NEAR-USD on Arcus (GET /v1/markets): marketId 56, tick 0.001 (2.07 bp at $4.82), step 0.000001, min order
+# 0.1 NEAR and $5 notional. Arcus NEAR-USD: ~$7.7M a day, ~15.8k trades; spread 1 tick = 2.07 bp, top sizes
+# $0.1-0.6k, top-10 ~$250-300k a side. A coarse-tick market: a quote is at the touch or a whole tick (2 bp)
+# away, whatever the markup.
+# Volatility (std of 1-minute returns on Binance spot): 21.9 bp, 3.61x BTC (ETH 1.36x). Binance ticks are as coarse:
+# 0.001 = 2.07 bp on spot and futures.
+log_level = "INFO"
+
+[binance]                     # spot: the spot guard, the price lines and the logs (pricing is off futures)
+symbol = "NEARUSDT"           # tick 0.001 (2.07 bp). Behind a geo-block (HTTP 451) use
+                              # wss://data-stream.binance.vision + https://data-api.binance.vision
+
+[arcus]
+market = "NEAR-USD"
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected (a stream that stopped
+                              # while the connection still answers pings; needs the 15 Oct code)
+
+[pricing]
+reference = "futures"         # as BTC and ETH: futures move first (14 Oct check over six runs)
+basis_s = 30
+window = 1000                 # used only with basis_s = 0
+min_samples = 100
+
+[trading]
+mode = "off"                  # the command line sets --trade quote / paper / live
+direction = "long"            # "short": sell first, then buy it back
+markup = 0.00006              # 0.6 bp, the owner's choice (twice the first 0.3 bp, ETH's 0.125 bp x 2.7 for
+                              # volatility). Under a tick: the buy joins the best bid when the fair is >= 0.6 bp
+                              # above it, else it rests a tick (2 bp) lower
+close_markup_cut = 0.3        # the closing order takes 30% less markup (0.42 bp)
+tol = 0.000005                # 0.05 bp: the target moves only by whole ticks, so any move re-places
+tol_away = 0.00025            # 2.5 bp, just over a tick: a buy one tick deep keeps its place in the queue,
+                              # two ticks deep it is lifted
+close_tol_away = 0.000005     # 0.05 bp (= tol, back from 2.5 bp): the exit follows a falling target at once. Replay
+                              # of the night's targets: 2.5 bp would cut the placements 29% but leave the exit sell at
+                              # the best ask 23% of its time instead of 34%, and NEAR's losses are long holds in a fall
+                              # (one trip held 2 h, -378 bp). The run used 0.05 bp, and requests are not short: at
+                              # 05:10 the account's order pool was 13% used (171k of 1.29M)
+order_size = 21               # NEAR, ~$101 at $4.82 (the owner's ~$100)
+never_lead = true             # join, never improve; pull when the book comes to the order
+dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
+cancel_lanes = 1
+presign_cancel_s = 1
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+[guard]                       # Binance spot best bid vs its time-weighted mean: a backup for the futures guard
+window_ms = 300
+drawdown = 0.00025            # 2.5 bp: over one Binance tick (2.07 bp): trips on a 2-tick move in 300 ms
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: the main guard and the fair
+enabled = true
+symbol = "NEARUSDT"
+stale_timeout_s = 5
+window_ms = 300
+drawdown = 0.00025            # 2.5 bp: over one futures tick (2.07 bp)
+pause_ms = 200
+
+[trades]                      # Binance spot trades as a guard: OFF for NEAR. Night of 14-15 Oct the fills that came
+enabled = false               # after such a sweep made +2.8 bp 5 s later (25 of the 64 NEAR and ZEC fills): the takers
+                              # here are slower (~0.3 s after Binance), so the guard would mostly cost good fills.
+
+[bybit]                       # OFF: its guard was off (drawdown 0) and it fed only the price lines, at the cost of two
+enabled = false               # connections parsed all night (14 Oct feed check: nothing over futures, ~40 ms behind
+                              # Binance from Tokyo). Fewer messages for a loop that ran 50-190 ms behind (BTC p75-p90).
+category = "linear"
+symbol = "NEARUSDT"
+drawdown = 0
+
+[arcus_guard]                 # Arcus mid vs its own 3 s mean: sweeps Binance does not show
+window_ms = 3000
+drawdown = 0.0004             # 4 bp (ETH 1.5 bp x 2.7); the Arcus mid moves in 1 bp half-ticks
+pause_ms = 300
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
+window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
+drawdown = 0.008              # 80 bp: NEAR moves 30 bp in 2 minutes a tenth of a calm hour (30 bp would have paused it
+pause_s = 60                  # half the night). Night of 14-15 Oct: 10 pauses, 3.5% of 8.4 h; it would have skipped one
+                              # trip, a +$1.51 buy at the crash low. The -378 bp trip was a 2-hour slide, too slow for it
+
+[lag]                         # NEW: market data read late = quoting blind. A Binance futures ticker read 200 ms or
+max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,
+pause_ms = 500                # and nothing is placed until 500 ms after the last such reading. 15 Oct from 13:35 UTC five
+                              # bots on one core read futures 2-45 s late for 4 h and kept quoting: 1089 orders refused as
+                              # crossing, -$3.80 in a rally. Fills read 100-200 ms late lost 1.0 bp 5 s later, 200-500 ms
+                              # 1.8-2.2 bp (under 100 ms: nothing). The health line gives the share of time it held placing.
+
+[imbalance]                   # OFF until measured on this market (ETH: only ratios of 200+ were worth the x5)
+levels = 5
+ratio = 0
+factor = 5
+hold_ms = 300
+sides = "open"

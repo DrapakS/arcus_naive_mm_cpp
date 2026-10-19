@@ -1,0 +1,122 @@
+# naive_mm config: Arcus GLD-USD (a perp on SPDR Gold Shares, the gold ETF) priced off gold, basis pricing, no ML.
+# Needs the code of branch claude/funny-wright-a95ao3 from 16 Oct with [arcus] feed_assets (older code refuses the key,
+# and without it refuses gold symbols for a GLD market). Not traded yet: paper first (README, "Запуск", GLD-USD).
+# Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
+# This file never trades by itself: the command line passes --trade quote / paper / live.
+# GLD-USD on Arcus (GET /v1/markets, 16 Oct): marketId 20, tick 0.01 (0.26 bp at $384: a coarse grid, every price
+# below is rounded to it), step 0.0000001, min order 0.01 GLD and $5; maker fee 0, taker 2.25 bp. ~$14.8M a day,
+# ~22.8k trades (median $167, p90 $1.4k); spread 1 tick, 1-100 GLD a level. It trades round the clock: regular hours
+# 04:00-20:00 New York (08:00-24:00 UTC until 1 Nov, then 09:00-01:00), outside them a 6% initial margin (4% in) and
+# possibly trading bounds around a settlement price (fields of /v1/markets). Tape of 14-16 Oct: trades every hour,
+# ~250 an hour at 21 UTC, ~2500 at 12-13 UTC.
+# Measured over the 50 h of 14-16 Oct (Arcus tape, Binance spot trades and klines; Binance futures and Bybit were
+# not reachable from where this was measured):
+#  - volatility (std of 1-minute returns): GLD 3.2 bp, XAUT 3.2, PAXG 3.2, BTC 6.4, ETH 9.6: gold moves HALF as much
+#    as BTC (7 days of klines: XAUT 2.3 bp, BTC 4.6). The thresholds below are BTC's x 0.5 unless measured.
+#  - price ratio: GLD = ~0.0917 x XAUT (a share is ~0.092 oz less the fund's fees); it drifts +-10 bp over hours
+#    (1-minute changes 1.2 bp std, 30-minute 3.5 bp), which the 30 s basis follows.
+#  - lead: Binance gold leads Arcus GLD. Of a 1-second XAUT move, GLD shows 0.24 in the same second, 0.58 by 5 s,
+#    0.80 by 30 s (cross-correlation of 1 s returns: XAUT 1 s earlier 0.17, 1 s later 0.08). The index perps
+#    (XAUUSDT on Binance and Bybit, where most gold perp volume trades) are expected to lead the tokens in turn.
+# Paper check, 16 Oct 14:41-14:53 UTC, priced off XAUT spot (futures were not reachable from there): the buy 2 ticks
+# under the bid, 111 placements in 12 min, each guard 2-4 trips a minute, no late data; 1 partial fill (a sweep).
+log_level = "INFO"
+
+[binance]                     # spot: the spot guard, the trades guard, the price lines (pricing is off futures)
+symbol = "XAUTUSDT"           # Tether Gold (1 oz), 24/7, tick 0.01 (0.024 bp): the most active Binance spot gold, ~$21.8M
+                              # a day and 60k trades (PAXGUSDT ~$9.8M and 27k: the other choice, also listed below).
+                              # Behind a geo-block (HTTP 451) use wss://data-stream.binance.vision + https://data-api.binance.vision
+
+[arcus]
+market = "GLD-USD"
+feed_assets = ["XAU", "XAUT", "PAXG"]  # NEW: the feeds quote gold, not GLD; without this the bot refuses the symbols
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected
+
+[pricing]
+reference = "futures"         # fair GLD bid = Binance XAUUSDT futures mid x the basis (Arcus bid / futures mid), which
+basis_s = 30                  # carries the ~0.0917 ratio and its drift. As BTC: 30 s, futures move first
+window = 1000                 # used only with basis_s = 0
+min_samples = 100
+
+[trading]
+mode = "off"                  # the command line sets --trade quote / paper / live
+direction = "long"            # "short": sell first, then buy it back
+markup = 0.00005              # 0.5 bp, ~2 ticks under the fair bid (a buy joins the best bid only when the fair is 2
+                              # ticks over it). Not BTC's 0.25 bp x 0.5: one tick is 0.26 bp, and the takers are informed:
+                              # against a fair off XAUT the maker side of GLD trades lost 0.38 bp 5 s later and 0.68 bp 30 s
+                              # later; makers that bought only 0.5 bp under that fair made +0.56 bp at 5 s, -0.20 bp at 30 s
+                              # (0.25 bp under: +0.34 / -0.31). 0.25 bp (1 tick) for more fills once paper shows the fair
+close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.35 bp)
+tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
+tol_away = 0.00005            # 0.5 bp (BTC 1 bp x 0.5): a buy left deeper keeps its place in the queue until 2 ticks off
+close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
+order_size = 0.5              # GLD, ~$192 at $384 (Arcus minimum 0.01 GLD and $5; step 1e-7). $500 = 1.3 GLD
+never_lead = true             # join, never improve; pull when the book comes to the order
+came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
+                              # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
+dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
+cancel_lanes = 1
+presign_cancel_s = 1
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+[guard]                       # Binance spot XAUT best bid vs its time-weighted mean: a backup for the futures guard
+window_ms = 300
+drawdown = 0.000025           # 0.25 bp (BTC 0.5 bp x 0.5)
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: the fair and the main guard
+enabled = true
+symbol = "XAUUSDT"            # the gold perp (a TradFi perpetual, January 2026): tracks a spot gold index (not a token),
+                              # USDT-settled, trades 24/7 (Binance steadies the index while gold's own market is shut).
+                              # A USD-M contract like the others, so the same xauusdt@bookTicker stream (not checked from
+                              # here: Binance futures were not reachable where this was written)
+stale_timeout_s = 30          # as NVDA (18 Oct): the gold perp's top stood still for over 2 s 11 times in 41 min on a
+max_book_age_s = 10           # Sunday and pulled both sides each time (the default 2 s); 5 s reconnected a quiet link.
+                              # A quiet top is the same price; a dead link (two of them) is reconnected after 30 s
+window_ms = 300
+drawdown = 0.000025           # 0.25 bp (BTC 0.5 bp x 0.5)
+pause_ms = 200
+
+[trades]                      # Binance spot XAUT trades: a trade 0.2 bp under the high of the last 300 ms pulls the buy
+enabled = true                # (over the low: the sell). Measured: after such a down trade GLD fell 0.76 bp in 5 s and
+window_ms = 300               # 1.45 bp in 30 s (after an up trade +0.63 / +0.68), ~200 trips an hour, each side paused
+drawdown = 0.00002            # ~0.7% of the time (0.3 bp: 0.6%, the same moves after). The fair itself moves with gold at
+pause_ms = 200                # once; this covers the race with a taker in the first milliseconds
+
+[bybit]                       # OFF, as on every basis bot: as a guard it added nothing over Binance futures on BTC (14 Oct
+enabled = false               # feed check) and costs CPU. The gold feed, should it be turned on: the XAUUSDT perp (linear, a
+category = "linear"           # gold index like Binance's; most gold perp volume trades in these two; Bybit also lists
+                              # XAUTUSDT and PAXGUSDT perps)
+symbol = "XAUUSDT"
+stale_timeout_s = 30
+window_ms = 300
+drawdown = 0.000025           # 0.25 bp, as futures
+pause_ms = 200
+
+[arcus_guard]                 # Arcus GLD mid vs its own 3 s mean: sweeps the gold feeds do not show
+window_ms = 3000
+drawdown = 0.00005            # 0.5 bp = 2 ticks (not halved: the mid moves in half-ticks of 0.13 bp)
+pause_ms = 300
+
+[open_guard]                  # no adding around the gold opens (America/New_York, so daylight saving time is followed):
+opens = ["Sun 18:00", "Mon-Thu 18:00", "Mon-Fri 09:30"]  # Sunday's reopen after the weekend, the daily reopen after the
+tz = "America/New_York"       # 17:00-18:00 break, and the GLD ETF's own open. 18 Oct 22:03-22:08 UTC (the Sunday reopen)
+before_s = 60                 # the bot sold seven times in a row into the move, 4 GLD short, -31 bp: its whole loss of
+after_s = 900                 # the night. From 60 s before to 15 min after each: no order that opens or adds to the
+limit_share = 0               # position (flat: nothing quoted); the closing order as usual, but not through zero
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
+window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
+drawdown = 0.0015             # 15 bp under its 2-minute high (BTC 30 bp x 0.5). On XAUT over 14-16 Oct it would have paused
+pause_s = 60                  # 2.0% of the time in 24 episodes (10 bp: 6.1%, 20 bp: 0.95%)
+
+[lag]                         # market data read late = quoting blind: as BTC
+max_ms = 200
+pause_ms = 500
+
+[imbalance]                   # OFF until measured on this market
+levels = 5
+ratio = 0
+factor = 5
+hold_ms = 300
+sides = "open"

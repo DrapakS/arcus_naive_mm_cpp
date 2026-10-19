@@ -1,0 +1,127 @@
+# NVDA quoted on BOTH sides at once (direction = "both"): config.nvda.toml with only the direction changed, orders ~$98
+# (0.46 NVDA) and the position within $100 either way: one filled order puts it at the limit, then only the order that
+# shrinks it is quoted (with the cut markup and close_tol_away) until it is under $95. The trend guard holds buys after a
+# fall and sells after a rally. No stop-loss and no taker. NOT next to the long NVDA bot on the same subaccount (one
+# position per market): stop that one first. Raise order_size and max_position_usd together once paper and the first
+# live hours look right ($1000: order_size = 4.6, max_position_usd = 1000). Below: the notes of the long config.
+# naive_mm config: Arcus NVDA-USD (a perp on NVIDIA stock) priced off the Binance NVDAUSDT perp, basis pricing, no ML.
+# Small to start: orders of ~$100 (0.46 NVDA). Paper first, then live (README, "Запуск").
+# Needs the code of branch claude/funny-wright-a95ao3 from 17 Oct evening: [arcus] feed_assets, off_hours_markup_factor,
+# skew_open / exit_after_s. No [add_guard]: the limit is one order, there is no adding to cut.
+# Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
+# This file never trades by itself: the command line passes --trade quote / paper / live.
+# NVDA-USD on Arcus (GET /v1/markets, 17 Oct): marketId 28, tick 0.01 (0.47 bp at $214: a coarse grid, coarser than
+# GLD's, every price below is rounded to it), min order 0.01 NVDA and $5; ~$17.6M a day, ~37.6k trades; spread 1 tick
+# with large tops (hundreds of shares a level). Hours 04:00-20:00 New York, Monday to Friday (the US extended session);
+# outside them a 7.5% initial margin (5% in) and trading bounds around a settlement price (17 Oct, Saturday:
+# 208.30-218.98 around 213.64). Off hours the stock does not trade: the perps price off each other only, and the first
+# print of the next session can jump past the bounds' middle; hence off_hours_markup_factor below.
+# Measured over 7 days of Binance 1-minute klines (Binance futures and Bybit were not reachable from where this was
+# measured, so the spot token stood in for the perp):
+#  - volatility (std of 1-minute returns): NVDAB 4.36 bp, BTC 4.74 bp: NVDA moves as much as BTC overall, so the
+#    thresholds below are BTC's unless the tick says otherwise. By hours: NYSE cash session 6.72 bp (BTC then 5.54),
+#    the rest of the extended session 3.80, nights and weekends 3.44.
+#  - trend: 30 bp under the 2-minute high (BTC's) would have paused about 0.1% of the time.
+#  - Binance spot NVDAB (the NVIDIA token, priced ~1:1 with the share): tick 0.01, ~$5.65M a day, 26k trades; trades a
+#    minute: 58 in the cash session, 26.5 in the rest of the extended one, 21 off hours.
+log_level = "INFO"
+
+[binance]                     # spot: the spot guard, the trades guard, the price lines (pricing is off futures)
+symbol = "NVDABUSDT"          # the only Binance spot NVIDIA: base asset NVDAB, so [arcus] feed_assets below.
+                              # Behind a geo-block (HTTP 451) use wss://data-stream.binance.vision + https://data-api.binance.vision
+
+[arcus]
+market = "NVDA-USD"
+feed_assets = ["NVDAB"]       # the spot symbol is NVDAB-USDT, not NVDA: without this the bot refuses it
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected
+
+[pricing]
+reference = "futures"         # fair NVDA bid = Binance NVDAUSDT futures mid x the basis (Arcus bid / futures mid)
+basis_s = 30                  # as BTC: 30 s, futures move first
+window = 1000                 # used only with basis_s = 0
+min_samples = 100
+
+[trading]
+mode = "off"                  # the command line sets --trade quote / paper / live
+direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
+max_position_usd = 100        # the position either way stays within $100 to start; a side at the limit is not quoted
+max_position_resume = 0.95    # ... and comes back once the position on that side is under $95
+skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
+skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $100, none at the limit
+exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
+                              # joined the best price with no markup after 10 min). The closing order keeps its markup
+exit_loss = 0                 # OFF from 18 Oct as well (was 0.0005: the same once that far under water at the Arcus mid)
+markup = 0.00005              # 0.5 bp = ~1 tick under the fair bid. BTC's 0.25 bp is half a tick here: the grid, not the
+                              # volatility, sets the floor (as on GLD)
+close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.35 bp, rounded to the tick)
+off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New York, Mon-Fri; holidays by Arcus
+                              # isOutsideRth) both sides take twice the markup: 1 bp, ~2 ticks
+tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
+tol_away = 0.0001             # 1 bp (BTC's): a buy left deeper keeps its place in the queue until 2 ticks off
+close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
+order_size = 0.46             # NVDA, ~$98 at $214 (Arcus minimum 0.01 NVDA and $5; step 0.01). $1000 = 4.67 NVDA
+never_lead = true             # join, never improve; pull when the book comes to the order
+came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
+                              # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
+dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
+cancel_lanes = 1
+presign_cancel_s = 1
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+[guard]                       # Binance spot NVDAB best bid vs its time-weighted mean: a backup for the futures guard
+window_ms = 300
+drawdown = 0.00005            # 0.5 bp (BTC's), ~1 tick
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: the fair and the main guard
+enabled = true
+symbol = "NVDAUSDT"           # the NVIDIA perp (a TradFi perpetual, USDT-settled; binance.com/en/futures/NVDAUSDT). The
+                              # same nvdausdt@bookTicker stream as the others (not checked from here: Binance futures were
+                              # not reachable where this was written)
+stale_timeout_s = 30          # off hours the perp's top can stand still for seconds (17 Oct, Saturday: ~2 tickers a
+max_book_age_s = 10           # second, gaps up to 8 s): with the default 2 s the quote was pulled 15% of the time,
+                              # 325 times in 49 min; with 5 s, 18 Oct (Sunday), still 181 pulls of both sides in 4.2 h
+                              # (13% of the cancels). 10 s since 18 Oct: a quiet top is the same price, a dead link
+                              # (two of them) is still reconnected after 30 s
+window_ms = 300
+drawdown = 0.00005            # 0.5 bp (BTC's)
+pause_ms = 200
+
+[trades]                      # Binance spot NVDAB trades: a trade 0.3 bp under the high of the last 300 ms pulls the buy
+enabled = true                # (over the low: the sell). Thin next to BTC (21-58 trades a minute), so it trips rarely
+window_ms = 300
+drawdown = 0.00003            # 0.3 bp (BTC's)
+pause_ms = 200
+
+[bybit]                       # OFF, as on every basis bot
+enabled = false
+category = "linear"
+drawdown = 0
+
+[arcus_guard]                 # Arcus NVDA mid vs its own 3 s mean: sweeps the Binance feeds do not show
+window_ms = 3000
+drawdown = 0.00005            # 0.5 bp: a one-tick move of the mid (it moves in half-ticks of 0.23 bp)
+pause_ms = 300
+
+[open_guard]                  # no adding around the opens (America/New_York, so daylight saving time is followed):
+opens = ["Sun 18:00", "Mon-Fri 04:00", "Mon-Fri 09:30"]  # the US index futures' Sunday reopen (18 Oct NVDA +117 bp in
+tz = "America/New_York"       # the hour after it), the pre-market and the regular open. From 60 s before to 15 min after
+before_s = 60                 # each: no order that opens or adds to the position (flat: nothing quoted); the closing
+after_s = 900                 # order as usual, but not through zero. As GLD, which lost its whole night on the Sunday
+limit_share = 0               # gold reopen (18 Oct 22:03-22:08 UTC: seven sells in a row into the move, -31 bp)
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
+window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
+drawdown = 0.003              # 30 bp under its 2-minute high (BTC's): ~0.1% of the time on 7 days of NVDAB
+pause_s = 60
+
+[lag]                         # market data read late = quoting blind: as BTC
+max_ms = 200
+pause_ms = 500
+
+[imbalance]                   # OFF until measured on this market
+levels = 5
+ratio = 0
+factor = 5
+hold_ms = 300
+sides = "open"

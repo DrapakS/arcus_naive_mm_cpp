@@ -1,0 +1,129 @@
+# naive_mm live config: Arcus ETH-USD from the Tokyo host. Use the latest code of branch claude/funny-wright-a95ao3
+# (5789db9 or later: [lag] is a new key, and older code refuses keys it does not know).
+# Live: ETH run 12 (3205def), runs 15 and 16 (0286bb7, the owner's markup 0.15 bp, tol 0.03, ratio 40),
+# run 21, the night of 14-15 Oct (0.125 bp: 145 trips, -$2.87), 22 (15 Oct 06:02-07:38 UTC: 30 trips, -$0.10)
+# and 23, the first with [trades] (07:38-11:04, market down 0.4%: 40 trips, -$0.34). Run 25, the night of 15-16 Oct
+# with a CPU core per bot: 96 trips, -$0.84 at ~$100 orders, fills 5 s later -0.18 bp each. Orders of ~$500 from 16 Oct (run 26: 81 trips, -$1.44 in 7 h), ~$1000 from that evening.
+# The host needs a free CPU core per bot (README, "Хост").
+# Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
+# Keys not listed keep the defaults in naive_mm/config.py, and those defaults are BTC: every symbol below must
+# stay ETH (the bot refuses to start when an enabled feed's symbol is not the arcus.market asset). This file
+# never trades by itself: the
+# command line passes --trade quote / paper / live.
+# ETH-USD on Arcus (GET /v1/markets): marketId 2, tick 0.01 below $10k (0.04 bp at $2500), step 0.0000001,
+# min order 0.001 ETH AND $5 notional (0.001 ETH is only ~$2.50). The bot keeps buying until a long is worth $5
+# at its sell price, then sells it whole, and refuses to quote a buy under $5 (an error line says so).
+# Values come from 17 minutes of ETH data (14 Oct, 06:31-06:49 UTC): first guesses, re-check after a long run.
+log_level = "INFO"            # order events and price lines reach the orders log at any level
+
+[binance]                     # spot: the spot guard, the price lines and the logs (pricing is off futures)
+symbol = "ETHUSDT"            # default endpoints (stream.binance.com / api.binance.com) work from Tokyo; behind a
+                              # geo-block (HTTP 451) use wss://data-stream.binance.vision + https://data-api.binance.vision
+
+[arcus]
+market = "ETH-USD"
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected (a stream that stopped
+                              # while the connection still answers pings; needs the 15 Oct code)
+
+[pricing]
+reference = "futures"         # as BTC. ETH: futures fair R2 to the next 1 s Arcus bid move 5.4%, spot fair ~0%
+basis_s = 30                  # Arcus/futures basis -8 bp, std 0.22 bp (Arcus/spot -13 bp, std 0.51); 30 s fitted best
+window = 1000                 # used only with basis_s = 0
+min_samples = 100             # samples (any update of either book) before the first price: well under a second
+
+[trading]
+mode = "off"                  # the command line sets --trade quote / paper / live
+direction = "long"            # buy first, then sell it; "short": sell first, then buy it back (a bet on the direction
+                              # either way: run ETH one way and BTC the other to offset part of the market's move)
+markup = 0.0000125            # 0.125 bp, the owner's choice (half of 0.25; BTC 0.25 bp): ~3 ticks at $2430. The
+                              # futures-fair gap is tighter on ETH (std 0.20 bp vs 0.35). Run 16 at 0.15 bp (8 trips,
+                              # -13 bp, all of it the market falling 123 bp while long; entries beat random moments at
+                              # 30 and 120 s): n tiny, nothing yet says how much worse each fill gets below that.
+close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.0875 bp, ~2 ticks): out of a long sooner
+tol = 0.000005                # 0.05 bp (was 0.03): a 1-tick move (0.04 bp) no longer re-places the order. Run 12: 34% of
+                              # the cancels toward the market were a single tick; 1063 placements/h, 242 per fill.
+                              # Under the closing sell's markup (0.125 bp x 0.7 = 0.0875 bp): a sell that drifts one
+                              # step toward the market still keeps >= 0.04 bp (a tick). Run 16 (0.03 bp, a falling
+                              # hour): 3474 placements/h; 0.05 bp would have saved only 0.5-1.5% there. Pools: far off.
+tol_away = 0.00015            # 1.5 bp (BTC 1 bp x ETH/BTC volatility ~1.5): a buy left deeper waits for a 1.5 bp gap
+close_tol_away = 0.00001      # 0.1 bp: a sell left above a target that fell is re-placed once it is 0.1 bp behind. Run 19
+                              # at 1.5 bp: the exit sell sat behind its target 66% of the time and at the best ask 7%, while
+                              # its target was at the best ask 54%. Run 20 at 0.05 bp: at its target all the time, at the
+                              # best ask 38%, but ~1.1 sells a second while exiting (603 in one 511 s exit); 0.1 bp to
+                              # halve that. Same price rule, not a stop: only no lag behind it.
+order_size = 0.41             # ETH, ~$1000 at $2445: the owner's $1000 from 16 Oct evening, as BTC's 0.0122 BTC (0.204,
+                              # ~$500, in run 26; 0.041, ~$100, up to run 25). 1 bp = ~$0.10 per fill. Must be worth >= $5 at the buy price (else the bot
+                              # does not quote and logs an error): fine above ~$25. A partial fill worth under $5 is
+                              # not sold alone: the buy keeps working until it is.
+never_lead = true             # join, never improve; pull when the book comes to the order. The ETH touch usually holds
+                              # $85-115k, so expect few fills (the order waits at the back of that queue)
+came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
+                              # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
+dms_timeout_s = 60            # the exchange cancels our ETH order after 60 s of silence (per-market switch, re-armed
+                              # every 30 s; independent of the BTC bot's switch)
+cancel_lanes = 1              # each cancel also goes out on a spare connection; every copy draws on the cancel pool
+presign_cancel_s = 1          # cancel signed right after placing
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+[guard]                       # Binance spot best bid vs its time-weighted mean: leads only 35% of ETH 1 bp moves,
+window_ms = 300               # kept mainly as a backup for when the futures guard is blind
+drawdown = 0.000075           # 0.75 bp (BTC 0.5): ~163 trips/h, side paused ~0.7%. 0.5 bp on ETH drops 11% of good flow
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: leads 82% of ETH 1 bp moves, ~67 ms early
+enabled = true                # required: pricing.reference = "futures"
+symbol = "ETHUSDT"
+stale_timeout_s = 5           # a silent link reconnects after 5 s (ETH futures ~157 msgs/s; the other link keeps the book)
+window_ms = 300
+drawdown = 0.00006            # 0.6 bp (BTC 0.5): stops the same 64% of toxic notional as 0.5 bp with ~20% fewer trips
+pause_ms = 200
+
+[trades]                      # NEW: Binance spot trades (<symbol>@aggTrade), the earliest sign of a sweep. A trade 0.3 bp
+enabled = true                # (7 ticks) under the high of the last 300 ms pulls the buy at once (over the low: the sell),
+window_ms = 300               # no buy for 200 ms. Night of 14-15 Oct: 40% of ETH fills came >= 20 ms after such a trade
+drawdown = 0.00003            # (the takers hit ~80 ms after it), at -1.7 bp each 5 s later (the other fills -0.8, ~0 at
+pause_ms = 200                # 30 s); by 30 s those fills had lost $2.66, the whole night $2.87. Pauses a side ~4% of a
+                              # calm hour, ~24% of the 02:00 crash hour.
+                              # Run 23 live: fills 5 s later -0.18 bp each (night -1.19); the 59% with no such trade
+                              # within 1 s of the match +0.20, the rest -0.71. The rule saw the trade >= 20 ms before
+                              # the match on 29% of the fills, the bot in time on 7 of those 25: it read the others
+                              # 69-331 ms late (median 164 ms: the host's loop stalls). Paused a side 4.2% of the time.
+
+[bybit]                       # OFF: its guard was off (drawdown 0) and it fed only the price lines, at the cost of two
+enabled = false               # connections parsed all night (14 Oct feed check: nothing over futures, ~40 ms behind
+                              # Binance from Tokyo). Fewer messages for a loop that ran 50-190 ms behind (BTC p75-p90).
+category = "linear"
+symbol = "ETHUSDT"
+drawdown = 0                  # 0 = no Bybit guard
+
+[arcus_guard]                 # Arcus mid vs its own 3 s mean: a safety net for sweeps Binance does not show
+window_ms = 3000
+drawdown = 0.00015            # 1.5 bp (BTC 0.5): at 0.5 bp the ETH mid trips ~520 times/h and pauses a side 8% of the
+pause_ms = 300                # time (ETH spreads open and close more often); 1.5 bp: ~107 trips/h, ~1% paused
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
+window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
+drawdown = 0.004              # 40 bp under its 2-minute high (BTC 30 bp): night of 14-15 Oct 7 pauses, 3.3% of 8.8 h; the
+pause_s = 60                  # 9 trips bought in them -$0.49 of -$2.77. At 30 bp: 7.5% of the time for -$0.30
+
+[lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
+max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,
+pause_ms = 500                # and nothing is placed until 500 ms after the last such reading. 15 Oct from 13:35 UTC five
+                              # bots on one core read futures 2-45 s late for 4 h and kept quoting: 1089 orders refused as
+                              # crossing, -$3.80 in a rally. Fills read 100-200 ms late lost 1.0 bp 5 s later, 200-500 ms
+                              # 1.8-2.2 bp (under 100 ms: nothing). The health line gives the share of time it held placing.
+
+[imbalance]                   # top-5 Arcus volumes more than 200x lopsided -> the buy's markup x5 (0.625 bp) when the
+                              # bids are thin; the closing sell keeps its 0.0875 bp (sides = "open")
+levels = 5
+ratio = 200                   # was 40. Run 12 at 40: the flag flickered (738 times/h, median 0.4 s) and was on 19% of the
+                              # time on the quoted side; orders placed under it sat ~1.3 bp deep for 53% of the buy time
+                              # and got 0 of 8 fills, and it was behind ~20% of all cancels. Moves toward the thin side:
+                              # +0.1-0.5 bp over 1-30 s at moderate ratios (far under what x5 adds), +1.26 +/- 0.43 bp
+                              # over 30 s at 200+ (about the x5 step). An order placed under x5 is now re-priced by tol,
+                              # not tol_away, once the flag is gone (no longer left deep).
+factor = 5
+hold_ms = 300                 # thin side stays thin 300 ms after the book evens out. ETH paper at 6c21c39 (no hold):
+                              # 104 of 246 placements flip-flopped; at 3bf31fe with 300 ms: 3 of 245
+sides = "open"                # the closing order, held further out by a lopsided book, only keeps the position
+                              # longer (BTC run 17: x5 put it 25 bp over the market a quarter of the time). "both" = old

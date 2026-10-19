@@ -1,0 +1,97 @@
+# naive_mm live config: Arcus ZEC-USD from the Tokyo host. Use the latest code of branch claude/funny-wright-a95ao3
+# (5789db9 or later: [lag] is a new key, and older code refuses keys it does not know).
+# First values from Binance 1-minute closes (14 Oct) and the Arcus book of that evening, scaled from the
+# ETH config by volatility and tick size. Live since the night of 14-15 Oct (20 trips, -$0.75,
+# the losers bought into the 02:20 crash; the [trades] guard stays off here, see below). Then runs 22 (8 trips,
+# -$0.26) and 23 (5 trips, -$2.06: one 37-min hold while ZEC fell 2.2% lost $2.19): 33 trips, -$3.07 in all,
+# set by the market's direction rather than the markup. Not worth a CPU core the BTC, ETH and SOL bots need:
+# on a host without a free core per bot, leave this bot off (README, "Хост").
+# Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
+# Every symbol below must stay ZEC (the bot refuses to start when an enabled feed's symbol is not the arcus.market
+# asset). This file never trades by itself: the command line passes --trade quote / paper / live.
+# ZEC-USD on Arcus (GET /v1/markets): marketId 8, tick 0.001 (0.009 bp at $1156), step 0.000001, min order
+# 0.01 ZEC and $5 notional. Arcus ZEC-USD: ~$7.2M a day, ~10.6k trades; a thin book: spread ~0.9 bp (~100 ticks),
+# top sizes ~$300, top-10 ~$20-40k a side. Fills will be few, and a sweep goes deep.
+# Volatility (std of 1-minute returns on Binance spot): 17.2 bp, 2.83x BTC (ETH 1.36x). Binance ticks are fine:
+# 0.01 = 0.09 bp.
+log_level = "INFO"
+
+[binance]                     # spot: the spot guard, the price lines and the logs (pricing is off futures)
+symbol = "ZECUSDT"            # tick 0.01 (0.09 bp). Behind a geo-block (HTTP 451) use
+                              # wss://data-stream.binance.vision + https://data-api.binance.vision
+
+[arcus]
+market = "ZEC-USD"
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected (a stream that stopped
+                              # while the connection still answers pings; needs the 15 Oct code)
+
+[pricing]
+reference = "futures"         # as BTC and ETH: futures move first (14 Oct check over six runs)
+basis_s = 30
+window = 1000                 # used only with basis_s = 0
+min_samples = 100
+
+[trading]
+mode = "off"                  # the command line sets --trade quote / paper / live
+direction = "long"            # "short": sell first, then buy it back
+markup = 0.00005              # 0.5 bp, the owner's choice (twice the first 0.25 bp, ETH's 0.125 bp x 2.1 for
+                              # volatility)
+close_markup_cut = 0.3        # the closing order takes 30% less markup (0.35 bp)
+tol = 0.00001                 # 0.1 bp (BTC/ETH 0.05 bp x 2): with a fine tick the target moves with every futures tick
+tol_away = 0.0003             # 3 bp (BTC 1 bp x 2.8): a buy left deeper waits for a 3 bp gap
+close_tol_away = 0.00001      # = tol: the closing order follows the market at once (run 20: the exit sell at its
+                              # target all the time, at the best ask 26-38% against 8-10% before)
+order_size = 0.09             # ZEC, ~$104 at $1156 (the owner's ~$100)
+never_lead = true             # join, never improve; pull when the book comes to the order
+dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
+cancel_lanes = 1
+presign_cancel_s = 1
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+[guard]                       # Binance spot best bid vs its time-weighted mean: a backup for the futures guard
+window_ms = 300
+drawdown = 0.00015            # 1.5 bp (ETH 0.75 bp x 2.1)
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: the main guard and the fair
+enabled = true
+symbol = "ZECUSDT"
+stale_timeout_s = 5
+window_ms = 300
+drawdown = 0.000125           # 1.25 bp (ETH 0.6 bp x 2.1)
+pause_ms = 200
+
+[trades]                      # Binance spot trades as a guard: OFF for ZEC. Night of 14-15 Oct the fills that came
+enabled = false               # after such a sweep made +2.8 bp 5 s later (25 of the 64 NEAR and ZEC fills): the takers
+                              # here are slower (~0.3 s after Binance), so the guard would mostly cost good fills.
+
+[bybit]                       # OFF: its guard was off (drawdown 0) and it fed only the price lines, at the cost of two
+enabled = false               # connections parsed all night (14 Oct feed check: nothing over futures, ~40 ms behind
+                              # Binance from Tokyo). Fewer messages for a loop that ran 50-190 ms behind (BTC p75-p90).
+category = "linear"
+symbol = "ZECUSDT"
+drawdown = 0
+
+[arcus_guard]                 # Arcus mid vs its own 3 s mean: sweeps Binance does not show
+window_ms = 3000
+drawdown = 0.0003             # 3 bp (ETH 1.5 bp x 2.1); the wide Arcus spread moves the mid a lot
+pause_ms = 300
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
+window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
+drawdown = 0.008              # 80 bp under its 2-minute high: night of 14-15 Oct 5 pauses, 3.2% of 8.5 h, 02:18-03:01; the
+pause_s = 60                  # 5 trips bought in them -$1.65 (three buys in a row into the crash). At 30 bp: 41% paused
+
+[lag]                         # NEW: market data read late = quoting blind. A Binance futures ticker read 200 ms or
+max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,
+pause_ms = 500                # and nothing is placed until 500 ms after the last such reading. 15 Oct from 13:35 UTC five
+                              # bots on one core read futures 2-45 s late for 4 h and kept quoting: 1089 orders refused as
+                              # crossing, -$3.80 in a rally. Fills read 100-200 ms late lost 1.0 bp 5 s later, 200-500 ms
+                              # 1.8-2.2 bp (under 100 ms: nothing). The health line gives the share of time it held placing.
+
+[imbalance]                   # OFF until measured on this market (ETH: only ratios of 200+ were worth the x5)
+levels = 5
+ratio = 0
+factor = 5
+hold_ms = 300
+sides = "open"

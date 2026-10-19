@@ -1,0 +1,9 @@
+build*/
+config.toml
+paper-*.log
+paper-*.err
+paper-*.pid
+# Credentials live outside the repository; these patterns are a safety net.
+credentials*.toml
+!credentials.example.toml
+*.pem

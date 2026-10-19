@@ -1,0 +1,259 @@
+# Copy to config.toml and adjust. Every key is optional; defaults are in naive_mm/config.py.
+log_level = "INFO"
+
+[binance]
+symbol = "BTCUSDT"
+ws_url = "wss://stream.binance.com:9443"  # market-data only: wss://data-stream.binance.vision
+rest_url = "https://api.binance.com"
+snapshot_limit = 1000
+update_speed_ms = 100
+book_ticker = true    # overlay the real-time best bid/ask from <symbol>@bookTicker
+stale_timeout_s = 30  # reconnect after this long without a message; 0 = off
+max_book_age_s = 2    # book older than this is not ready to price from; 0 = off
+connections = 2       # the same stream over this many connections; the first copy of each update wins
+
+[arcus]
+market = "BTC-USD"
+ws_url = "wss://api.arcus.xyz/v1/ws"  # testnet: wss://api.testnet.arcus.xyz/v1/ws
+rest_url = "https://api.arcus.xyz"    # testnet: https://api.testnet.arcus.xyz
+n_levels = 100       # snapshot depth per side, 1..100 (deltas cover every price)
+# A quiet book sends nothing, so both checks are off; liveness comes from ws ping/pong.
+stale_timeout_s = 0
+max_book_age_s = 0
+connections = 2      # the same stream over this many connections; the first copy of each update wins
+# feed_assets = ["XAU", "XAUT", "PAXG"]  # assets the Binance and Bybit symbols may quote instead of the market's
+                     # own: GLD-USD (a gold ETF share) priced off gold, config.gld.toml; empty = the market's only
+
+[pricing]
+# model = "basis": the fair Arcus bid is a reference price times its basis to Arcus (the keys below);
+# "ml": the linear model of [ml]. Only the model chosen is computed.
+model = "basis"
+# reference = "spot": the fair Arcus bid is priced off Binance spot; "futures": off Binance USDⓈ-M
+# futures, which move first (needs [futures] enabled; a futures top older than
+# futures.max_book_age_s is no price). basis_s = 0: fair = spot bid × mean(Arcus bid / spot bid)
+# (with reference = "futures": futures mid × mean(Arcus bid / futures mid)) over the last `window`
+# samples, one per Arcus book update. basis_s > 0: fair =
+# reference mid × an exponential moving average of Arcus bid / reference mid over time, this time
+# constant in seconds, fed by every update of either book (30 s fitted the recorded data best).
+# With the futures feed on, the fair priced off futures is also kept when quoting off spot: the
+# placement reasons and the fill lines show it.
+reference = "spot"
+basis_s = 0
+window = 1000
+min_samples = 100  # no estimate before this many samples
+
+[ml]
+# pricing.model = "ml": a model (linear or LightGBM) over the features of research/ml_pricing.ipynb (README, "Прайсинг
+# по ML-модели"). It predicts P_next / P_base - 1, P_next the time-weighted mean Arcus target_price over
+# the next target_window_s. target_base "now" (the notebook from 18 Oct): P_base = the price now, fair bid =
+# Arcus bid now + price now * prediction; "prev" (up to 17 Oct): P_base = its mean over the last
+# target_window_s, fair bid = mean bid + P_base * prediction. Keep these as the model was trained.
+target_window_s = 3.0
+target_base = "now"         # now | prev
+target_price = "mid"       # mid | bid | ask
+max_gap_s = 10.0           # Binance and Bybit: no frame of a book this long, its price is unknown
+arcus_max_gap_s = 60.0
+eval_interval_ms = 100     # re-price at least this often, as the windows slide; 0 = only on market data
+scaled = false             # true: the model was fit on StandardScaler-scaled features; then [ml.mean] and
+                           # [ml.scale] (the scaler's mean_ and scale_, a value per feature) are required
+kind = "linear"            # "linear": the weights of [ml.weights]; "lightgbm": a LightGBM model, no weights:
+# lightgbm_model = "models/btc_lgbm_v1.txt"  # LightGBM text format (Booster.save_model), or the pickle of a
+                           # Booster / LGBMRegressor (read without unpickling it); path from where the bot starts
+# features = ["arcus_mid_r1s", "arcus_mid_r5s"]  # the model's columns in order; needed when it was fit on an
+                           # array (its features are then Column_0, Column_1...)
+
+[ml.weights]
+# feature = weight, the notebook's names and intercept; fractions, as in the notebook. Venue arcus, binance,
+# binance_futures or bybit; price mid, bid or ask; seconds up to 600:
+#   {venue}_{price}_r{seconds}s        the price now over its mean over the last seconds, minus 1
+#   {venue}_{price}_d{seconds}s        (not arcus) that change less Arcus's over the same window
+#   basis_{venue}_{price}_ema{tau}s    (not arcus) venue price x its usual basis to Arcus (time EMA of
+#                                      arcus / venue, time constant tau) over the Arcus price, minus 1;
+#                                      no value until 3 tau of known time
+# intercept = 0.0
+# arcus_mid_r1s = -0.12
+# binance_futures_mid_r5s = 0.34
+# bybit_mid_d5s = 0.2
+# basis_binance_futures_mid_ema30s = 0.1
+
+[trading]
+mode = "off"          # off | quote (prints buy/sell prices it would quote, no orders) | paper
+                      # (fills simulated from public trades) | live; --trade overrides
+markup = 0.0005       # buy at min(fair*(1-markup), ask-tick), sell at max(bid+tick, (fair+tick)*(1+markup))
+close_markup_cut = 0  # the closing order (a long's sell, a short's buy) takes this share less markup: 0.3 = 30% less
+tol = 0.0002          # cancel and re-place when the order is this far (fraction) from its target
+tol_away = 0          # the same when the target moved away from the order, leaving it deeper in the
+                      # book (no danger; re-placing loses its place in the queue); 0 = same as tol
+close_tol_away = 0    # the same for the closing order: a sell left above a target that fell keeps
+                      # the position while the price falls; 0 = same as tol (follow it at once)
+order_size = 0.001    # opening order size, BTC; the closing order closes the whole position
+direction = "long"    # "long": buy first, then sell it; "short": sell first, then buy it back;
+                      # "both": a buy and a sell at once, order_size each, the position either way
+                      # within max_position_usd (a side at the limit is not quoted until it comes back)
+max_position_usd = 1000  # direction = "both": the largest position either way, dollars at the order's price
+max_position_resume = 0.95  # direction = "both": a side held at the limit comes back under this share of it
+skew_open = 0         # direction = "both": the adding order's markup x (1 + skew_open * position/limit)
+skew_close = 0        # ... and the closing order's x (1 - skew_close * position/limit), 0..1
+exit_after_s = 0      # a position held this long: its closing order joins the best price, no markup (0 = off)
+exit_loss = 0         # ... or once this far under water at the Arcus mid (fraction, 0.0005 = 5 bp; 0 = off)
+off_hours_markup_factor = 1  # a market with hours (RWA): outside the session (US: 04:00-20:00 New York,
+                      # Mon-Fri, or Arcus isOutsideRth) both sides take this many times the markup
+never_lead = false    # buy no higher than the others' best bid, sell no lower than their best ask,
+                      # and cancel the moment the book comes to the order: the levels ahead of it
+                      # vanish, or everyone else leaves its level (it would be the best price alone)
+came_hold_ms = 0      # never_lead: after the book came to the order and it was cancelled, no order on
+                      # that side at its price or better for this long, one tick behind it instead (a
+                      # flickering best had the bot re-place at the same price); 0 = off
+dms_timeout_s = 60    # live: server cancels our orders if we go silent this long; 0 = off
+cancel_lanes = 1      # live: extra connections each cancel is also written to, first copy wins;
+                      # every copy draws on the cancel pool; 0 = main connection only
+presign_cancel_s = 1  # live: sign each order's cancel right after placing it and keep the signature
+                      # at most this old, so cancelling skips the signature; 0 = sign when sending
+slow_reconnect_ms = 50  # live: reconnect an Arcus connection whose answers take a median of more than
+                      # this over a minute (one at a time, each at most every 5 min); 0 = never
+orders_log = ""       # also write order events (placements, fills, cancels, the exchange's answers)
+                      # to this file as they happen, e.g. "orders.log"; --orders-log overrides
+
+[guard]
+# Sharp Binance moves: every book update (bookTicker and depth) compares the best bid with
+# its mean over the last `window_ms`, weighted by time (each price counts for as long as it
+# stood). More than `drawdown` (fraction) under it: a working buy is cancelled on the spot
+# and no buy is placed for `pause_ms`. That far over it: the same for sells. Every update
+# still that far out extends the pause of its side. drawdown = 0 turns the guard off.
+# (The window used to be a number of updates, `window`; that key is no longer accepted.)
+window_ms = 1000
+drawdown = 0.0001
+pause_ms = 100
+
+[futures]
+# Binance USDⓈ-M futures best bid/ask (<symbol>@bookTicker), a second input of the price guard:
+# futures tend to move before spot. Same rule as [guard] with its own numbers: the futures best
+# bid more than `drawdown` under its mean over the last `window_ms` pulls a buy and holds
+# off buying for `pause_ms`; that far over the mean, the same for sells. drawdown = 0 keeps the
+# feed (shown on the price lines) without the guard; enabled = false drops it.
+enabled = true
+symbol = "BTCUSDT"
+ws_url = "wss://fstream.binance.com"
+stale_timeout_s = 30
+connections = 2
+max_book_age_s = 2  # pricing.reference = "futures": a top older than this is no price; 0 = off
+window_ms = 1000
+drawdown = 0.0001
+pause_ms = 100
+
+[trades]
+# Binance spot trades (<symbol>@aggTrade of [binance] symbol, pushed in real time), the earliest
+# sign of a sweep and the fastest input of the price guard. A trade more than `drawdown` under
+# the highest trade of the last `window_ms` pulls a working buy at once and holds off buying
+# until `pause_ms` after the last trade that far down; that far over the lowest, the same for
+# sells. Against the extreme, not the mean: a fall right after a spike up trips at once. On
+# 14-15 Oct the takers hit our BTC, ETH and SOL quotes some 80 ms after such trades, while the
+# book-based guards saw the moves 50-80 ms later. drawdown = 0 keeps the feed (its delays in the
+# health line) without the guard; enabled = false drops it. ws_url "" = [binance] ws_url.
+enabled = true
+ws_url = ""
+stale_timeout_s = 60
+connections = 2
+window_ms = 300
+drawdown = 0.00003
+pause_ms = 200
+
+[bybit]
+# Bybit V5 best bid/ask (orderbook.1, snapshots every 10 ms) from wss://stream.bybit.com/v5/public/<category>,
+# one more input of the price guard: category "linear" (the USDT perpetual) or "spot". Same rule as
+# [guard] with its own numbers. drawdown = 0 keeps the feed (shown on the price lines) without the
+# guard; enabled = false drops it.
+enabled = true
+category = "linear"
+symbol = "BTCUSDT"
+ws_url = "wss://stream.bybit.com"
+stale_timeout_s = 30
+connections = 2
+window_ms = 1000
+drawdown = 0.0001
+pause_ms = 100
+
+[arcus_guard]
+# The Arcus price itself: the Arcus mid more than `drawdown` over its mean over the last
+# `window_ms` pulls a working sell and holds off selling for `pause_ms` (a rally on Arcus
+# takes sells out before Binance shows anything); that far under, the same for buys. In a
+# simulation on recorded data, 3000 ms / 0.00005 / 300 ms turned the 1 s markout of fills
+# from -0.07 to +0.04 bp. drawdown = 0 turns it off.
+window_ms = 3000
+drawdown = 0.00005
+pause_ms = 300
+
+
+[takes]
+# Arcus taker waves: a taker order of min_usd or more in the Arcus public trades pulls our order on the
+# side it hit (a taker buy: our sell) and nothing goes there for pause_ms after the last such take.
+# pause_ms = 0 turns it off; config.{btc,eth}-both.toml use min_usd 0, pause_ms 500.
+# Quiet takers: each take is scored by the Arcus mid score_ms after it against the mid just before it
+# (+ = the taker's way); a taker with min_takes takes scored (its last 100) whose mean is under min_move
+# (a fraction: 0.00002 = 0.2 bp) pauses nothing, and pauses again once its takes move the price.
+# min_takes = 0: every take counts.
+min_usd = 0
+pause_ms = 0
+min_takes = 0
+min_move = 0.00002
+score_ms = 1000
+[add_guard]           # direction = "both": after a futures move of `drawdown` against a side within `window_s`,
+window_s = 300        # an order there may take the position on that side to `limit_share` of max_position_usd at
+drawdown = 0          # most, for `pause_s` past the last such price (fraction; 0 = off)
+pause_s = 60
+limit_share = 0.5
+
+[trend]
+# No opening order right after a sharp move against it, over minutes rather than milliseconds:
+# while the Binance futures mid (spot with [futures] off) is more than `drawdown` under its
+# highest of the last `window_s`, a long bot pulls its working buy and places none until
+# `pause_s` after the last price that far down; a short bot the same for sells over the
+# lowest. The closing order is never held back: no stop-loss, no taker, only fewer entries.
+# Set `drawdown` by the coin's volatility: on 14-15 Oct 30 bp paused BTC 2.3% of the night
+# but NEAR 47% (it moves 30 bp in 2 minutes a tenth of a calm hour). drawdown = 0 turns it off.
+window_s = 120
+drawdown = 0.003
+pause_s = 60
+
+[lag]
+# Market data read late: the bot would quote the market as it was, not as it is. When a
+# Binance futures ticker or a Binance spot trade is read `max_ms` or more after
+# its exchange's own time for it (the host clock set against the exchange's by the offset
+# measured to Arcus, the `--- clock` line), or the event loop runs that late, both orders are
+# pulled at once and nothing is placed until `pause_ms` after the last such reading. No
+# position is closed for it (no taker, no stop): the closing order is pulled as well. On 15 Oct
+# five bots on one core read futures 2-45 s late for four hours from 13:35 UTC and kept
+# quoting; before that, fills read 100-200 ms late lost 1.0 bp 5 s later, 200-500 ms late
+# 1.8-2.2 bp (under 100 ms: nothing). max_ms = 0 turns it off.
+max_ms = 200
+pause_ms = 500
+bybit_max_ms = 0     # a Bybit ticker read late pauses only from this lag (ms, >= max_ms); 0 = never: Bybit is
+                     # an ML feature (5 s ahead), not the price
+
+[imbalance]
+# Lopsided Arcus book: when one side has more than `ratio` times the volume of the other
+# on the first `levels` levels, the price tends to go toward the thin side, so the markup
+# of an order on the thin side is multiplied by `factor` (asks thin: sells; bids thin:
+# buys). Our own order is not counted. ratio = 0 turns it off. A side found thin stays thin
+# for `hold_ms` after the book stops being lopsided (or until the other side turns thin), so a
+# book flickering around the ratio does not re-place the order on every frame.
+# `sides`: the orders it widens, "open" (default; the old name "buy" still works) or "both".
+# The closing order, held further out by a lopsided book, only keeps the position longer.
+levels = 5
+ratio = 5
+factor = 5
+hold_ms = 300
+sides = "open"
+
+[agent]
+depth = 10
+status_interval_s = 5
+# The health line in the console and the orders log, this often: the event loop's lag, how late
+# each exchange-stamped stream was read (Binance futures tickers, Binance spot trades, Arcus order
+# events) and the CPU share. A lag of 100 ms or more also gets a line of its own. 0 turns it off.
+health_interval_s = 60
+# A line in the orders log on every change of a book's best bid price, one per feed that is on:
+# "BINANCE FUTURES: 82182.0 exchange 09:52:34.668123 now 09:52:34.669901 (+1.8 ms)", the same for BINANCE SPOT,
+# BYBIT and ARCUS (UTC; "exchange n/a" when the frame has no time of its own: a spot bookTicker, an Arcus
+# depth update). false = none.
+tob_lines = true
