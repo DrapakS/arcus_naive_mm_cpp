@@ -75,5 +75,10 @@ bool is_cancellation(const std::exception_ptr& e);
 
 // Throw if the current task has been cancelled.
 awaitable<void> check_cancelled();
+// Whether the current task has been cancelled.
+awaitable<bool> is_cancelled();
+
+// The message of an exception ("" for none).
+std::string what(const std::exception_ptr& e);
 
 }  // namespace nmm

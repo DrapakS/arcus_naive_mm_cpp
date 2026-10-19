@@ -129,3 +129,23 @@ awaitable<void> check_cancelled() {
 }
 
 }  // namespace nmm
+
+namespace nmm {
+
+awaitable<bool> is_cancelled() {
+    auto state = co_await asio::this_coro::cancellation_state;
+    co_return state.cancelled() != asio::cancellation_type::none;
+}
+
+std::string what(const std::exception_ptr& e) {
+    if (!e) return "";
+    try {
+        std::rethrow_exception(e);
+    } catch (const std::exception& err) {
+        return err.what();
+    } catch (...) {
+        return "unknown error";
+    }
+}
+
+}  // namespace nmm

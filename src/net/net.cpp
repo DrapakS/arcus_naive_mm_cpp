@@ -216,13 +216,15 @@ public:
         co_return beast::buffers_to_string(buffer_.data());
     }
 
-    void send(std::string text, std::function<void(const std::string&)> done) override {
+    bool send(std::string text, std::function<void(const std::string&)> done) override {
         if (closed_) {
             if (done) done("connection closed");
-            return;
+            return false;
         }
         queue_.push_back({std::move(text), std::move(done)});
-        if (!writing_) write_next();
+        if (writing_) return false;
+        write_next();
+        return true;
     }
 
     void close() override {
