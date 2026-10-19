@@ -165,6 +165,19 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     if (ad.drawdown) add_guard = std::make_unique<TrendGuard>(ad.window_s, ad.drawdown, ad.pause_s, "both");
     const OpenGuardConfig& og = config.open_guard;  // [open_guard]: no adding around the underlying's opens
     if (!og.opens.empty()) open_guard = std::make_unique<OpenWindows>(strings(og.opens), og.tz, og.before_s, og.after_s);
+    const PortfolioConfig& pf = config.portfolio;  // [portfolio]: the asset class's lean across the bots of the host, by files
+    if (pf.enabled && config.trading.mode == "live") {  // paper: never (its positions are not real)
+        PortfolioOptions po;
+        po.weight = pf.weight;
+        po.limit_usd = pf.limit_usd;
+        po.factor = pf.factor;
+        po.stale_s = pf.stale_s;
+        po.interval_s = pf.interval_ms / 1000;
+        po.position = [this] { return own_position(); };
+        po.mark = [this] { return arcus_mid(); };
+        portfolio = std::make_unique<Portfolio>(expand_path(pf.dir) + "/" + (pf.group.empty() ? config.trading.mode : pf.group),
+                                                config.arcus.market, pf.asset_class, po);
+    }
     // The futures mid's move over the last few seconds: a side it went against takes a wider markup
     // (drift.markup_factor; 1 = off), and every placement and fill logs it either way.
     const DriftConfig& dr = config.drift;
@@ -272,6 +285,7 @@ awaitable<void> Agent::run() {
     spawn(status_loop(), "status");
     if (cfg.agent.health_interval_s || lag_guard) spawn(loop_watch->run(), "loop-watch");
     if (cfg.agent.health_interval_s) spawn(health_loop(), "health");
+    if (portfolio) spawn(portfolio->run(), "portfolio");
     Task trading;
     if (gateway) {
         trading = Task::spawn(gateway->run(), "trading", "naive_mm.agent", on_failure);
@@ -387,6 +401,7 @@ StrategyOptions Agent::strategy_options() {
     o.came_hold_s = t.came_hold_ms / 1000;
     o.open_guard = open_guard.get();
     o.open_limit_share = config.open_guard.limit_share;
+    o.portfolio = portfolio.get();
     return o;
 }
 
@@ -432,6 +447,11 @@ awaitable<void> Agent::start_trading() {
         log_->warning("market opens {}; the next: {}", open_guard->describe(),
                       next ? std::format("{} ({} UTC)", next->first.text, utc_strftime(next->second, "%a %d %b %H:%M")) : "none");
         open_guard->window();  // says at once if one holds now
+    }
+    if (portfolio) {
+        const Portfolio& pf = *portfolio;
+        log_->warning("portfolio {}: {} weighs x{:g}; the class's lean over ${:g} moves the markups by up to {:.0f}%; positions shared through {}",
+                      pf.asset_class, pf.market, pf.weight, pf.limit_usd, pf.factor * 100, pf.dir);
     }
     if (t.mode == "quote") {
         quote_strategy = std::make_unique<QuoteStrategy>(nullptr, market, strategy_options());
@@ -1091,6 +1111,14 @@ std::optional<double> Agent::venue_bid() {
     return others_best(levels, own->first, own->second);
 }
 
+double Agent::own_position() const { return gateway ? gateway->position().to_double() : 0.0; }
+
+std::optional<double> Agent::arcus_mid() const {
+    auto bid = venue_book.best_bid(), ask = venue_book.best_ask();
+    if (!bid || !ask) return std::nullopt;
+    return (bid->first + ask->first) / 2;
+}
+
 void Agent::print_ladders(OrderBook& updated) {
     // Both books side by side; called on every update of either one.
     int depth = config.agent.depth;
@@ -1252,6 +1280,11 @@ void Agent::log_status() {
     for (auto& feed : feeds) log_->info("{}", status_line(*feed));
     if (trades_feed) log_->info("{}", trades_feed->status());
     log_->info("basis arcus/binance mid: {}", basis_text(v->basis_bps()));
+    if (portfolio) {
+        auto mid = arcus_mid();
+        log_->info("{}", portfolio->status(Decimal::from_double(own_position()),
+                                           mid ? std::optional(Decimal::from_double(*mid)) : std::nullopt));
+    }
     std::string pricing = pricing_summary();
     if (pricer)
         if (auto ratio = pricer->ratio())

@@ -12,6 +12,7 @@
 
 #include "lgbm.hpp"
 #include "ml.hpp"
+#include "portfolio.hpp"
 #include "tomlplusplus/toml.hpp"
 #include "trading/guard.hpp"
 #include "trading/opens.hpp"
@@ -121,6 +122,10 @@ template <class F> void fields(ArcusGuardConfig& c, F&& f) {
 template <class F> void fields(OpenGuardConfig& c, F&& f) {
     f("opens", c.opens); f("tz", c.tz); f("before_s", c.before_s); f("after_s", c.after_s); f("limit_share", c.limit_share);
 }
+template <class F> void fields(PortfolioConfig& c, F&& f) {
+    f("enabled", c.enabled); f("asset_class", c.asset_class); f("weight", c.weight); f("limit_usd", c.limit_usd);
+    f("factor", c.factor); f("dir", c.dir); f("group", c.group); f("stale_s", c.stale_s); f("interval_ms", c.interval_ms);
+}
 template <class F> void fields(AddGuardConfig& c, F&& f) {
     f("window_s", c.window_s); f("drawdown", c.drawdown); f("pause_s", c.pause_s); f("limit_share", c.limit_share);
 }
@@ -147,7 +152,8 @@ template <class F> void sections(Config& c, F&& f) {
     f("binance", c.binance); f("arcus", c.arcus); f("pricing", c.pricing); f("ml", c.ml); f("trading", c.trading);
     f("guard", c.guard); f("futures", c.futures); f("trades", c.trades); f("bybit", c.bybit);
     f("okx", c.okx); f("arcus_guard", c.arcus_guard); f("takes", c.takes); f("trend", c.trend); f("add_guard", c.add_guard);
-    f("open_guard", c.open_guard); f("drift", c.drift); f("lag", c.lag); f("imbalance", c.imbalance); f("agent", c.agent);
+    f("open_guard", c.open_guard); f("portfolio", c.portfolio); f("drift", c.drift); f("lag", c.lag); f("imbalance", c.imbalance);
+    f("agent", c.agent);
 }
 
 // Keys that changed meaning: a config still using them is stopped with the new name.
@@ -559,6 +565,15 @@ void Config::validate() const {
     if (!(0 <= og.before_s && og.before_s <= 3600) || !(0 <= og.after_s && og.after_s <= 4 * 3600) ||
         !(0 <= og.limit_share && og.limit_share < 1))
         throw std::invalid_argument("open_guard needs before_s within 0..3600, after_s within 0..14400 and 0 <= limit_share < 1");
+    const PortfolioConfig& pf = portfolio;
+    if (pf.enabled) {
+        if (!contains(ASSET_CLASSES, pf.asset_class))
+            throw std::invalid_argument("portfolio.asset_class must be one of " + join(ASSET_CLASSES, ", "));
+        if (!(0 < pf.weight && pf.weight <= 10) || pf.limit_usd <= 0 || !(0 <= pf.factor && pf.factor < 1))
+            throw std::invalid_argument("portfolio needs 0 < weight <= 10, limit_usd > 0 and 0 <= factor < 1");
+        if (!(50 <= pf.interval_ms && pf.interval_ms <= 10'000) || pf.stale_s < 3 * std::max(1.0, pf.interval_ms / 1000))
+            throw std::invalid_argument("portfolio needs interval_ms within 50..10000 and stale_s of 3 s (3 heartbeats) at least");
+    }
     if (ad.drawdown && t.direction != "both")
         throw std::invalid_argument("add_guard works with direction = \"both\" only (the opening side is fixed otherwise)");
     if (t.skew_open < 0 || !(0 <= t.skew_close && t.skew_close <= 1) || t.exit_after_s < 0 || !(0 <= t.exit_loss && t.exit_loss < 0.1))

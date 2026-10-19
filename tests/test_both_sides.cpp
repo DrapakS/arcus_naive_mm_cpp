@@ -63,6 +63,7 @@ Config as_long(Config both_cfg, const Config& long_cfg) {
     both_cfg.futures.drawdown = long_cfg.futures.drawdown;
     both_cfg.futures.pause_ms = long_cfg.futures.pause_ms;
     both_cfg.takes = long_cfg.takes;
+    both_cfg.portfolio = long_cfg.portfolio;  // the class's lean across the bots (19 Oct): two-sided crypto bots only
     return both_cfg;
 }
 

@@ -274,6 +274,26 @@ struct OpenGuardConfig {
     double limit_share = 0.0;
 };
 
+struct PortfolioConfig {
+    // Inventory by asset class across the bots of a host, each still its own process on its own market:
+    // every bot writes its position to a file in `dir`/`group` and reads the others' every interval_ms. The
+    // class exposure (weight x position x mark over its markets, ours included; weight = the market's risk in
+    // BTC units, its 1-min volatility over BTC's) over limit_usd is u (-1..1); an order adding to the lean
+    // takes markup x (1 + factor u), one taking it back x (1 - factor u), on top of the bot's own skew. A file
+    // not rewritten for stale_s is left out (its bot stopped). Live only: paper bots never use it (their
+    // positions are not real, and an A/B pair would count each other). group "" = "live". The Python bots
+    // share the same files.
+    bool enabled = false;
+    std::string asset_class;  // crypto | stocks | metals
+    double weight = 1.0;
+    double limit_usd = 1500.0;
+    double factor = 0.3;
+    std::string dir = "~/.naive_mm/portfolio";
+    std::string group;
+    double stale_s = 30.0;
+    double interval_ms = 100.0;  // how often each bot reads the others' files (its own: on a change, and each second)
+};
+
 struct AddGuardConfig {
     // direction = "both": after the futures mid moved more than `drawdown` against a side within
     // `window_s`, an order on that side may take the position there to `limit_share` of
@@ -364,6 +384,7 @@ struct Config {
     TrendConfig trend;
     AddGuardConfig add_guard;
     OpenGuardConfig open_guard;
+    PortfolioConfig portfolio;
     DriftConfig drift;
     LagConfig lag;
     ImbalanceConfig imbalance;
