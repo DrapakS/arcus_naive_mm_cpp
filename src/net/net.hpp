@@ -67,8 +67,10 @@ public:
     // connection. Throws on an error, a heartbeat timeout or close().
     virtual awaitable<std::optional<std::string>> read() = 0;
     // Queue a text message: it goes out as soon as the ones before it are written.
-    // `done(error)` is called once it is written (error empty) or failed.
-    virtual void send(std::string text, std::function<void(const std::string&)> done = {}) = 0;
+    // `done(error)` is called once it is written (error empty) or failed. True when
+    // the write started at once (nothing queued ahead of it): the frame is on its
+    // way to the socket before send returns.
+    virtual bool send(std::string text, std::function<void(const std::string&)> done = {}) = 0;
     // Close it at once: a read in progress fails.
     virtual void close() = 0;
     // A close handshake, then the socket closed (at most `timeout_s`).
