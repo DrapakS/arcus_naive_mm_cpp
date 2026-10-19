@@ -19,23 +19,28 @@ Python-версии рассказывает о прайсинге, защита
 
 ```bash
 sudo apt update
-sudo apt install build-essential g++-13 cmake ninja-build libboost-all-dev libssl-dev libgtest-dev   # Ubuntu 24.04
+sudo apt install build-essential cmake ninja-build libboost-all-dev libssl-dev libgtest-dev   # Ubuntu 24.04+ (24.04: и g++-13)
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ./build/nmm_tests            # 410 тестов, ~50 с
 ```
 
-- Компилятор CMake берёт сам: `g++-15`/`g++-14`/`g++-13`, затем `c++`, `g++`, `clang++` (другой — через
-  `CXX=...` или `-DCMAKE_CXX_COMPILER=...`); GCC старше 13 он не примет. Пакет `g++-13` ставит только
-  `g++-13`, без `c++` и `g++`, — старый CMakeLists его не видел (`No CMAKE_CXX_COMPILER could be found`).
-- После неудачной настройки — `rm -rf build`: CMake запоминает в `build/CMakeCache.txt`, что
-  компилятора нет, и не ищет его снова.
-- Память: одна компиляция берёт до ~700 МБ (файлы тестов — до ~1 ГБ). С Ninja CMake сам ограничивает
-  число одновременных компиляций — по одной на каждый ГБ, свободный при настройке (`Compiles at once: N`
-  в её выводе; задать руками — `-DNMM_COMPILE_JOBS=1`). Иначе на маленьком хосте компилятор убивает
-  OOM killer: `Killed signal terminated program cc1plus`. Меньше 1 ГБ свободно — добавьте swap
-  (`sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`)
-  или соберите только бота, без тестов: `cmake --build build --target naive_mm`.
+- Компилятор CMake берёт сам: самый новый GCC 13+ из `g++`, `c++`, `g++-16`…`g++-13` (другой — через
+  `CXX=...` или `-DCMAKE_CXX_COMPILER=...`); GCC старше 13 не годится (нет `<format>`). Самый новый —
+  потому что системный Boost собран системным GCC: Boost 1.90, собранный GCC 15, с `g++-13` не
+  линкуется (`undefined reference to __cxa_call_terminate@CXXABI_1.3.15`).
+- После неудачной настройки — `rm -rf build`: CMake запоминает в `build/CMakeCache.txt` и
+  компилятор, и его отсутствие.
+- Память: одна компиляция берёт до ~2 ГБ (`net.cpp`; `agent.cpp` ~700 МБ). С Ninja CMake сам
+  ограничивает число одновременных компиляций — по одной на 2 ГБ, свободных при настройке
+  (`Compiles at once: N` в её выводе; задать руками — `-DNMM_COMPILE_JOBS=1`), а при свободных
+  < 4 ГБ GCC чаще собирает мусор (пик ~1,2 ГБ). Иначе компилятор убивает OOM killer:
+  `Killed signal terminated program cc1plus`. Свободно меньше ~1,5 ГБ — добавьте swap и соберите
+  только бота, без тестов:
+  ```bash
+  sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+  cmake --build build --target naive_mm
+  ```
 - Ubuntu 22.04 не подойдёт как есть: там GCC 11 и Boost 1.74.
 
 Версия бота (коммит, ветка, есть ли незакоммиченные правки, отпечаток исходников) вшивается при

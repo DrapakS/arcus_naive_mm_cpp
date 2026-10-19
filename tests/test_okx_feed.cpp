@@ -12,6 +12,9 @@
 using namespace nmm;
 using namespace nmm::test;
 
+// designated initializers name only the fields a test sets
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+
 namespace {
 
 Json okx_top(int64_t seq, const std::string& bid, const std::string& ask, int64_t ts, const std::string& inst = "BTC-USDT-SWAP") {
