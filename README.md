@@ -99,12 +99,20 @@ Python считает во `float`, C++ считает в `double`, а печа�
 за общее время:
 
 ```bash
-SETS='binance.ws_url="wss://data-stream.binance.vision" binance.rest_url="https://data-api.binance.vision"' \
-  bash bench/paper_pair.sh start config.btc-both.toml      # имя пары: btc-both
+bash bench/paper_pair.sh start basis        # BTC, basis-прайсинг, long: config.recommended.toml
+bash bench/paper_pair.sh start basis-both   # BTC, basis-прайсинг, обе стороны: config.btc-both.toml
 bash bench/paper_pair.sh status
-bash bench/paper_pair.sh stop                               # SIGTERM обоим, как Ctrl+C
-bash bench/paper_pair.sh compare                            # = python3 bench/compare_logs.py A.log B.log
+bash bench/paper_pair.sh compare            # в любой момент; = python3 bench/compare_logs.py A.log B.log
+bash bench/paper_pair.sh stop               # SIGTERM обоим, как Ctrl+C
 ```
+
+Именованные пары — как боты в `scripts/paper_ab.sh`: `basis`, `basis-both`, `ml`, `ml-both`,
+`eth-basis-both`, `eth-ml-both`, `gld`; можно и любой конфиг: `start config.sol-both.toml sol`. Оба
+бота читают один и тот же файл (из этого checkout), Python-версия должна быть на коде, с которого
+сделан порт (ветка `claude/funny-wright-a95ao3`, `2ab7fbe` или новее), — `start` печатает коммиты
+обоих, а `compare` — версии из логов. За гео-блоком Binance — те же зеркала через `SETS`:
+`SETS='binance.ws_url="wss://data-stream.binance.vision" binance.rest_url="https://data-api.binance.vision"'`.
+Каждому боту — своё ядро: `start` предупреждает, когда ботов на хосте больше, чем ядер.
 
 `PY_REPO` — checkout Python-версии (по умолчанию `../arcus_naive_mm`), `PY` — его интерпретатор
 (по умолчанию `$PY_REPO/.venv/bin/python`), `BIN` — C++-бинарник. Логи — `paper-pair/<имя>-py.log`

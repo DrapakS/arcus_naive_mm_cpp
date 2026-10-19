@@ -3,11 +3,17 @@
 # started together, each with its orders log. bench/compare_logs.py then sets the two logs against
 # each other (what they placed, cancelled and filled, their round trips, guards, quotes, CPU and delays).
 #
-#   bash bench/paper_pair.sh start config.btc-both.toml          # name: btc-both
+#   bash bench/paper_pair.sh start basis-both                    # a named pair (below): BTC both sides, basis pricing
+#   bash bench/paper_pair.sh start config.btc-both.toml          # any config; name: btc-both
 #   bash bench/paper_pair.sh start config.eth-both.toml eth       # name: eth
 #   bash bench/paper_pair.sh status [name]
 #   bash bench/paper_pair.sh stop [name]                          # SIGTERM to both, as Ctrl+C
 #   bash bench/paper_pair.sh compare [name]                       # the comparison of the two logs
+#
+# Named pairs, as scripts/paper_ab.sh names its bots: basis (config.recommended.toml, BTC long, priced by the
+# basis off Binance futures), basis-both (config.btc-both.toml, BTC both sides), ml (config.btc-ml.toml),
+# ml-both (config.btc-ml-both.toml), eth-basis-both (config.eth-both.toml), eth-ml-both (config.eth-ml-both.toml),
+# gld (config.gld.toml). Both bots read the very same file (this checkout's), so they run one config.
 #
 # Logs: paper-pair/<name>-py.log and <name>-cpp.log (+ .err). An earlier run's logs are kept under a name
 # with the time they were moved aside. SETS: --set overrides for both, e.g. behind Binance's geo-block
@@ -23,6 +29,8 @@ if [ -z "${PY:-}" ]; then
 fi
 BIN=${BIN:-build/naive_mm}
 OUT=paper-pair
+PAIRS="basis:config.recommended.toml basis-both:config.btc-both.toml ml:config.btc-ml.toml ml-both:config.btc-ml-both.toml
+       eth-basis-both:config.eth-both.toml eth-ml-both:config.eth-ml-both.toml gld:config.gld.toml"
 mkdir -p "$OUT"
 
 cmd=${1:-status}
@@ -40,8 +48,12 @@ names() {  # the runs named, or all there are
 
 case "$cmd" in
 start)
-    config=${1:?"usage: bash bench/paper_pair.sh start CONFIG [NAME]"}
+    config=${1:?"usage: bash bench/paper_pair.sh start PAIR|CONFIG [NAME]"}
     name=${2:-$(basename "$config" .toml | sed 's/^config\.//')}
+    for pair in $PAIRS; do  # a named pair: its config, under its name
+        if [ "${pair%%:*}" = "$config" ]; then name=${2:-$config}; config=${pair#*:}; fi
+    done
+    [ -f "$config" ] || { echo "no config $config (named pairs: $(for p in $PAIRS; do printf '%s ' "${p%%:*}"; done))" >&2; exit 2; }
     config=$(cd "$(dirname "$config")" && pwd)/$(basename "$config")
     sets=()
     for item in ${SETS:-}; do sets+=(--set "$item"); done
@@ -65,6 +77,7 @@ start)
         > /dev/null 2> "$OUT/$name-cpp.err" &
     echo $! > "$OUT/$name-cpp.pid"
     echo "$name: python pid $(cat "$OUT/$name-py.pid"), c++ pid $(cat "$OUT/$name-cpp.pid"); logs $OUT/$name-py.log and $OUT/$name-cpp.log"
+    echo "config $config; python $(git -C "$PY_REPO" log -1 --format='%h %cs' 2>/dev/null || echo '?'), c++ $(git log -1 --format='%h %cs')"
     cores=$(nproc 2>/dev/null || echo 0)
     bots=$(pgrep -fc "naive_mm --config" || true)
     if [ "$cores" -gt 0 ] && [ "$bots" -gt "$cores" ]; then
@@ -97,7 +110,7 @@ compare)
     done
     ;;
 *)
-    echo "usage: bash bench/paper_pair.sh start CONFIG [NAME] | status [NAME] | stop [NAME] | compare [NAME]" >&2
+    echo "usage: bash bench/paper_pair.sh start PAIR|CONFIG [NAME] | status [NAME] | stop [NAME] | compare [NAME]" >&2
     exit 2
     ;;
 esac
