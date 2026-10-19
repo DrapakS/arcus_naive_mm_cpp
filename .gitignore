@@ -7,3 +7,5 @@ paper-*.pid
 credentials*.toml
 !credentials.example.toml
 *.pem
+paper-pair/
+bench/out/

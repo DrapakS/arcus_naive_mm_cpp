@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace nmm {
 
@@ -17,6 +18,26 @@ using JsonArray = boost::json::array;
 
 // Parse a message; throws std::runtime_error on malformed JSON.
 Json parse_json(std::string_view text);
+
+// Parses frames into a buffer reused frame after frame: a usual frame takes no heap allocation.
+// The value parse() returns lives until the next parse() of the same parser: a value kept longer
+// is copied out with keep() (onto the heap).
+class FrameParser {
+public:
+    explicit FrameParser(size_t buffer_bytes = 16 * 1024);
+    FrameParser(const FrameParser&) = delete;
+    FrameParser& operator=(const FrameParser&) = delete;
+    const Json& parse(std::string_view text);  // throws std::runtime_error on malformed JSON
+
+private:
+    std::vector<unsigned char> buffer_;
+    std::optional<boost::json::monotonic_resource> resource_;
+    boost::json::parser parser_;
+    std::optional<Json> value_;  // in the buffer's memory (assigning it to a heap value would copy it)
+};
+
+// A copy of `v` on the heap, independent of the memory `v` was parsed into.
+inline Json keep(const Json& v) { return Json(v, boost::json::storage_ptr()); }
 
 // The field of an object; nullptr when `v` is no object or has no such key.
 const Json* jget(const Json& v, std::string_view key);

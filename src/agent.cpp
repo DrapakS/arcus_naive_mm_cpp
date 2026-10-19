@@ -280,9 +280,9 @@ awaitable<void> Agent::run() {
     if (gateway) {
         co_await gateway->shutdown();
         trading.cancel();
-        gateway->round_trips->report_final();  // what is still open, at the last Arcus top seen with it open
     }
     co_await sleep(0.05);  // the cancelled tasks finish their cleanup
+    if (gateway) gateway->round_trips->report_final();  // what is still open, at the last Arcus top seen with it open
     if (failure_) std::rethrow_exception(failure_);
 }
 

@@ -124,10 +124,11 @@ awaitable<void> BookFeed::run_link(Link& link) {
             log.info("connected {}{}", url, tag);
             on_connected(link);
             if (options.stale_timeout > 0) stale = std::make_unique<StaleWatch>(ws, options.stale_timeout);
+            FrameParser parser;
             for (;;) {
                 auto text = co_await ws->read();
                 if (!text) break;
-                Json data = parse_json(*text);
+                const Json& data = parser.parse(*text);
                 if (carries_data(data)) {  // a greeting or an ack is no sign of health
                     received = true;
                     if (stale) stale->state->fresh = monotonic();
@@ -246,7 +247,7 @@ bool SnapshotFeed::lagging(const Link& link) const {
 }
 
 void SnapshotFeed::park(int64_t first, const Json& update, Link& link) {
-    parked_.emplace(first, std::make_pair(update, &link));
+    parked_.emplace(first, std::make_pair(keep(update), &link));
     if (!gap_timer_) gap_timer_ = call_later(gap_wait, [this] { gap_expired(); });
 }
 
@@ -276,7 +277,7 @@ void SnapshotFeed::gap_expired() {
 }
 
 void SnapshotFeed::buffer_update(const Json& update) {
-    buffer_.push_back(update);
+    buffer_.push_back(keep(update));
     if (buffer_.size() > max_buffered) buffer_.erase(buffer_.begin());
     if (snapshot_) try_sync();
     else if (!snapshot_task_) request_snapshot();
@@ -308,7 +309,7 @@ bool SnapshotFeed::replay(const std::vector<Json>& updates) {
 
 void SnapshotFeed::resync(const Json* update, std::vector<Json> more) {
     std::optional<Json> keep;
-    if (update != nullptr) keep = *update;  // it may live in what reset() clears
+    if (update != nullptr) keep = nmm::keep(*update);  // it may live in what reset() clears
     book->invalidate();
     reset();
     if (keep) buffer_.push_back(std::move(*keep));

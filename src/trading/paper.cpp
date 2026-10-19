@@ -23,10 +23,11 @@ awaitable<void> PaperGateway::run() {
             log->info("paper trading on {} trades", market.symbol);
             ready = true;
             on_change();
+            FrameParser parser;
             for (;;) {
                 auto text = co_await ws->read();
                 if (!text) break;
-                on_message(parse_json(*text));
+                on_message(parser.parse(*text));
             }
             closed = true;
         } catch (...) {

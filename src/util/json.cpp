@@ -1,6 +1,7 @@
 #include "util/json.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
@@ -16,6 +17,23 @@ Json parse_json(std::string_view text) {
     Json v = boost::json::parse(text, ec);
     if (ec) throw std::runtime_error("malformed JSON: " + ec.message());
     return v;
+}
+
+FrameParser::FrameParser(size_t buffer_bytes) : buffer_(buffer_bytes) {}
+
+const Json& FrameParser::parse(std::string_view text) {
+    value_.reset();  // lets go of the last frame's memory before the buffer is reused
+    resource_.reset();
+    resource_.emplace(buffer_.data(), buffer_.size());
+    parser_.reset(boost::json::storage_ptr(&*resource_));
+    boost::system::error_code ec;
+    parser_.write(text.data(), text.size(), ec);
+    if (ec) {
+        parser_.reset();
+        throw std::runtime_error("malformed JSON: " + ec.message());
+    }
+    value_.emplace(parser_.release());
+    return *value_;
 }
 
 const Json* jget(const Json& v, std::string_view key) {
@@ -50,12 +68,17 @@ double to_float(const Json& v) {
     case boost::json::kind::double_: return v.get_double();
     case boost::json::kind::bool_: return v.get_bool() ? 1.0 : 0.0;
     case boost::json::kind::string: {
-        std::string s(strip(std::string_view(v.get_string())));
+        std::string_view s = strip(std::string_view(v.get_string()));
+        if (!s.empty() && s.front() == '+') s.remove_prefix(1);  // float("+1.5"); from_chars takes no sign but "-"
         if (s.empty()) break;
-        char* end = nullptr;
-        errno = 0;
-        double x = std::strtod(s.c_str(), &end);
-        if (end != s.c_str() + s.size()) break;
+        double x = 0.0;
+        auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), x);
+        if (ec == std::errc() && end == s.data() + s.size()) return x;
+        // what from_chars does not read the way float() does: inf, nan and the like
+        std::string text(s);
+        char* stop = nullptr;
+        x = std::strtod(text.c_str(), &stop);
+        if (stop != text.c_str() + text.size()) break;
         return x;
     }
     default: break;

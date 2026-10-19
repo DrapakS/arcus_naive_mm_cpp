@@ -66,3 +66,23 @@ TEST(PyFmt, ReprLikePython) {
     EXPECT_EQ(nmm::thousands(1234567.4), "1,234,567");
     EXPECT_EQ(nmm::thousands(720.0), "720");
 }
+
+TEST(Decimal, DivisionRoundsHalfEvenAtTheLastPlace) {
+    EXPECT_EQ((Decimal("0.000000000000000005") / Decimal(2)).str(), "0.000000000000000002");  // 2.5e-18 -> 2e-18
+    EXPECT_EQ((Decimal("0.000000000000000007") / Decimal(2)).str(), "0.000000000000000004");  // 3.5e-18 -> 4e-18
+    EXPECT_EQ((Decimal(1) / Decimal(8)).str(), "0.125");
+    EXPECT_EQ((Decimal("83191.5") / Decimal("0.1")).str(), "831915");
+    EXPECT_EQ((Decimal("1000") / Decimal("83191.53")).str(), "0.012020454486171849");
+    // a divisor past the fast path's range takes the exact 256-bit one
+    EXPECT_EQ((Decimal("100000000000000000000") / Decimal("300000000000")).str(), "333333333.333333333333333333");
+    EXPECT_EQ((Decimal("1") / Decimal("300000000000")).str(), "0.000000000003333333");
+}
+
+TEST(Decimal, ConversionsMatchPython) {
+    EXPECT_EQ(Decimal::from_double(0.1 + 0.2).str(), "0.30000000000000004");
+    EXPECT_EQ(Decimal::from_double(1e-7).str(), "0.0000001");
+    EXPECT_EQ(Decimal::from_double(123456789012.5).str(), "123456789012.5");
+    EXPECT_EQ(Decimal("123456789012345678.000000000000000001").str(), "123456789012345678.000000000000000001");
+    EXPECT_DOUBLE_EQ(Decimal("0.1").to_double(), 0.1);
+    EXPECT_EQ(Decimal("-82725.8").to_double(), -82725.8);
+}

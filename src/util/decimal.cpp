@@ -1,5 +1,8 @@
 #include "util/decimal.hpp"
 
+#include <charconv>
+#include <cmath>
+#include <cstdint>
 #include <cstdlib>
 
 #include "util/pyfmt.hpp"
@@ -91,13 +94,11 @@ __int128 signed_result(u128 magnitude, bool negative) {
 u128 magnitude(__int128 v) { return v < 0 ? static_cast<u128>(-v) : static_cast<u128>(v); }
 
 std::string u128_str(u128 v) {
-    if (v == 0) return "0";
-    std::string s;
-    while (v) {
-        s.insert(s.begin(), static_cast<char>('0' + static_cast<int>(v % 10)));
-        v /= 10;
-    }
-    return s;
+    if (v <= UINT64_MAX) return std::to_string(static_cast<u64>(v));
+    // in chunks of 19 digits
+    constexpr u64 CHUNK = 10'000'000'000'000'000'000ULL;
+    std::string low = std::to_string(static_cast<u64>(v % CHUNK));
+    return u128_str(v / CHUNK) + std::string(19 - low.size(), '0') + low;
 }
 
 }  // namespace
@@ -111,8 +112,26 @@ Decimal operator*(const Decimal& a, const Decimal& b) {
 Decimal operator/(const Decimal& a, const Decimal& b) {
     if (b.v_ == 0) throw std::domain_error("Decimal division by zero");
     bool negative = (a.v_ < 0) != (b.v_ < 0);
-    U256 scaled = mul(magnitude(a.v_), static_cast<u128>(ONE64));
-    return Decimal::from_raw(signed_result(div_round(scaled, magnitude(b.v_)), negative));
+    u128 n = magnitude(a.v_), d = magnitude(b.v_);
+    constexpr u128 BILLION = 1'000'000'000;
+    if (d < (static_cast<u128>(1) << 127) / BILLION) {
+        // the usual case (a divisor under ~1.7e11): the quotient's whole part, then its 18 places in
+        // two steps of nine, the remainder times 1e9 still fitting in 128 bits
+        u128 q = n / d, r = n % d;
+        if (q > MAX_MAG / ONE64) throw std::overflow_error("Decimal overflow");
+        u128 x = r * BILLION;
+        u128 f1 = x / d;
+        r = x % d;
+        x = r * BILLION;
+        u128 f2 = x / d;
+        r = x % d;
+        u128 result = q * ONE64 + f1 * BILLION + f2;
+        u128 twice = r * 2;
+        if (twice > d || (twice == d && (result & 1))) ++result;
+        return Decimal::from_raw(signed_result(result, negative));
+    }
+    U256 scaled = mul(n, static_cast<u128>(ONE64));
+    return Decimal::from_raw(signed_result(div_round(scaled, d), negative));
 }
 
 Decimal Decimal::parse(std::string_view text) {
@@ -170,9 +189,10 @@ std::optional<Decimal> Decimal::try_parse(std::string_view text) {
     int shift = exp - frac_len + SCALE;  // value * 10^18 = int(digits) * 10^shift
     u128 mag = 0;
     if (shift >= 0) {
-        if (static_cast<int>(digits.size()) + shift > 38) return std::nullopt;
-        for (char c : digits) mag = mag * 10 + static_cast<u128>(c - '0');
-        mag *= pow10(shift);
+        if (static_cast<int>(digits.size()) + shift > 39) return std::nullopt;
+        for (char c : digits)
+            if (__builtin_mul_overflow(mag, 10, &mag) || __builtin_add_overflow(mag, static_cast<u128>(c - '0'), &mag)) return std::nullopt;
+        if (__builtin_mul_overflow(mag, pow10(shift), &mag)) return std::nullopt;
     } else {
         int drop = -shift;
         if (drop > static_cast<int>(digits.size())) {
@@ -192,13 +212,20 @@ std::optional<Decimal> Decimal::try_parse(std::string_view text) {
 }
 
 Decimal Decimal::from_double(double x) {
-    std::string text = pyrepr(x);
-    auto parsed = try_parse(text);
-    if (!parsed) throw std::invalid_argument("cannot convert float " + text + " to Decimal");
+    // the digits of repr(x): the shortest scientific form reads back to the same value as repr's
+    char buf[64];
+    auto res = std::to_chars(buf, buf + sizeof buf, x, std::chars_format::scientific);
+    auto parsed = std::isfinite(x) ? try_parse(std::string_view(buf, static_cast<size_t>(res.ptr - buf))) : std::nullopt;
+    if (!parsed) throw std::invalid_argument("cannot convert float " + pyrepr(x) + " to Decimal");
     return *parsed;
 }
 
-double Decimal::to_double() const { return std::strtod(str().c_str(), nullptr); }
+double Decimal::to_double() const {
+    std::string text = str();
+    double x = 0.0;
+    std::from_chars(text.data(), text.data() + text.size(), x);  // correctly rounded, as float(Decimal)
+    return x;
+}
 
 std::string Decimal::str() const {
     u128 mag = magnitude(v_);

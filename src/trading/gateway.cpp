@@ -509,10 +509,11 @@ awaitable<void> ArcusGateway::run_main() {
             if (opt.dms_timeout) dms_task_ = Task::spawn(keep_dms_armed(), "dms", log->name());
             watchdog_ = Task::spawn(watch_pending(), "pending-watchdog", log->name());
             presigner_ = Task::spawn(keep_presigned(), "presign", log->name());
+            FrameParser parser;
             for (;;) {
                 auto text = co_await ws->read();
                 if (!text) break;
-                on_message(parse_json(*text));
+                on_message(parser.parse(*text));
             }
             closed = true;
         } catch (...) {
@@ -554,10 +555,11 @@ awaitable<void> ArcusGateway::run_lane(Conn* conn) {
             conn->attach(ws);
             log->info("cancel {} connected", conn->name);
             if (main_conn.ws == nullptr) pull_while_blind();  // main is still down: this lane is the way out
+            FrameParser parser;
             for (;;) {
                 auto text = co_await ws->read();
                 if (!text) break;
-                Json data = parse_json(*text);
+                const Json& data = parser.parse(*text);
                 if (has_key(data, "method") && has_key(data, "id")) on_response(data, *conn);
             }
             closed = true;
