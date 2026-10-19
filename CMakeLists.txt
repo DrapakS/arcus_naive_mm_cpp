@@ -26,6 +26,28 @@ endif()
 
 option(NMM_TESTS "Build the unit tests (GoogleTest)" ON)
 
+# A compile takes up to ~700 MB here (the bot's Asio/Beast coroutines; the tests' fake servers ~1 GB):
+# with Ninja, no more compiles at once than the memory free at configure time holds, so a small host
+# builds slower rather than have the compiler killed ("Killed signal terminated program cc1plus").
+# NMM_COMPILE_JOBS sets the number by hand.
+cmake_host_system_information(RESULT NMM_FREE_MB QUERY AVAILABLE_PHYSICAL_MEMORY)
+math(EXPR NMM_JOBS_BY_MEMORY "${NMM_FREE_MB} / 1000")
+if(NMM_JOBS_BY_MEMORY LESS 1)
+  set(NMM_JOBS_BY_MEMORY 1)
+endif()
+if(NMM_COMPILE_JOBS)
+  set(NMM_JOBS ${NMM_COMPILE_JOBS})
+else()
+  set(NMM_JOBS ${NMM_JOBS_BY_MEMORY})
+endif()
+set_property(GLOBAL APPEND PROPERTY JOB_POOLS nmm_compile=${NMM_JOBS})
+set(CMAKE_JOB_POOL_COMPILE nmm_compile)
+message(STATUS "Compiles at once: ${NMM_JOBS} (${NMM_FREE_MB} MB free; -DNMM_COMPILE_JOBS=N to set)")
+if(NMM_FREE_MB LESS 900)
+  message(WARNING "${NMM_FREE_MB} MB free: one compile takes up to ~700 MB (~1 GB for the tests). Add swap, "
+                  "or build the bot alone: cmake --build build --target naive_mm")
+endif()
+
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Boost 1.81 REQUIRED COMPONENTS json)

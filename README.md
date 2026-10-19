@@ -30,6 +30,12 @@ cmake --build build -j
   `g++-13`, без `c++` и `g++`, — старый CMakeLists его не видел (`No CMAKE_CXX_COMPILER could be found`).
 - После неудачной настройки — `rm -rf build`: CMake запоминает в `build/CMakeCache.txt`, что
   компилятора нет, и не ищет его снова.
+- Память: одна компиляция берёт до ~700 МБ (файлы тестов — до ~1 ГБ). С Ninja CMake сам ограничивает
+  число одновременных компиляций — по одной на каждый ГБ, свободный при настройке (`Compiles at once: N`
+  в её выводе; задать руками — `-DNMM_COMPILE_JOBS=1`). Иначе на маленьком хосте компилятор убивает
+  OOM killer: `Killed signal terminated program cc1plus`. Меньше 1 ГБ свободно — добавьте swap
+  (`sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`)
+  или соберите только бота, без тестов: `cmake --build build --target naive_mm`.
 - Ubuntu 22.04 не подойдёт как есть: там GCC 11 и Boost 1.74.
 
 Версия бота (коммит, ветка, есть ли незакоммиченные правки, отпечаток исходников) вшивается при
