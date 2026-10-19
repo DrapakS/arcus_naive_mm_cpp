@@ -248,11 +248,7 @@ awaitable<void> Agent::run() {
     if (futures_book)
         feeds.push_back(std::make_unique<BinanceFuturesTickerFeed>(*futures_book, cfg.futures.symbol, cfg.futures.ws_url,
                                                                    options(cfg.futures.stale_timeout_s, cfg.futures.connections)));
-    if (cfg.trades.enabled)  // the Binance spot trades of the [binance] symbol, by default over the [binance] URL
-        trades_feed = std::make_unique<BinanceTradesFeed>(
-            cfg.binance.symbol, cfg.trades.ws_url.empty() ? cfg.binance.ws_url : cfg.trades.ws_url,
-            [this](double price, int64_t trade_us, int64_t received_us) { on_trade(price, trade_us, received_us); },
-            [this] { on_trades_reset(); }, options(cfg.trades.stale_timeout_s, cfg.trades.connections));
+    if (cfg.trades.enabled) trades_feed = make_trades_feed();
     if (bybit_book)
         feeds.push_back(std::make_unique<BybitTickerFeed>(*bybit_book, cfg.bybit.category, cfg.bybit.symbol, cfg.bybit.ws_url,
                                                           options(cfg.bybit.stale_timeout_s, cfg.bybit.connections)));
@@ -284,6 +280,17 @@ awaitable<void> Agent::run() {
     }
     co_await sleep(0.05);  // the cancelled tasks finish their cleanup
     if (failure_) std::rethrow_exception(failure_);
+}
+
+std::unique_ptr<BinanceTradesFeed> Agent::make_trades_feed() {
+    const Config& cfg = config;
+    FeedOptions o;  // no book: each trade goes to on_trade
+    o.stale_timeout = cfg.trades.stale_timeout_s;
+    o.connections = cfg.trades.connections;
+    return std::make_unique<BinanceTradesFeed>(
+        cfg.binance.symbol, cfg.trades.ws_url.empty() ? cfg.binance.ws_url : cfg.trades.ws_url,
+        [this](double price, int64_t trade_us, int64_t received_us) { on_trade(price, trade_us, received_us); },
+        [this] { on_trades_reset(); }, o);
 }
 
 awaitable<void> Agent::exchange_watch() {

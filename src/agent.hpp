@@ -110,6 +110,10 @@ public:
     void log_status();
 
 private:
+    friend struct AgentTestAccess;  // the tests reach the per-frame handlers and their state
+
+    // The Binance spot trades of the [binance] symbol, by default over the [binance] URL.
+    std::unique_ptr<BinanceTradesFeed> make_trades_feed();
     awaitable<void> start_trading();
     awaitable<void> exchange_watch();
     awaitable<void> session_watch();
