@@ -111,4 +111,13 @@ void log_config(const Config& config, const std::optional<std::string>& source, 
     for (const auto& line : describe(config)) log.info("{}", line);
 }
 
+awaitable<void> repeat_version(std::string version, double every_s) {
+    Logger& log = get_logger(CONFIG_LOGGER);
+    double started = monotonic();
+    for (;;) {
+        co_await sleep(every_s);
+        log.info("naive_mm {}, up {:.1f} h", version, (monotonic() - started) / 3600);
+    }
+}
+
 }  // namespace nmm

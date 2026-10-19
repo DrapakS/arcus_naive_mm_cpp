@@ -40,86 +40,97 @@ struct Record {
 std::string format_record(const Record& record);
 
 // A queue drained by a thread of its own; push never blocks (a full queue drops).
+// The thread shares the queue's state: one stop() left stuck on a dead disk can
+// wake after the queue is gone.
 template <class T>
 class BackgroundQueue {
 public:
     explicit BackgroundQueue(std::function<void(T&)> consume, size_t maxsize = QUEUE_SIZE)
-        : consume_(std::move(consume)), maxsize_(maxsize) {
-        thread_ = std::thread([this] { run(); });
+        : s_(std::make_shared<State>(std::move(consume), maxsize)) {
+        thread_ = std::thread([s = s_] { s->run(); });
     }
     BackgroundQueue(const BackgroundQueue&) = delete;
     BackgroundQueue& operator=(const BackgroundQueue&) = delete;
     ~BackgroundQueue() { stop(); }
 
     bool push(T item) {
+        State& s = *s_;
         {
-            std::lock_guard lock(mutex_);
-            if (stopping_ || items_.size() >= maxsize_) {
-                ++dropped_;
+            std::lock_guard lock(s.mutex);
+            if (s.stopping || s.items.size() >= s.maxsize) {
+                ++s.dropped;
                 return false;
             }
-            items_.push_back(std::move(item));
-            ++pending_;
+            s.items.push_back(std::move(item));
+            ++s.pending;
         }
-        cv_.notify_one();
+        s.cv.notify_one();
         return true;
     }
 
-    size_t dropped() const { return dropped_.load(); }
+    size_t dropped() const { return s_->dropped.load(); }
 
     // Wait (up to `timeout_s`) until everything pushed so far is written.
     void flush(double timeout_s = 2.0) {
-        std::unique_lock lock(mutex_);
-        idle_.wait_for(lock, std::chrono::duration<double>(timeout_s), [this] { return pending_ == 0; });
+        State& s = *s_;
+        std::unique_lock lock(s.mutex);
+        s.idle.wait_for(lock, std::chrono::duration<double>(timeout_s), [&s] { return s.pending == 0; });
     }
 
     // Write out what is held (up to `timeout_s`) and stop the thread; a thread
     // stuck on a dead disk is left behind rather than waited for.
     void stop(double timeout_s = 2.0) {
+        State& s = *s_;
         {
-            std::unique_lock lock(mutex_);
+            std::unique_lock lock(s.mutex);
             if (!thread_.joinable()) return;
-            idle_.wait_for(lock, std::chrono::duration<double>(timeout_s), [this] { return pending_ == 0; });
-            stopping_ = true;
+            s.idle.wait_for(lock, std::chrono::duration<double>(timeout_s), [&s] { return s.pending == 0; });
+            s.stopping = true;
         }
-        cv_.notify_all();
+        s.cv.notify_all();
         bool done;
         {
-            std::unique_lock lock(mutex_);
-            done = idle_.wait_for(lock, std::chrono::duration<double>(timeout_s), [this] { return exited_; });
+            std::unique_lock lock(s.mutex);
+            done = s.idle.wait_for(lock, std::chrono::duration<double>(timeout_s), [&s] { return s.exited; });
         }
         if (done) thread_.join();
         else thread_.detach();
     }
 
 private:
-    void run() {
-        std::unique_lock lock(mutex_);
-        for (;;) {
-            cv_.wait(lock, [this] { return stopping_ || !items_.empty(); });
-            if (items_.empty() && stopping_) break;
-            T item = std::move(items_.front());
-            items_.pop_front();
-            lock.unlock();
-            try {
-                consume_(item);
-            } catch (...) {
-            }
-            lock.lock();
-            if (--pending_ == 0) idle_.notify_all();
-        }
-        exited_ = true;
-        idle_.notify_all();
-    }
+    struct State {
+        State(std::function<void(T&)> consume_, size_t maxsize_) : consume(std::move(consume_)), maxsize(maxsize_) {}
 
-    std::function<void(T&)> consume_;
-    size_t maxsize_;
-    std::mutex mutex_;
-    std::condition_variable cv_, idle_;
-    std::deque<T> items_;
-    size_t pending_ = 0;
-    bool stopping_ = false, exited_ = false;
-    std::atomic<size_t> dropped_ {0};
+        void run() {
+            std::unique_lock lock(mutex);
+            for (;;) {
+                cv.wait(lock, [this] { return stopping || !items.empty(); });
+                if (items.empty() && stopping) break;
+                T item = std::move(items.front());
+                items.pop_front();
+                lock.unlock();
+                try {
+                    consume(item);
+                } catch (...) {
+                }
+                lock.lock();
+                if (--pending == 0) idle.notify_all();
+            }
+            exited = true;
+            idle.notify_all();
+        }
+
+        std::function<void(T&)> consume;
+        size_t maxsize;
+        std::mutex mutex;
+        std::condition_variable cv, idle;
+        std::deque<T> items;
+        size_t pending = 0;
+        bool stopping = false, exited = false;
+        std::atomic<size_t> dropped {0};
+    };
+
+    std::shared_ptr<State> s_;
     std::thread thread_;
 };
 
