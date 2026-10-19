@@ -128,7 +128,7 @@ std::string expand_path(std::string_view path) {
 
 Portfolio::Portfolio(std::string_view directory, std::string market_, std::string asset_class_, PortfolioOptions o)
     : dir(expand_path(directory)), market(std::move(market_)), asset_class(std::move(asset_class_)), weight(o.weight),
-      limit_usd(o.limit_usd), factor(o.factor), stale_s(o.stale_s), interval_s(o.interval_s), position(std::move(o.position)),
+      limit_usd(o.limit_usd), factor(o.factor), shift_bp(o.shift_bp), stale_s(o.stale_s), interval_s(o.interval_s), position(std::move(o.position)),
       mark(std::move(o.mark)), clock(std::move(o.clock)), pid(o.pid ? *o.pid : static_cast<int64_t>(::getpid())) {
     if (std::find(ASSET_CLASSES.begin(), ASSET_CLASSES.end(), asset_class) == ASSET_CLASSES.end())
         throw std::invalid_argument(std::format("asset class {}: one of {}", pyrepr(std::string_view(asset_class)), join(ASSET_CLASSES, ", ")));
@@ -239,11 +239,19 @@ Decimal Portfolio::multiplier(const std::string& side, const Decimal& pos, const
     return Decimal(std::format("{:.6f}", 1 + factor * u * (side == "BUY" ? 1 : -1)));  // Decimal(str(round(x, 6)))
 }
 
+Decimal Portfolio::shift(const Decimal& pos, const Decimal& price) const {
+    if (!shift_bp) return Decimal(0);
+    double s = shift_bp * lean(pos.to_double(), price.to_double()) / 1e4;
+    return Decimal::from_double(std::stod(std::format("{:.10f}", s)));  // Decimal(str(round(x, 10)))
+}
+
 std::optional<std::string> Portfolio::note(const std::string& side, const Decimal& pos, const Decimal& price) const {
     if (others.empty()) return std::nullopt;
     double p = pos.to_double(), x = price.to_double();
-    return std::format("class {} {} $ (u {:+.2f}): markup x{}", asset_class, signed_usd(exposure(p, x)), lean(p, x),
-                       multiplier(side, pos, price).fixed(2));
+    std::string text = std::format("class {} {} $ (u {:+.2f}): markup x{}", asset_class, signed_usd(exposure(p, x)), lean(p, x),
+                                   multiplier(side, pos, price).fixed(2));
+    if (shift_bp) text += std::format(", quotes {:+.2f} bp", -shift_bp * lean(p, x));
+    return text;
 }
 
 std::string Portfolio::status(const Decimal& pos, const std::optional<Decimal>& price) const {
@@ -255,8 +263,10 @@ std::string Portfolio::status(const Decimal& pos, const std::optional<Decimal>& 
     if (!price) return text + "; ours: no price yet";
     double p = pos.to_double(), x = price->to_double();
     double ours = weight * p * x;
-    return text + std::format("; ours {} $ -> {} $, u {:+.2f}: buys x{}, sells x{}", signed_usd(ours), signed_usd(exposure(p, x)),
-                              lean(p, x), multiplier("BUY", pos, *price).fixed(2), multiplier("SELL", pos, *price).fixed(2));
+    text += std::format("; ours {} $ -> {} $, u {:+.2f}: buys x{}, sells x{}", signed_usd(ours), signed_usd(exposure(p, x)),
+                        lean(p, x), multiplier("BUY", pos, *price).fixed(2), multiplier("SELL", pos, *price).fixed(2));
+    if (shift_bp) text += std::format(", quotes {:+.2f} bp", -shift_bp * lean(p, x));
+    return text;
 }
 
 const Holding* Portfolio::other(const std::string& m) const {

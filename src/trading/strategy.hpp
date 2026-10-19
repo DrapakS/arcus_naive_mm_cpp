@@ -53,7 +53,8 @@
 //
 // With a portfolio (portfolio.hpp: the other bots' positions of the same asset
 // class), an order that adds to the class's lean takes a wider markup and one that
-// takes it back a narrower one, on top of the own skew.
+// takes it back a narrower one, on top of the own skew; with its shift_bp, both
+// quotes move against the lean by that much at its limit.
 #pragma once
 
 #include <map>

@@ -297,7 +297,8 @@ TEST(AgentTakes, TheAgentLogsAQuietTakerAndFeedsTheMid) {
 TEST(AgentTakes, TheBtcAndEthConfigsTurnItOn) {
     for (std::string name : {"btc-both", "eth-both", "btc-ml-both", "eth-ml-both", "btc-ml-okx-only", "sol-both", "sol"}) {
         Config c = load_config(repo("config." + name + ".toml"));
-        bool live_ml = name == "eth-ml-both" || name == "btc-ml-okx-only";  // 300 ms from 19 Oct evening
+        // 300 ms from 19 Oct evening (C++ checkout: config.btc-ml-both.toml is config.btc-ml-okx-only.toml)
+        bool live_ml = name == "eth-ml-both" || name == "btc-ml-okx-only" || name == "btc-ml-both";
         EXPECT_EQ(c.takes.min_usd, 0.0) << name;
         EXPECT_EQ(c.takes.pause_ms, live_ml ? 300.0 : 500.0) << name;
         EXPECT_EQ(c.takes.min_takes, 20) << name;
@@ -317,7 +318,7 @@ TEST(AgentTakes, TheBtcAndEthConfigsTurnItOn) {
 TEST(AgentTakes, TheTwoSidedConfigsHoldThePriceTheBookCameTo) {
     for (std::string name : {"btc-both", "eth-both", "btc-ml-both", "eth-ml-both", "sol-both", "nvda-both", "gld-both"}) {
         Config c = load_config(repo("config." + name + ".toml"));
-        EXPECT_EQ(c.trading.never_lead, !name.starts_with("eth")) << name;
+        EXPECT_EQ(c.trading.never_lead, !name.starts_with("eth") && name != "btc-ml-both") << name;  // C++: btc-ml-both is the live set
         EXPECT_EQ(c.trading.came_hold_ms, 300.0) << name;
     }
     for (std::string name : {"eth", "eth-both", "eth-ml-both"})  // ETH: never_lead off from 19 Oct evening
@@ -372,9 +373,10 @@ TEST(AgentDrift, TheDriftSectionAndSetOverrides) {
     }
     EXPECT_LOAD_ERROR(std::nullopt, {"drift.markup_factor"}, "section.key=value");
     EXPECT_LOAD_ERROR(std::nullopt, {"drift.nope=1"}, "unknown config key");
-    for (std::string name : {"btc-both", "eth-both", "btc-ml-both"})  // on for BTC and ETH, x2.5 from 18 Oct
+    for (std::string name : {"btc-both", "eth-both"})  // on for BTC and ETH, x2.5 from 18 Oct
         EXPECT_EQ(load_config(repo("config." + name + ".toml")).drift.markup_factor, 2.5) << name;
-    for (std::string name : {"eth-ml-both", "btc-ml-okx-only"})  // the live ML bots: x2 from 19 Oct evening
+    // the live ML bots: x2 from 19 Oct evening (C++ checkout: config.btc-ml-both.toml is config.btc-ml-okx-only.toml)
+    for (std::string name : {"eth-ml-both", "btc-ml-okx-only", "btc-ml-both"})
         EXPECT_EQ(load_config(repo("config." + name + ".toml")).drift.markup_factor, 2.0) << name;
 }
 

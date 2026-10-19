@@ -131,7 +131,7 @@ template <class F> void fields(VolMarkupConfig& c, F&& f) {
 }
 template <class F> void fields(PortfolioConfig& c, F&& f) {
     f("enabled", c.enabled); f("asset_class", c.asset_class); f("weight", c.weight); f("limit_usd", c.limit_usd);
-    f("factor", c.factor); f("dir", c.dir); f("group", c.group); f("stale_s", c.stale_s); f("interval_ms", c.interval_ms);
+    f("factor", c.factor); f("shift_bp", c.shift_bp); f("dir", c.dir); f("group", c.group); f("stale_s", c.stale_s); f("interval_ms", c.interval_ms);
 }
 template <class F> void fields(AddGuardConfig& c, F&& f) {
     f("window_s", c.window_s); f("drawdown", c.drawdown); f("pause_s", c.pause_s); f("limit_share", c.limit_share);
@@ -586,8 +586,9 @@ void Config::validate() const {
     if (pf.enabled) {
         if (!contains(ASSET_CLASSES, pf.asset_class))
             throw std::invalid_argument("portfolio.asset_class must be one of " + join(ASSET_CLASSES, ", "));
-        if (!(0 < pf.weight && pf.weight <= 10) || pf.limit_usd <= 0 || !(0 <= pf.factor && pf.factor < 1))
-            throw std::invalid_argument("portfolio needs 0 < weight <= 10, limit_usd > 0 and 0 <= factor < 1");
+        if (!(0 < pf.weight && pf.weight <= 10) || pf.limit_usd <= 0 || !(0 <= pf.factor && pf.factor < 1) ||
+            !(0 <= pf.shift_bp && pf.shift_bp <= 5))
+            throw std::invalid_argument("portfolio needs 0 < weight <= 10, limit_usd > 0, 0 <= factor < 1 and shift_bp within 0..5");
         if (!(50 <= pf.interval_ms && pf.interval_ms <= 10'000) || pf.stale_s < 3 * std::max(1.0, pf.interval_ms / 1000))
             throw std::invalid_argument("portfolio needs interval_ms within 50..10000 and stale_s of 3 s (3 heartbeats) at least");
     }

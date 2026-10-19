@@ -42,11 +42,12 @@ struct Bot {
     std::unique_ptr<Portfolio> p;
 
     Bot(const fs::path& dir, const std::string& market, const FakeClock& clock, double weight = 1.0,
-        const std::string& asset_class = "crypto", std::optional<int64_t> pid = {}) {
+        const std::string& asset_class = "crypto", std::optional<int64_t> pid = {}, double shift_bp = 0.0) {
         PortfolioOptions o;
         o.weight = weight;
         o.limit_usd = 1500.0;
         o.factor = 0.3;
+        o.shift_bp = shift_bp;
         o.position = [this] { return position; };
         o.mark = [this] { return std::optional(mark); };
         o.clock = clock.fn();
@@ -223,10 +224,46 @@ TEST(Portfolio, TheStrategyQuotesTheBuyFurtherAndTheSellNearerWithTheClassLong) 
     })) << join(messages, "\n");
 }
 
+TEST(Portfolio, TheShiftMovesBothQuotesAgainstTheClassLean) {
+    LogCapture log("naive_mm.orders");
+    TempDir tmp;
+    FakeClock clock(1'000.0);
+    Bot eth(tmp.path, "ETH-USD", clock, 1.3);
+    eth.position = 0.5, eth.mark = 2'400.0;  // the class long past the limit: u = 1
+    eth.p->publish();
+    Bot btc(tmp.path, "BTC-USD", clock, 1.0, "crypto", {}, 2.0);
+    btc.p->read();
+    EXPECT_EQ(btc.p->shift(Decimal(0), Decimal(100'000)), D("0.0002"));
+    eth.position = -0.5;  // short: both up
+    eth.p->publish();
+    btc.p->read();
+    EXPECT_EQ(btc.p->shift(Decimal(0), Decimal(100'000)), D("-0.0002"));
+    EXPECT_NE(btc.p->status(Decimal(0), Decimal(100'000)).find("u -1.00: buys x0.70, sells x1.30, quotes +2.00 bp"), std::string::npos)
+        << btc.p->status(Decimal(0), Decimal(100'000));
+    eth.position = 0.5;
+    eth.p->publish();
+    btc.p->read();
+    auto [gw, leaned] = both(0.001, 0.0002, SIZE, 1000.0, [&](StrategyOptions& o) { o.portfolio = btc.p.get(); });
+    leaned->evaluate(view(100'000.0));
+    std::map<std::string, Decimal> moved;
+    for (const auto& a : actions(*gw)) moved[a.side] = a.price;
+    // from 100000 x (1 - 2 bp): the buy 99980 x (1 - 0.0013), the sell (99980 + 0.1) x (1 + 0.0007)
+    EXPECT_EQ(moved["BUY"], D("99850.0"));
+    EXPECT_EQ(moved["SELL"], D("100050.1"));
+    auto messages = log.messages();
+    EXPECT_TRUE(std::any_of(messages.begin(), messages.end(), [](const std::string& m) {
+        return m.find(">>> PLACE BUY") != std::string::npos && m.find("markup x1.30, quotes -2.00 bp") != std::string::npos;
+    })) << join(messages, "\n");
+    Portfolio off(tmp.path.string(), "X", "crypto");
+    EXPECT_EQ(off.shift(Decimal(1), Decimal(1)), Decimal(0));  // off by default
+}
+
 TEST(Portfolio, OnOnlyLiveAndChecked) {
     EXPECT_FALSE(Config().portfolio.enabled);  // off by default
     EXPECT_NE(load_error({"portfolio.enabled=true"}).find("asset_class"), std::string::npos);
     EXPECT_NE(load_error({"portfolio.enabled=true", "portfolio.asset_class=\"crypto\"", "portfolio.factor=1.0"}).find("factor"),
+              std::string::npos);
+    EXPECT_NE(load_error({"portfolio.enabled=true", "portfolio.asset_class=\"crypto\"", "portfolio.shift_bp=6"}).find("shift_bp"),
               std::string::npos);
     EXPECT_EQ(load_error({"portfolio.enabled=true", "portfolio.asset_class=\"crypto\"", "portfolio.interval_ms=20"}),
               "portfolio needs interval_ms within 50..10000 and stale_s of 3 s (3 heartbeats) at least");
@@ -258,8 +295,10 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_TRUE(pf.enabled) << name;
         EXPECT_EQ(pf.asset_class, "crypto") << name;
         EXPECT_EQ(pf.weight, weight) << name;
-        EXPECT_EQ(pf.limit_usd, name == "eth-ml-both" ? 2500.0 : 1500.0) << name;  // the live ETH: with its $2500 limit (19 Oct evening)
+        // the live ML bots: with their $2500 limit (19 Oct evening; C++ checkout: btc-ml-both is the live set)
+        EXPECT_EQ(pf.limit_usd, name == "eth-ml-both" || name == "btc-ml-both" ? 2500.0 : 1500.0) << name;
         EXPECT_EQ(pf.factor, 0.3) << name;
+        EXPECT_EQ(pf.shift_bp, 0.3) << name;
         EXPECT_EQ(pf.interval_ms, 100.0) << name;
     }
     for (const char* name : {"nvda-both", "gld-both"})  // one bot a class: its own skew is the class's

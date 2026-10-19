@@ -74,3 +74,9 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst2500) {
         EXPECT_EQ(pf.factor, 0.3) << name;
     }
 }
+
+// C++ checkout: config.btc-ml-both.toml is the live BTC ML set, config.btc-ml-okx-only.toml as it is, for
+// the C++ bot live next to the Python bots on one host.
+TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
+    EXPECT_EQ(describe(cfg("btc-ml-both")), describe(cfg("btc-ml-okx-only")));
+}

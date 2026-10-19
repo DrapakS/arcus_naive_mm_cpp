@@ -219,7 +219,11 @@ std::optional<Decimal> QuoteStrategy::price(const std::string& s, const MarketVi
         Decimal u = used(fair);
         if (u) m *= is_closing ? max(Decimal(0), Decimal(1) - skew_close * u) : Decimal(1) + skew_open * u;
     }
-    if (portfolio != nullptr) m *= portfolio->multiplier(s, position_now(), fair);
+    Decimal quoted = fair;  // the fair the price is taken from: moved against the class's lean (portfolio shift_bp)
+    if (portfolio != nullptr) {
+        m *= portfolio->multiplier(s, position_now(), fair);
+        if (Decimal shift = portfolio->shift(position_now(), fair)) quoted = fair * (Decimal(1) - shift);
+    }
     if (vol != nullptr) m *= vol->factor();
     if (is_urgent) m = Decimal(0);
     if (session != nullptr && off_hours_factor != 1 && session->outside()) m *= off_hours_factor;
@@ -231,7 +235,7 @@ std::optional<Decimal> QuoteStrategy::price(const std::string& s, const MarketVi
         Decimal cap = best_ask - market.tick_at(best_ask);
         if (never_lead)
             if (auto others = best_of_others(view, "BUY")) cap = min(cap, D(*others));  // join the best bid at most, never improve it
-        result = market.floor_price(min(fair * (Decimal(1) - m), cap));
+        result = market.floor_price(min(quoted * (Decimal(1) - m), cap));
         if (is_urgent) {  // join the best bid (the others' with never_lead), still under the ask
             std::optional<double> join = never_lead ? best_of_others(view, "BUY") : std::nullopt;
             Decimal j = D(join ? *join : *bid);
@@ -243,7 +247,7 @@ std::optional<Decimal> QuoteStrategy::price(const std::string& s, const MarketVi
         Decimal floor = best_bid + tick;
         if (never_lead)
             if (auto others = best_of_others(view, "SELL")) floor = max(floor, D(*others));
-        result = market.ceil_price(max(floor, (fair + tick) * (Decimal(1) + m)));
+        result = market.ceil_price(max(floor, (quoted + tick) * (Decimal(1) + m)));
         if (is_urgent) {  // join the best ask (the others' with never_lead), still over the bid
             std::optional<double> join = never_lead ? best_of_others(view, "SELL") : std::nullopt;
             Decimal j = D(join ? *join : *ask);

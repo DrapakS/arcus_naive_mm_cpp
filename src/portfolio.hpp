@@ -18,8 +18,12 @@
 // correlated with BTC). u = exposure / limit_usd, within -1..1. An order that
 // adds to the class's lean takes markup x (1 + factor u), one that takes it back
 // markup x (1 - factor u): with the class long, buys are quoted further out and
-// sells nearer, in every market of the class, on top of each bot's own skew. No
-// taker, no stop-loss: only where the quotes stand.
+// sells nearer, in every market of the class, on top of each bot's own skew.
+// Besides, with `shift_bp`, both quotes move by shift_bp x u against the lean
+// (the class long: both lower, by shift_bp at u = 1): the markup is a fraction of
+// a bp, so its x0.7..x1.3 is a tick or so on ETH (19 Oct: the class short 82% of
+// the time, at u = -1 18%); the shift does not shrink with the markup. No taker,
+// no stop-loss: only where the quotes stand.
 //
 // A file not rewritten for `stale_s` (its bot stopped) is left out, and said
 // once; so is a file of our own market from another process (a paper A/B variant
@@ -68,6 +72,7 @@ struct PortfolioOptions {
     double weight = 1.0;
     double limit_usd = 1500.0;
     double factor = 0.3;
+    double shift_bp = 0.0;
     double stale_s = 30.0;
     double interval_s = 0.1;
     std::function<double()> position = [] { return 0.0; };
@@ -101,6 +106,8 @@ public:
     double lean(double position, double price) const;
     // The markup factor of an order on `side`: 1 + factor u for a buy, 1 - factor u for a sell.
     Decimal multiplier(const std::string& side, const Decimal& position, const Decimal& price) const;
+    // How far both quotes move down, a fraction of the price: shift_bp x u (the class short: up).
+    Decimal shift(const Decimal& position, const Decimal& price) const;
     // For the placement line: the class's exposure and what it does to this side's markup.
     std::optional<std::string> note(const std::string& side, const Decimal& position, const Decimal& price) const;
     // "portfolio crypto: ETH-USD -300 $ (x1.3, 1 s ago), ours +750 $ -> +360 $, u +0.24: buys x1.07, sells x0.93".
@@ -115,6 +122,7 @@ public:
     double weight;
     double limit_usd;
     double factor;
+    double shift_bp;
     double stale_s;
     double interval_s;
     std::function<double()> position;

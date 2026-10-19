@@ -173,6 +173,7 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
         po.weight = pf.weight;
         po.limit_usd = pf.limit_usd;
         po.factor = pf.factor;
+        po.shift_bp = pf.shift_bp;
         po.stale_s = pf.stale_s;
         po.interval_s = pf.interval_ms / 1000;
         po.position = [this] { return own_position(); };
@@ -458,8 +459,9 @@ awaitable<void> Agent::start_trading() {
     }
     if (portfolio) {
         const Portfolio& pf = *portfolio;
-        log_->warning("portfolio {}: {} weighs x{:g}; the class's lean over ${:g} moves the markups by up to {:.0f}%; positions shared through {}",
-                      pf.asset_class, pf.market, pf.weight, pf.limit_usd, pf.factor * 100, pf.dir);
+        log_->warning("portfolio {}: {} weighs x{:g}; the class's lean over ${:g} moves the markups by up to {:.0f}% and the quotes by up to {:g} bp; "
+                      "positions shared through {}",
+                      pf.asset_class, pf.market, pf.weight, pf.limit_usd, pf.factor * 100, pf.shift_bp, pf.dir);
     }
     if (open_halt) {
         auto next = open_halt->next_open();

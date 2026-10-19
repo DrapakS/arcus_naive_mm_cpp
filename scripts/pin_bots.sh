@@ -16,6 +16,7 @@ declare -A CORE=(
     [config.eth-ml-both.toml]=3
     [config.btc-both.toml]=2
     [config.btc-ml-okx-only.toml]=2   # the BTC bot either way: one of the two runs live
+    [config.btc-ml-both.toml]=2       # C++ checkout: the live BTC ML set (= btc-ml-okx-only), the C++ BTC bot
     [config.gld-both.toml]=1
     [config.nvda-both.toml]=0
 )

@@ -97,9 +97,8 @@ TEST(Volatility, VolMarkupConfigIsCheckedAndOnInTheTradingConfigs) {
     EXPECT_FALSE(Config().vol_markup.enabled);
     std::string err = load_error({"vol_markup.enabled=true", "vol_markup.low=1.5"});
     EXPECT_NE(err.find("vol_markup needs"), std::string::npos) << err;
-    // Python also checks btc-both, btc-ml-both, eth-both, eth-ml-both and sol-both, which have a [portfolio] (not
-    // ported here), and their long pairs recommended, btc-ml, eth and sol: all of them stay as they were, without it
-    for (const std::string name : {"gld-both", "nvda-both", "gld", "nvda"}) {
+    for (const std::string name : {"btc-both", "btc-ml-both", "eth-both", "eth-ml-both", "sol-both", "gld-both", "nvda-both",
+                                   "recommended", "eth", "sol", "gld", "nvda", "btc-ml"}) {
         const VolMarkupConfig vm = load_config(repo_file("config." + name + ".toml")).vol_markup;
         EXPECT_EQ(std::make_tuple(vm.enabled, vm.short_s, vm.long_s, vm.low, vm.high, vm.warmup_s),
                   std::make_tuple(true, 60.0, 1800.0, 0.8, 2.0, 300.0))

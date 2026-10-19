@@ -336,21 +336,15 @@ TEST(BothSides, TheShippedNvdaConfigsQuote500AndDoubleTheMarkupOffHours) {
 }
 
 TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
-    Config ml_both = load("config.btc-ml-both.toml"), ml_long = load("config.btc-ml.toml"), basis_both = load("config.btc-both.toml");
-    const TradingConfig &a = ml_both.trading, &b = basis_both.trading;
-    EXPECT_EQ(a.direction, b.direction);
-    EXPECT_EQ(a.max_position_usd, b.max_position_usd);
-    EXPECT_EQ(a.max_position_resume, b.max_position_resume);
-    EXPECT_EQ(a.skew_open, b.skew_open);
-    EXPECT_EQ(a.skew_close, b.skew_close);
-    EXPECT_EQ(a.exit_after_s, b.exit_after_s);
-    EXPECT_EQ(a.exit_loss, b.exit_loss);
-    EXPECT_EQ(a.order_size, b.order_size);
-    Config only_add_ml = ml_both, only_add_basis = ml_both;
-    only_add_basis.add_guard = basis_both.add_guard;
-    EXPECT_EQ(text(only_add_ml), text(only_add_basis));  // the same add guard
+    // C++ checkout: config.btc-ml-both.toml is the live BTC ML set, config.btc-ml-okx-only.toml as it is
+    // (Python's is the ML model with config.btc-both.toml's controls); the model is config.btc-ml.toml's
+    Config ml_both = load("config.btc-ml-both.toml"), ml_long = load("config.btc-ml.toml"), live = load("config.btc-ml-okx-only.toml");
+    EXPECT_EQ(text(ml_both), text(live));
     EXPECT_EQ(ml_both.pricing.model, "ml");
-    EXPECT_EQ(text(as_long(ml_both, ml_long)), text(ml_long));
+    EXPECT_EQ(ml_both.trading.direction, "both");
+    Config model_only = ml_both;
+    model_only.ml = ml_long.ml;
+    EXPECT_EQ(text(model_only), text(ml_both));  // the same model as the long ML config
     // ETH (18 Oct night): config.eth-both.toml as it is, only the pricing is the model
     Config eth_ml = load("config.eth-ml-both.toml"), eth = load("config.eth-both.toml");
     EXPECT_EQ(eth_ml.pricing.model, "ml");

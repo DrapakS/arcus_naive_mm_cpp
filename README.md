@@ -85,6 +85,29 @@ build/naive_mm --config config.toml --check                  # только пр
 - `scripts/paper_ab.sh` — тот же A/B на бумаге, только запускает C++-бинарник (`BIN`, по умолчанию
   `build/naive_mm`).
 
+### Live рядом с Python-ботами
+
+`config.btc-ml-both.toml` в этом checkout — живой BTC ML набор владельца, `config.btc-ml-okx-only.toml` как
+есть (19 октября вечером; Python-овский `config.btc-ml-both.toml` — модель с гардами `config.btc-both.toml`,
+им шла пара `ml-both`). Его проверяет `tests/test_live_19oct.cpp`.
+
+```bash
+cd ~/arcus_naive_mm_cpp && git pull && cmake --build build
+build/naive_mm --check --config config.btc-ml-both.toml
+nohup build/naive_mm --config config.btc-ml-both.toml --trade live \
+    --orders-log live-btc-ml-cpp.log > /dev/null 2> live-btc-ml-cpp.err &
+sudo bash scripts/pin_bots.sh          # копия из этого checkout: знает config.btc-ml-both.toml (ядро 2)
+```
+
+- Один BTC-бот на субаккаунт: перед запуском остановить Python-бота на BTC-USD (`btc-both` или
+  `btc-ml-okx-only`); позицию бот берёт с биржи, два бота на одном рынке мешают друг другу.
+- `[portfolio]`: файлы позиций в `~/.naive_mm/portfolio/live/<рынок>.<pid>.json`, формат Python-ботов
+  байт в байт; C++ и Python читают друг друга. Запускать от того же пользователя, что и Python-боты
+  (тот же `~`, не через `sudo`). В строке статуса видно, кого бот видит:
+  `portfolio crypto: ETH-USD +1,248 $ (x1.3, 0 s ago), ...`; при запуске — `portfolio crypto: BTC-USD weighs x1 ...`.
+- Ключи — тот же файл, что у Python (`~/.config/naive_mm/credentials.toml`, `$NAIVE_MM_CREDENTIALS` или
+  `--credentials`). Остановка — `kill <pid>` (SIGTERM): ордера снимаются, `=== AT EXIT` в логе.
+
 ## Устройство
 
 Один поток с `boost::asio::io_context` вместо цикла asyncio: каждая корутина Python стала
@@ -131,7 +154,8 @@ bash bench/paper_pair.sh compare            # в любой момент; = pyth
 bash bench/paper_pair.sh stop               # SIGTERM обоим, как Ctrl+C
 ```
 
-Именованные пары — как боты в `scripts/paper_ab.sh`: `basis`, `basis-both`, `ml`, `ml-both`,
+Именованные пары — как боты в `scripts/paper_ab.sh`: `basis`, `basis-both`, `ml`, `ml-both` (здесь — живой
+набор, см. «Live рядом с Python-ботами»),
 `ml-okx-only` (`config.btc-ml-okx-only.toml`: BTC ML, из гардов только OKX), `eth-basis-both`, `eth-ml-both`, `gld`; можно и любой конфиг: `start config.sol-both.toml sol`. Оба
 бота читают один и тот же файл (из этого checkout), Python-версия должна быть на коде, с которого
 сделан порт (ветка `claude/funny-wright-a95ao3`, `58cacaf` или новее), — `start` печатает коммиты
