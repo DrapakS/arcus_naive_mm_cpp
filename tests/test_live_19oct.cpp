@@ -94,7 +94,7 @@ TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     cpp.ml = live.ml;
     EXPECT_EQ(cpp.lag.max_ms, 200.0);  // on (20 Oct, the owner's)
     cpp.lag = live.lag;
-    EXPECT_EQ(cpp.takes.pause_ms, 1500.0);  // 1.5 s (20 Oct evening, the owner's)
+    EXPECT_EQ(cpp.takes.pause_ms, 0.0);  // off (20 Oct evening, the owner's)
     cpp.takes.pause_ms = live.takes.pause_ms;
     EXPECT_EQ(cpp.vol_markup.high, 3.0);  // x0.8..3 at ^0.75 (20 Oct evening, the owner's)
     cpp.vol_markup = live.vol_markup;
