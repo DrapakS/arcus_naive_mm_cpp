@@ -103,3 +103,19 @@ TEST(SpyConfig, TheSpyPaperConfigReadsTheBinancePerpOnly) {
     EXPECT_EQ(c.trading.max_position_usd, 500.0);
     EXPECT_FALSE(c.portfolio.enabled);
 }
+
+// C++ checkout: config.qqq-both.toml, config.spy-both.toml with QQQ's market and feeds.
+TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
+    Config q = cfg("qqq-both"), s = cfg("spy-both");
+    EXPECT_EQ(q.arcus.market, "QQQ-USD");
+    EXPECT_EQ(q.futures.symbol, "QQQUSDT");
+    EXPECT_EQ(q.binance.symbol, "QQQBUSDT");
+    EXPECT_EQ(strings(q.arcus.feed_assets), (std::vector<std::string> {"QQQB"}));
+    EXPECT_TRUE(190 < q.trading.order_size * 715 && q.trading.order_size * 715 < 210);  // ~$200
+    q.arcus.market = s.arcus.market;  // all else as SPY's
+    q.arcus.feed_assets = s.arcus.feed_assets;
+    q.futures.symbol = s.futures.symbol;
+    q.binance.symbol = s.binance.symbol;
+    q.trading.order_size = s.trading.order_size;
+    EXPECT_EQ(describe(q), describe(s));
+}
