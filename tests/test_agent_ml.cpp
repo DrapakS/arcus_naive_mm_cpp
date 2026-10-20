@@ -230,7 +230,8 @@ TEST_P(AgentMlEndToEnd, TheMlPricingRunsOverTheFeeds) {
 
 INSTANTIATE_TEST_SUITE_P(Kinds, AgentMlEndToEnd, ::testing::Values("linear", "lightgbm"));
 
-// config.btc-ml-both.toml (19 Oct evening): off futures, 21 features with the Bybit perp's,
+// config.btc-ml-both.toml (C++: the live set, the BTC refit of 20 Oct on the 10 s target): off futures, 26 features
+// (23 with a weight) with the Bybit perp's,
 // skip_missing. The spot and Bybit books never ready hold their features (here at their means: never
 // known), the price comes from Arcus, futures and the basis bot's prediction; a log line names what
 // is held. Bybit is on for the model only.
@@ -238,7 +239,7 @@ TEST(AgentMl, TheMlPaperConfigPricesOnWhenTheSpotAndBybitBooksGoQuiet) {
     LogCapture log(ORDERS_LOGGER);
     Config c = load_config(repo("config.btc-ml-both.toml"));
     EXPECT_EQ(c.ml.target_base, "futures");
-    EXPECT_EQ(c.ml.target_window_s, 30.0);
+    EXPECT_EQ(c.ml.target_window_s, 10.0);
     EXPECT_TRUE(c.ml.skip_missing);
     EXPECT_EQ(strings(c.ml.required), (std::vector<std::string> {"basis_pred_ema30s"}));
     EXPECT_TRUE(c.bybit.enabled);  // a feed, not a guard
@@ -248,20 +249,22 @@ TEST(AgentMl, TheMlPaperConfigPricesOnWhenTheSpotAndBybitBooksGoQuiet) {
     const ConfigTable &w = c.ml.weights, &mean = c.ml.mean, &scale = c.ml.scale;
     std::vector<std::string> names;
     std::set<std::string> name_set, mean_set, scale_set;
+    int with_weight = 0;
     for (const auto& [n, v] : numbers(w))
         if (n != "intercept") {
             names.push_back(n);
             name_set.insert(n);
-            EXPECT_NE(v, 0.0) << n;
+            with_weight += v != 0.0;
         }
+    EXPECT_EQ(with_weight, 23);
     for (const auto& [n, v] : numbers(mean)) mean_set.insert(n);
     for (const auto& [n, v] : numbers(scale)) scale_set.insert(n);
-    EXPECT_EQ(names.size(), 21u);
+    EXPECT_EQ(names.size(), 26u);
     EXPECT_EQ(name_set, mean_set);
     EXPECT_EQ(name_set, scale_set);
     Bot b = ml_agent(c.ml.weights, [&](MlConfig& m) {
         m.target_base = "futures";
-        m.target_window_s = 30.0;
+        m.target_window_s = 10.0;
         m.skip_missing = true;
         m.required = {ConfigValue::string("basis_pred_ema30s")};
         m.mean = c.ml.mean;
