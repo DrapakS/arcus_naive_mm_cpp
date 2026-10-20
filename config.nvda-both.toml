@@ -111,10 +111,10 @@ after_s = 900                 # order as usual, but not through zero. As GLD, wh
 limit_share = 0               # gold reopen (18 Oct 22:03-22:08 UTC: seven sells in a row into the move, -31 bp)
 
 [open_halt]                   # no trading at all at the US stock open (09:30 New York, daylight saving time followed): from
-opens = ["Mon-Fri 09:30"]     # 60 s before to 2 min after it every order is pulled, the closing one too, and none placed.
-tz = "America/New_York"       # NVDA, 19 Oct 13:30 UTC: -50 bp in the first 30 s, 284 trades in them; its closing sell
-before_s = 60                 # was hit at 217.15 against a 218.54 buy. [open_guard] above still holds adding for its
-after_s = 120                 # 15 min after
+opens = ["Mon-Fri 09:30"]     # 15 min before to 15 min after it every order is pulled, the closing one too, and none placed
+tz = "America/New_York"       # (20 Oct, the owner's, every stock; was 60 s / 2 min). NVDA, 19 Oct 13:30 UTC: -50 bp in the
+before_s = 900                # first 30 s; QQQ, 20 Oct 13:45-14:20 UTC: +1% after the open, shorted to its $2500 limit
+after_s = 900                 # into it (-$20). [open_guard] (no adding) then ends with it, 15 min after
 
 [trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
 window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
