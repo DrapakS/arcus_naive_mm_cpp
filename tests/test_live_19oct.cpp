@@ -75,8 +75,11 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst2500) {
     }
 }
 
-// C++ checkout: config.btc-ml-both.toml is the live BTC ML set, config.btc-ml-okx-only.toml as it is, for
-// the C++ bot live next to the Python bots on one host.
+// C++ checkout: config.btc-ml-both.toml is the live BTC ML set, config.btc-ml-okx-only.toml as it is but for the
+// markup (0.1 bp from 20 Oct), for the C++ bot live next to the Python bots on one host.
 TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
-    EXPECT_EQ(describe(cfg("btc-ml-both")), describe(cfg("btc-ml-okx-only")));
+    Config cpp = cfg("btc-ml-both");
+    EXPECT_EQ(cpp.trading.markup, 0.00001);
+    cpp.trading.markup = cfg("btc-ml-okx-only").trading.markup;
+    EXPECT_EQ(describe(cpp), describe(cfg("btc-ml-okx-only")));
 }

@@ -339,7 +339,9 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     // C++ checkout: config.btc-ml-both.toml is the live BTC ML set, config.btc-ml-okx-only.toml as it is
     // (Python's is the ML model with config.btc-both.toml's controls); the model is config.btc-ml.toml's
     Config ml_both = load("config.btc-ml-both.toml"), ml_long = load("config.btc-ml.toml"), live = load("config.btc-ml-okx-only.toml");
-    EXPECT_EQ(text(ml_both), text(live));
+    Config same = ml_both;
+    same.trading.markup = live.trading.markup;  // 0.1 bp here from 20 Oct
+    EXPECT_EQ(text(same), text(live));
     EXPECT_EQ(ml_both.pricing.model, "ml");
     EXPECT_EQ(ml_both.trading.direction, "both");
     Config model_only = ml_both;
