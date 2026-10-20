@@ -344,6 +344,8 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     Config ml_both = load("config.btc-ml-both.toml"), ml_long = load("config.btc-ml.toml"), live = load("config.btc-ml-okx-only.toml");
     Config same = ml_both;
     same.trading.markup = live.trading.markup;  // 0.1 bp here from 20 Oct
+    same.trading.order_size = live.trading.order_size;  // ~$2000 within $3750 here from 20 Oct
+    same.trading.max_position_usd = live.trading.max_position_usd;
     EXPECT_EQ(text(same), text(live));
     EXPECT_EQ(ml_both.pricing.model, "ml");
     EXPECT_EQ(ml_both.trading.direction, "both");
