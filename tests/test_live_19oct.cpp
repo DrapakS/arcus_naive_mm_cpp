@@ -83,3 +83,21 @@ TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     cpp.trading.markup = cfg("btc-ml-okx-only").trading.markup;
     EXPECT_EQ(describe(cpp), describe(cfg("btc-ml-okx-only")));
 }
+
+// C++ checkout: config.spy-both.toml, a base paper config for SPY-USD with the book collector's feeds of 19 Oct.
+TEST(SpyConfig, TheSpyPaperConfigReadsTheSpyFeeds) {
+    Config c = cfg("spy-both");
+    EXPECT_EQ(c.arcus.market, "SPY-USD");
+    EXPECT_EQ(c.binance.symbol, "SPYBUSDT");
+    EXPECT_EQ(strings(c.arcus.feed_assets), (std::vector<std::string> {"SPYB"}));
+    EXPECT_TRUE(c.futures.enabled);
+    EXPECT_EQ(c.futures.symbol, "SPYUSDT");
+    EXPECT_EQ(c.pricing.reference, "futures");
+    EXPECT_TRUE(c.okx.enabled);
+    EXPECT_EQ(c.okx.inst_id, "SPY-USDT-SWAP");
+    EXPECT_EQ(c.okx.drawdown, 0);  // a feed, no guard
+    EXPECT_FALSE(c.bybit.enabled);
+    EXPECT_EQ(c.trading.direction, "both");
+    EXPECT_TRUE(900 < c.trading.order_size * 768 && c.trading.order_size * 768 < 1100);  // ~$1000
+    EXPECT_FALSE(c.portfolio.enabled);
+}

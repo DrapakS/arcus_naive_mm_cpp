@@ -1,0 +1,133 @@
+# SPY quoted on BOTH sides at once: a base config for paper (not live yet), config.nvda-both.toml as it is on 20 Oct
+# with SPY's feeds and sizes. Arcus SPY-USD (a perp on the SPDR S&P 500 ETF) priced off the Binance SPYUSDT perp, basis
+# pricing, no ML. The thresholds are NVDA's (BTC's), not measured on SPY yet: measure on the paper logs first.
+# Feeds (the book collector's of 19 Oct, DrapakS/arcus books/collector.py --asset SPY):
+#  - Binance USD-M SPYUSDT perp: the fair and the main guard ($72-85M a day, 15-20x OKX's);
+#  - Binance spot SPYBUSDT (tokenized SPY, base asset SPYB, ~$0.8M a day): the spot and trades guards, thin;
+#  - OKX SPY-USDT-SWAP (1 SPY a contract, ~$4.9M a day): the price lines only, no guard (drawdown 0);
+#  - Bybit off (SPYUSDT not checked: HTTP 403 where the collector was written).
+# Not OKX US500-USDT-SWAP (the index, another scale, ~$100k a day) nor SPX-USDT-SWAP (a memecoin).
+# SPY-USD on Arcus (GET /v1/markets, 19 Oct): marketId 23, tick 0.01 (0.13 bp at $768: a fine grid next to NVDA's
+# 0.47 bp), min order 0.001 SPY and $5. Hours as NVDA's (the US extended session, read from Arcus): see the NVDA notes
+# in config.nvda-both.toml. No [portfolio]: one stock bot a class is its own skew.
+# Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
+# This file never trades by itself: the command line passes --trade quote / paper.
+log_level = "INFO"
+
+[binance]                     # spot: the spot guard, the trades guard, the price lines (pricing is off futures)
+symbol = "SPYBUSDT"           # the Binance spot SPY token: base asset SPYB, so [arcus] feed_assets below.
+                              # Behind a geo-block (HTTP 451) use wss://data-stream.binance.vision + https://data-api.binance.vision
+
+[arcus]
+market = "SPY-USD"
+feed_assets = ["SPYB"]        # the spot symbol is SPYB-USDT, not SPY: without this the bot refuses it
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected
+
+[pricing]
+reference = "futures"         # fair SPY bid = Binance SPYUSDT futures mid x the basis (Arcus bid / futures mid)
+basis_s = 30                  # as BTC: 30 s, futures move first
+window = 1000                 # used only with basis_s = 0
+min_samples = 100
+
+[trading]
+mode = "off"                  # the command line sets --trade quote / paper / live
+direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
+max_position_usd = 2000       # the position either way stays within $2000 (as NVDA); a side at the limit is not quoted
+max_position_resume = 0.95    # ... and comes back once the position on that side is under $1900
+skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
+skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $500, none at the limit
+exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
+                              # joined the best price with no markup after 10 min). The closing order keeps its markup
+exit_loss = 0                 # OFF from 18 Oct as well (was 0.0005: the same once that far under water at the Arcus mid)
+markup = 0.000025             # 0.25 bp (NVDA's of 20 Oct) = ~2 ticks of SPY under the fair bid
+close_markup_cut = 0.3        # the closing order takes 30% less markup (0.175 bp, rounded to the tick)
+off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New York, Mon-Fri; holidays by Arcus
+                              # isOutsideRth) both sides take twice the markup: 0.5 bp, ~4 ticks
+tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
+tol_away = 0.00005            # 0.5 bp (19 Oct evening, the owner's; was 1 bp): a buy left that far behind is placed again
+close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
+order_size = 1.3              # SPY, ~$1000 at $768 (as NVDA). Arcus minimum 0.001 SPY and $5; step 0.0000001
+never_lead = false            # may improve the best price (20 Oct, the owner's; was true: join, never improve)
+came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
+                              # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
+dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
+cancel_lanes = 1
+presign_cancel_s = 1
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+[guard]                       # Binance spot SPYB best bid vs its time-weighted mean: a backup for the futures guard
+window_ms = 300
+drawdown = 0.00005            # 0.5 bp (BTC's), ~4 ticks
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: the fair and the main guard
+enabled = true
+symbol = "SPYUSDT"            # the SPY perp (a TradFi perpetual, USDT-settled; binance.com/en/futures/SPYUSDT), 24/7.
+                              # Not reachable from where this was written (HTTP 451): its klines are on data.binance.vision
+stale_timeout_s = 30          # off hours the perp's top can stand still for seconds (17 Oct, Saturday: ~2 tickers a
+max_book_age_s = 10           # second, gaps up to 8 s): with the default 2 s the quote was pulled 15% of the time,
+                              # 325 times in 49 min; with 5 s, 18 Oct (Sunday), still 181 pulls of both sides in 4.2 h
+                              # (13% of the cancels). 10 s since 18 Oct: a quiet top is the same price, a dead link
+                              # (two of them) is still reconnected after 30 s
+window_ms = 300
+drawdown = 0.00005            # 0.5 bp (BTC's)
+pause_ms = 200
+
+[trades]                      # Binance spot SPYB trades: a trade 0.3 bp under the high of the last 300 ms pulls the buy
+enabled = true                # (over the low: the sell). Thin (~$0.8M a day), so it trips rarely
+window_ms = 300
+drawdown = 0.00003            # 0.3 bp (BTC's)
+pause_ms = 200
+
+[bybit]                       # OFF, as on every basis bot
+enabled = false
+category = "linear"
+drawdown = 0
+
+[okx]                         # the OKX SPY perp: its price in the logs (the price lines), no guard
+enabled = true
+inst_id = "SPY-USDT-SWAP"
+connections = 1
+drawdown = 0                  # a feed only: ~$4.9M a day; turn the guard on once measured
+
+[arcus_guard]                 # Arcus SPY mid vs its own 3 s mean: sweeps the Binance feeds do not show
+window_ms = 3000
+drawdown = 0.00005            # 0.5 bp: ~4 ticks of the mid (it moves in half-ticks of 0.065 bp)
+pause_ms = 300
+
+[open_guard]                  # no adding around the opens (America/New_York, so daylight saving time is followed), as NVDA:
+opens = ["Sun 18:00", "Mon-Fri 04:00", "Mon-Fri 09:30"]  # the US index futures' Sunday reopen (18 Oct NVDA +117 bp in
+tz = "America/New_York"       # the hour after it), the pre-market and the regular open. From 60 s before to 15 min after
+before_s = 60                 # each: no order that opens or adds to the position (flat: nothing quoted); the closing
+after_s = 900                 # order as usual, but not through zero. As GLD, which lost its whole night on the Sunday
+limit_share = 0               # gold reopen (18 Oct 22:03-22:08 UTC: seven sells in a row into the move, -31 bp)
+
+[open_halt]                   # no trading at all at the US stock open (09:30 New York, daylight saving time followed): from
+opens = ["Mon-Fri 09:30"]     # 60 s before to 2 min after it every order is pulled, the closing one too, and none placed.
+tz = "America/New_York"       # NVDA, 19 Oct 13:30 UTC: -50 bp in the first 30 s, 284 trades in them; its closing sell
+before_s = 60                 # was hit at 217.15 against a 218.54 buy. [open_guard] above still holds adding for its
+after_s = 120                 # 15 min after
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
+window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
+drawdown = 0.003              # 30 bp under its 2-minute high (BTC's; SPY moves less: rarely if ever)
+pause_s = 60
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
+
+[lag]                         # market data read late = quoting blind: as BTC
+max_ms = 200
+pause_ms = 500
+
+[imbalance]                   # OFF until measured on this market
+levels = 5
+ratio = 0
+factor = 5
+hold_ms = 300
+sides = "open"
