@@ -1,6 +1,7 @@
 # SOL quoted on BOTH sides at once, basis pricing, every guard on (20 Oct, the owner's): config.sol-both.toml (the
 # Python bot's SOL config: its sizes, markup, tolerances and its tick-scaled thresholds) with the guards of
-# config.eth-both.toml that SOL's was without: the Bybit and OKX perps' and the drift markup. C++ checkout only.
+# config.eth-both.toml that SOL's was without: the Bybit and OKX perps' and the drift markup; the limit $1500 (sol-both:
+# $3000). C++ checkout only.
 # Every perp of SOL quotes in ticks of 0.01 (0.96 bp at $104: Binance spot and futures, Bybit SOLUSDT, OKX
 # SOL-USDT-SWAP), so ETH's 0.2 bp thresholds would trip on every tick here: the perps' guards are over one tick
 # (1.5 bp, as the futures guard), and the drift markup takes a move of over one tick (1 bp).
@@ -55,8 +56,8 @@ min_samples = 100
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 3000       # the position either way stays within $3000 (17 Oct: $1000, one order filled it); a side
-                              # at the limit is not quoted. SOL moves ~2x BTC: 8 bp; one 4.7 order is ~$500, a sixth of the limit
+max_position_usd = 1500       # the position either way stays within $1500 (20 Oct, the owner's; sol-both: $3000); a side
+                              # at the limit is not quoted. One 4.7 order is ~$500, a third of the limit
 max_position_resume = 0.95    # ... and comes back once the position on that side is under 95% of it
 skew_open = 1.0               # the order that adds to the position: markup x (1 + u), u = position / limit (x2 at it)
 skew_close = 1.0              # the order that closes it: its markup x (1 - u) (none at the limit): out sooner

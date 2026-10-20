@@ -137,6 +137,8 @@ TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
     for (double on : {b.guard.drawdown, b.futures.drawdown, b.trades.drawdown, b.arcus_guard.drawdown, b.trend.drawdown,
                       b.add_guard.drawdown, b.lag.max_ms, b.takes.pause_ms})
         EXPECT_GT(on, 0);
+    EXPECT_EQ(b.trading.max_position_usd, 1500.0);  // 20 Oct, the owner's (sol-both: $3000)
+    b.trading.max_position_usd = s.trading.max_position_usd;
     b.bybit = s.bybit;  // all else as SOL's
     b.okx = s.okx;
     b.drift = s.drift;
