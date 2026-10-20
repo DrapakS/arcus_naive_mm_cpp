@@ -1,11 +1,9 @@
 # SPY quoted on BOTH sides at once: a base config for paper (not live yet), config.nvda-both.toml as it is on 20 Oct
 # with SPY's feeds and sizes. Arcus SPY-USD (a perp on the SPDR S&P 500 ETF) priced off the Binance SPYUSDT perp, basis
 # pricing, no ML. The thresholds are NVDA's (BTC's), not measured on SPY yet: measure on the paper logs first.
-# Feeds (the book collector's of 19 Oct, DrapakS/arcus books/collector.py --asset SPY):
-#  - Binance USD-M SPYUSDT perp: the fair and the main guard ($72-85M a day, 15-20x OKX's);
-#  - Binance spot SPYBUSDT (tokenized SPY, base asset SPYB, ~$0.8M a day): the spot and trades guards, thin;
-#  - OKX SPY-USDT-SWAP (1 SPY a contract, ~$4.9M a day): the price lines only, no guard (drawdown 0);
-#  - Bybit off (SPYUSDT not checked: HTTP 403 where the collector was written).
+# Feeds: the Binance USD-M SPYUSDT perp only (20 Oct, the owner's): the fair and every guard of the market data
+# ($35-85M a weekday, 12-19 Oct). Off: Binance spot SPYBUSDT ($0.2-1.2M a day; its book is still read, as the bot
+# has no switch for it, but neither prices nor guards), its trades, OKX SPY-USDT-SWAP (~$4M), Bybit SPYUSDT (~$3.4M).
 # Not OKX US500-USDT-SWAP (the index, another scale, ~$100k a day) nor SPX-USDT-SWAP (a memecoin).
 # SPY-USD on Arcus (GET /v1/markets, 19 Oct): marketId 23, tick 0.01 (0.13 bp at $768: a fine grid next to NVDA's
 # 0.47 bp), min order 0.001 SPY and $5. Hours as NVDA's (the US extended session, read from Arcus): see the NVDA notes
@@ -14,8 +12,10 @@
 # This file never trades by itself: the command line passes --trade quote / paper.
 log_level = "INFO"
 
-[binance]                     # spot: the spot guard, the trades guard, the price lines (pricing is off futures)
+[binance]                     # spot: read (no switch for it), but off: no guard, no trades feed, pricing off futures
 symbol = "SPYBUSDT"           # the Binance spot SPY token: base asset SPYB, so [arcus] feed_assets below.
+connections = 1               # one is enough for a book nothing reads but the price lines
+stale_timeout_s = 0           # no reconnect on a quiet spell: a thin book nothing depends on (weekends: minutes apart)
                               # Behind a geo-block (HTTP 451) use wss://data-stream.binance.vision + https://data-api.binance.vision
 
 [arcus]
@@ -55,9 +55,9 @@ cancel_lanes = 1
 presign_cancel_s = 1
 orders_log = ""               # the command line gives each run its own file with --orders-log
 
-[guard]                       # Binance spot SPYB best bid vs its time-weighted mean: a backup for the futures guard
+[guard]                       # OFF: Binance spot SPYB, too thin (20 Oct, the owner's)
 window_ms = 300
-drawdown = 0.00005            # 0.5 bp (BTC's), ~4 ticks
+drawdown = 0
 pause_ms = 200
 
 [futures]                     # Binance USD-M futures bookTicker: the fair and the main guard
@@ -73,22 +73,16 @@ window_ms = 300
 drawdown = 0.00005            # 0.5 bp (BTC's)
 pause_ms = 200
 
-[trades]                      # Binance spot SPYB trades: a trade 0.3 bp under the high of the last 300 ms pulls the buy
-enabled = true                # (over the low: the sell). Thin (~$0.8M a day), so it trips rarely
-window_ms = 300
-drawdown = 0.00003            # 0.3 bp (BTC's)
-pause_ms = 200
+[trades]                      # OFF: Binance spot SPYB trades, too thin (20 Oct, the owner's)
+enabled = false
 
-[bybit]                       # OFF, as on every basis bot
+[bybit]                       # OFF: Bybit SPYUSDT, ~$3.4M a day
 enabled = false
 category = "linear"
 drawdown = 0
 
-[okx]                         # the OKX SPY perp: its price in the logs (the price lines), no guard
-enabled = true
-inst_id = "SPY-USDT-SWAP"
-connections = 1
-drawdown = 0                  # a feed only: ~$4.9M a day; turn the guard on once measured
+[okx]                         # OFF: OKX SPY-USDT-SWAP, ~$4M a day (20 Oct, the owner's)
+enabled = false
 
 [arcus_guard]                 # Arcus SPY mid vs its own 3 s mean: sweeps the Binance feeds do not show
 window_ms = 3000
