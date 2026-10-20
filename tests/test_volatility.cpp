@@ -59,6 +59,20 @@ TEST(Volatility, X1WhileWarmingUpThenTheRatioOfNowToTheUsualWithinLowAndHigh) {
     EXPECT_NE(v.status().find("markup x0.80"), std::string::npos) << v.status();
 }
 
+TEST(Volatility, APowerOverAHalfReachesLowAndHighSooner) {
+    // the same burst (3x the usual for 2 min): x~1.9 at the square root, x3 (the cap) at ^0.75
+    VolScale root(60, 1800, 0.8, 3.0, 0), steeper(60, 1800, 0.8, 3.0, 0);
+    steeper.power = 0.75;
+    for (VolScale* v : {&root, &steeper}) {
+        v->observe(100.0, 0.0);
+        auto [t, p] = run(*v, 0.0, 1800, 1.0);
+        run(*v, t, 120, 3.0, p);
+    }
+    EXPECT_GT(root.factor(), D("1.8"));
+    EXPECT_LT(root.factor(), D("2.2"));
+    EXPECT_EQ(steeper.factor(), Decimal(3));
+}
+
 TEST(Volatility, SamplesOnceAStepAndAGapCountsPerStep) {
     VolScale v(60, 1800, 0.8, 2.0, 0);
     v.observe(100.0, 0.0);
@@ -100,10 +114,17 @@ TEST(Volatility, VolMarkupConfigIsCheckedAndOnInTheTradingConfigs) {
     for (const std::string name : {"btc-both", "btc-ml-both", "eth-both", "eth-ml-both", "sol-both", "gld-both", "nvda-both",
                                    "recommended", "eth", "sol", "gld", "nvda", "btc-ml"}) {
         const VolMarkupConfig vm = load_config(repo_file("config." + name + ".toml")).vol_markup;
-        EXPECT_EQ(std::make_tuple(vm.enabled, vm.short_s, vm.long_s, vm.low, vm.high, vm.warmup_s),
-                  std::make_tuple(true, 60.0, 1800.0, 0.8, 2.0, 300.0))
+        // the live bots: x0.8..3 and (short / long) ^ 0.75 from 20 Oct evening (the owner's)
+        bool live = name == "btc-ml-both" || name == "eth-ml-both" || name == "gld-both" || name == "nvda-both";
+        EXPECT_EQ(std::make_tuple(vm.enabled, vm.short_s, vm.long_s, vm.low, vm.high, vm.warmup_s, vm.power),
+                  std::make_tuple(true, 60.0, 1800.0, 0.8, live ? 3.0 : 2.0, 300.0, live ? 0.75 : 0.5))
             << name;
     }
+    for (const std::string name : {"sol-basic", "spy-both", "qqq-both"}) {
+        const VolMarkupConfig vm = load_config(repo_file("config." + name + ".toml")).vol_markup;
+        EXPECT_EQ(std::make_tuple(vm.high, vm.power), std::make_tuple(3.0, 0.75)) << name;
+    }
+    EXPECT_NE(load_error({"vol_markup.enabled=true", "vol_markup.power=3"}).find("power"), std::string::npos);
 }
 
 TEST(Volatility, RightAfterTheWarmUpASteadyMarketIsX1NotTheCap) {

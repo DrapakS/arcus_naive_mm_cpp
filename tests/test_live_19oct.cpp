@@ -96,6 +96,8 @@ TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     cpp.lag = live.lag;
     EXPECT_EQ(cpp.takes.pause_ms, 0.0);  // off (20 Oct evening, the owner's)
     cpp.takes.pause_ms = live.takes.pause_ms;
+    EXPECT_EQ(cpp.vol_markup.high, 3.0);  // x0.8..3 at ^0.75 (20 Oct evening, the owner's)
+    cpp.vol_markup = live.vol_markup;
     EXPECT_EQ(describe(cpp), describe(cfg("btc-ml-okx-only")));
 }
 
@@ -185,5 +187,6 @@ TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
     b.okx = s.okx;
     b.drift = s.drift;
     b.lag.max_pause_ms = s.lag.max_pause_ms;  // the live bots' growing pauses (20 Oct)
+    b.vol_markup = s.vol_markup;  // and their x0.8..3 at ^0.75 (20 Oct evening)
     EXPECT_EQ(describe(b), describe(s));
 }

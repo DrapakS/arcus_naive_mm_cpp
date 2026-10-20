@@ -41,7 +41,7 @@ void VolScale::observe(double price, std::optional<double> now_) {
 
 Decimal VolScale::work_out(double now) const {
     if (!since_ || now - *since_ < warmup_s || !long_var || !*long_var || !short_var) return Decimal(1);
-    double ratio = std::sqrt(*short_var / *long_var);
+    double ratio = std::pow(*short_var / *long_var, power);
     // Decimal(str(round(x, 4))): the four places, correctly rounded
     return Decimal::parse(std::format("{:.4f}", std::min(high, std::max(low, ratio))));
 }

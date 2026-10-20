@@ -146,8 +146,10 @@ enabled = true                # its squared returns in an exponential mean over 
 short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
 long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
 low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
-high = 2.0
+high = 3                      # x3 at most (20 Oct evening, the owner's; was 2)
 warmup_s = 300
+power = 0.75                  # NEW (20 Oct evening, the owner's): (short / long) ^ 0.75, the ratio of the volatilities
+                              # ^ 1.5: a 1.5x volatility gives x1.84 (was x1.5), 2x gives x2.83 (was x2); quieter: x0.8 sooner
 
 [lag]                         # market data read late = quoting blind: as BTC
 max_ms = 200

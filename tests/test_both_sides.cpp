@@ -77,7 +77,8 @@ Config as_long(Config both_cfg, const Config& long_cfg) {
     both_cfg.futures.pause_ms = long_cfg.futures.pause_ms;
     both_cfg.takes = long_cfg.takes;
     both_cfg.portfolio = long_cfg.portfolio;  // the class's lean across the bots (19 Oct): two-sided crypto bots only
-    both_cfg.lag.max_pause_ms = long_cfg.lag.max_pause_ms;  // pauses growing while the data stays late: the live ones (20 Oct)
+    both_cfg.lag.max_pause_ms = long_cfg.lag.max_pause_ms;
+    both_cfg.vol_markup = long_cfg.vol_markup;  // x0.8..3 at ^0.75 on the live ones (20 Oct evening)  // pauses growing while the data stays late: the live ones (20 Oct)
     return both_cfg;
 }
 
@@ -383,7 +384,8 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     same.trading.max_position_usd = live.trading.max_position_usd;
     same.ml = live.ml;  // the 10 s refit here from 20 Oct
     same.lag = live.lag;  // on here from 20 Oct, its pauses growing while the data stays late
-    same.takes.pause_ms = live.takes.pause_ms;  // 3 s here from 20 Oct
+    same.takes.pause_ms = live.takes.pause_ms;  // off here from 20 Oct evening
+    same.vol_markup = live.vol_markup;  // x0.8..3 at ^0.75 here from 20 Oct evening
     EXPECT_EQ(text(same), text(live));
     EXPECT_EQ(ml_both.ml.target_window_s, 10.0);
     EXPECT_EQ(ml_both.pricing.model, "ml");
@@ -411,7 +413,7 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
             if (line.starts_with("[" + name + "] ")) return line;
         return std::string();
     };
-    for (std::string name : {"arcus", "imbalance", "open_guard", "open_halt", "vol_markup"})
+    for (std::string name : {"arcus", "imbalance", "open_guard", "open_halt"})  // vol_markup: x0.8..3 at ^0.75 from 20 Oct evening
         EXPECT_EQ(section(eth_ml, name), section(eth, name)) << name;
     // the Arcus book over two even on ML (19 Oct, evening): a late connection shows against the other one's copies
     EXPECT_EQ(eth_ml.binance.connections, 1);

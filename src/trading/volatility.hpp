@@ -43,6 +43,7 @@ public:
 
     double short_s, long_s, step_s;
     double low, high, warmup_s;
+    double power = 0.5;  // the factor is (short / long) ^ power: 0.5 the ratio of the volatilities, more reaches low and high sooner
     Clock clock;
     std::optional<double> short_var;  // bias-corrected means of the squared returns, per step
     std::optional<double> long_var;

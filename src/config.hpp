@@ -328,6 +328,9 @@ struct VolMarkupConfig {
     double low = 0.8;
     double high = 2.0;
     double warmup_s = 300.0;
+    // The factor is (short / long) ^ power: 0.5 (the default) the ratio of the volatilities themselves;
+    // 0.75 a volatility 1.5x the usual gives x1.84 (0.5: x1.5), 0.67x gives x0.55 (then low).
+    double power = 0.5;
 };
 
 struct DriftConfig {

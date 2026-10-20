@@ -127,7 +127,7 @@ template <class F> void fields(OpenHaltConfig& c, F&& f) {
 }
 template <class F> void fields(VolMarkupConfig& c, F&& f) {
     f("enabled", c.enabled); f("short_s", c.short_s); f("long_s", c.long_s); f("low", c.low); f("high", c.high);
-    f("warmup_s", c.warmup_s);
+    f("warmup_s", c.warmup_s); f("power", c.power);
 }
 template <class F> void fields(PortfolioConfig& c, F&& f) {
     f("enabled", c.enabled); f("asset_class", c.asset_class); f("weight", c.weight); f("limit_usd", c.limit_usd);
@@ -580,9 +580,9 @@ void Config::validate() const {
         throw std::invalid_argument("open_halt needs before_s and after_s within 0..3600");
     const VolMarkupConfig& vm = vol_markup;
     if (vm.enabled && (!(1 <= vm.short_s && vm.short_s < vm.long_s && vm.long_s <= 86'400) ||
-                       !(0 < vm.low && vm.low <= 1 && 1 <= vm.high && vm.high <= 10) || !(0 <= vm.warmup_s && vm.warmup_s <= 86'400)))
-        throw std::invalid_argument("vol_markup needs 1 <= short_s < long_s <= 86400, 0 < low <= 1 <= high <= 10 "
-                                    "and warmup_s within 0..86400");
+                       !(0 < vm.low && vm.low <= 1 && 1 <= vm.high && vm.high <= 10) || !(0 <= vm.warmup_s && vm.warmup_s <= 86'400) || !(0.1 <= vm.power && vm.power <= 2)))
+        throw std::invalid_argument("vol_markup needs 1 <= short_s < long_s <= 86400, 0 < low <= 1 <= high <= 10, "
+                                    "warmup_s within 0..86400 and power within 0.1..2");
     const PortfolioConfig& pf = portfolio;
     if (pf.enabled) {
         if (!contains(ASSET_CLASSES, pf.asset_class))

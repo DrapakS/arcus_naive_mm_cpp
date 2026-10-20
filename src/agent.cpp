@@ -160,7 +160,10 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     if (tr.drawdown) trend_guard = std::make_unique<TrendGuard>(tr.window_s, tr.drawdown, tr.pause_s, open_side);
     trend_book = futures_book ? futures_book.get() : &reference_book;
     const VolMarkupConfig& vm = config.vol_markup;  // [vol_markup]: the markup scaled by the reference's volatility
-    if (vm.enabled) vol_scale = std::make_unique<VolScale>(vm.short_s, vm.long_s, vm.low, vm.high, vm.warmup_s);
+    if (vm.enabled) {
+        vol_scale = std::make_unique<VolScale>(vm.short_s, vm.long_s, vm.low, vm.high, vm.warmup_s);
+        vol_scale->power = vm.power;
+    }
     // Both sides: after a move against a side, no adding there past a share of the limit (the
     // opening of a position from flat still goes). Not a pausing guard: it only cuts the size.
     const AddGuardConfig& ad = config.add_guard;
