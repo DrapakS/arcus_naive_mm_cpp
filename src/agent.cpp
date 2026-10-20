@@ -192,7 +192,7 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     drift_mark_ = {{"BUY", {0, 0.0}}, {"SELL", {0, 0.0}}};
     // Market data read late (or a late event loop): both orders pulled, nothing placed until it is on time.
     const LagConfig& lg = config.lag;
-    if (lg.max_ms) lag_guard = std::make_unique<LagGuard>(lg.max_ms, lg.pause_ms / 1000);
+    if (lg.max_ms) lag_guard = std::make_unique<LagGuard>(lg.max_ms, lg.pause_ms / 1000, monotonic, lg.max_pause_ms / 1000, lg.calm_ms / 1000);
     const TakesConfig& k = config.takes;  // Arcus taker waves: a take pauses the side it hit
     if (k.pause_ms)
         take_guard = std::make_unique<TakeGuard>(k.min_usd, k.pause_ms / 1000, monotonic, k.min_takes, k.min_move, k.score_ms / 1000);
@@ -917,8 +917,12 @@ void Agent::late(double lag_ms, const std::string& why) {
             events_->info("--- late data pause over: {}, extended {} times, the latest data read up to {:.0f} ms late",
                           span(std::get<1>(*previous) - std::get<0>(*previous)), std::get<2>(*previous), g.previous_worst);
     }
-    events_->info("!!! LATE {} (limit {:.0f} ms): both orders pulled, nothing placed until the data is on time for {}", why, g.max_ms,
-                  span(g.pause_s));
+    std::string longer;  // late again soon after the last pause: this one is longer
+    if (g.pause_s > g.base_pause_s)
+        longer = std::format(" (late again {} after the last pause, under {}: {})", span(g.calm_for), span(g.calm_s),
+                             g.pause_s < g.max_pause_s ? "twice as long" : "the longest");
+    events_->info("!!! LATE {} (limit {:.0f} ms): both orders pulled, nothing placed until the data is on time for {}{}", why, g.max_ms,
+                  span(g.pause_s), longer);
     lag_timer_ = call_later(g.pause_s, [this] { lag_resume(); });
 }
 

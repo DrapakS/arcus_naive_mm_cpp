@@ -28,8 +28,9 @@ void place_the_order(Bot& b, bool long_position) {
 
 // test_lag._lag_agent: only the lag guard (200 ms, pause 50 ms) and a working order: the buy when
 // flat, the closing sell when `long_position`. The guard reads the bot's clock.
-Bot lag_agent(bool long_position = false) {
+Bot lag_agent(bool long_position = false, double max_pause_ms = 0.0) {
     Config c;
+    c.lag.max_pause_ms = max_pause_ms;
     c.pricing.window = c.pricing.min_samples = 1;
     c.guard.drawdown = c.futures.drawdown = c.bybit.drawdown = c.arcus_guard.drawdown = 0;
     c.trades.drawdown = c.trend.drawdown = 0;
@@ -214,7 +215,15 @@ TEST(AgentLag, LagSettings) {
     Agent off(load_config(f.written));
     EXPECT_FALSE(off.lag_guard);  // off
     EXPECT_FALSE(off.loop_watch->on_lag);
-    for (const char* bad : {"max_ms = 5", "max_ms = -1", "max_ms = 70000", "pause_ms = -1"}) {
+    EXPECT_EQ(config.lag.max_pause_ms, 0.0);  // pauses never grow
+    EXPECT_EQ(config.lag.calm_ms, 60'000.0);
+    f.write("[lag]\nmax_pause_ms = 30000\ncalm_ms = 120000\n");
+    Agent growing(load_config(f.written));
+    EXPECT_EQ(growing.lag_guard->max_pause_s, 30.0);
+    EXPECT_EQ(growing.lag_guard->calm_s, 120.0);
+    EXPECT_EQ(growing.lag_guard->base_pause_s, 0.5);
+    for (const char* bad : {"max_ms = 5", "max_ms = -1", "max_ms = 70000", "pause_ms = -1", "max_pause_ms = 100", "max_pause_ms = 700000",
+                            "calm_ms = -1", "calm_ms = 4000000"}) {
         f.write(std::format("[lag]\n{}\n", bad));
         EXPECT_LOAD_ERROR(f.written, {}, "lag");
     }
@@ -245,6 +254,48 @@ TEST(AgentLag, BybitLagSettings) {
         f.write(std::format("[lag]\n{}\n", bad));
         EXPECT_LOAD_ERROR(f.written, {}, "bybit_max_ms");
     }
+}
+
+TEST(AgentLag, AStreamThatStaysLateKeepsTheBotOutLonger) {
+    // pause 50 ms; late again within calm_ms (60 s) of the last pause: twice the last, up to 400 ms
+    Loop loop;
+    LogCapture log(ORDERS_LOGGER);
+    Bot b = lag_agent(false, 400.0);
+    Agent& agent = *b.agent;
+    ticker(agent, 240);
+    EXPECT_TRUE(contains(log.messages(), "!!! LATE Binance futures ticker read 240 ms after the exchange's time for it (limit 200 ms): "
+                                         "both orders pulled, nothing placed until the data is on time for 50 ms"))
+        << join(log.messages(), "\n");
+    b.gw->confirm_cancel();
+    b.clock.advance(0.06);
+    loop.run_for(0.12);
+    evaluate(agent);
+    EXPECT_EQ(b.gw->kinds(), (Kinds {"place", "cancel", "place"}));  // on time for the pause: placed again
+    b.gw->ack();
+    b.clock.advance(0.5);
+    ticker(agent, 230);  // late again 510 ms after the pause: twice as long
+    EXPECT_EQ(b.gw->kinds(), (Kinds {"place", "cancel", "place", "cancel"}));
+    EXPECT_TRUE(contains(log.messages(), "!!! LATE Binance futures ticker read 230 ms after the exchange's time for it (limit 200 ms): "
+                                         "both orders pulled, nothing placed until the data is on time for 100 ms "
+                                         "(late again 510 ms after the last pause, under 60 s: twice as long)"))
+        << join(log.messages(), "\n");
+    b.gw->confirm_cancel();
+    b.clock.advance(0.06);  // the base pause would be over by now
+    loop.run_for(0.08);
+    evaluate(agent);
+    EXPECT_EQ(b.gw->kinds(), (Kinds {"place", "cancel", "place", "cancel"}));  // nothing placed: still paused
+    for (double ms : {200.0, 400.0, 400.0}) {
+        b.clock.advance(1.0);
+        ticker(agent, 250);
+        EXPECT_NEAR(agent.lag_guard->pause_s, ms / 1000, 1e-12);
+    }
+    EXPECT_TRUE(contains(log.messages(), "!!! LATE Binance futures ticker read 250 ms after the exchange's time for it (limit 200 ms): "
+                                         "both orders pulled, nothing placed until the data is on time for 400 ms "
+                                         "(late again 800 ms after the last pause, under 60 s: the longest)"))
+        << join(log.messages(), "\n");
+    b.clock.advance(61.0);  // on time for a minute
+    ticker(agent, 250);
+    EXPECT_NEAR(agent.lag_guard->pause_s, 0.05, 1e-12);
 }
 
 // ----------------------------------------------------------------- takes

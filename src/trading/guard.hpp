@@ -195,10 +195,16 @@ private:
 // should have paid a long. Before that, on the same host, fills whose newest futures ticker or
 // spot trade had been read 200-500 ms late lost 1.8-2.2 bp 5 s later (under 100 ms: none).
 //
+// A stream that stays bad must not be traded between its late readings: with `max_pause_s` over
+// `pause_s`, a pause that starts under `calm_s` after the last one ended runs twice as long as
+// that one did, up to `max_pause_s`; on-time data for `calm_s` brings it back to `pause_s`. 20 Oct
+// Binance futures read 200-250 ms late in bursts (BTC 14:27-14:29: p99 233 ms, over 1% of the
+// tickers), between which a 500 ms pause would resume, quote and pull again.
+//
 // It speaks the language of the other guards; the `mean` of a trip is `max_ms`.
 class LagGuard : public Pauses {
 public:
-    LagGuard(double max_ms, double pause_s, Clock clock = monotonic);
+    LagGuard(double max_ms, double pause_s, Clock clock = monotonic, double max_pause_s = 0.0, double calm_s = 0.0);
 
     // One reading (ms); both sides' trips when it is `max_ms` or more.
     std::optional<std::pair<Trip, Trip>> observe(double lag_ms);
@@ -206,6 +212,10 @@ public:
     double paused_for(std::optional<double> now = {});
 
     double max_ms;
+    double base_pause_s;  // the pause after on-time data for calm_s; pause_s is the running one's
+    double max_pause_s;  // the longest a pause grows to; base_pause_s or less: it never grows
+    double calm_s;  // on-time data this long after a pause: the next one starts from base_pause_s again
+    double calm_for = -1.0;  // how long the data was on time before the running pause (s); -1: the first pause
     double worst = 0.0;  // the largest reading of the running (or the last) pause, ms
     double previous_worst = 0.0;  // the same for the pause before it
 

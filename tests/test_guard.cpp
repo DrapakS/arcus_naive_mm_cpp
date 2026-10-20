@@ -389,6 +389,38 @@ TEST(LagGuard, ALateReadingPausesBothSidesAndLaterOnesExtendIt) {
     EXPECT_THROW(LagGuard(200.0, -1.0), std::invalid_argument);
 }
 
+TEST(LagGuard, LateAgainSoonAfterAPauseDoublesTheNextUpToTheLongest) {
+    FakeClock clock;
+    LagGuard guard(200.0, 0.5, clock.fn(), 4.0, 60.0);  // 0.5 s, twice that when late again within 60 s, at most 4 s
+    auto pause_after = [&](double calm_s) {  // on time for calm_s after the running pause ends, then late
+        clock.advance(guard.until["BUY"] - clock() + calm_s);
+        EXPECT_FALSE(guard.paused("BUY"));
+        auto trips = guard.observe(230.0);
+        EXPECT_TRUE(trips && trips->first.fresh);
+        return guard.pause_s;
+    };
+    EXPECT_EQ(pause_after(0.0), 0.5);  // the first pause
+    EXPECT_EQ(guard.calm_for, -1.0);
+    EXPECT_EQ(pause_after(0.2), 1.0);
+    EXPECT_TRUE(approx(guard.calm_for, 0.2));
+    clock.advance(0.9);
+    guard.observe(240.0);  // a late reading extends the pause by the running pause, not the base one
+    EXPECT_TRUE(approx(guard.until["BUY"] - clock(), 1.0));
+    EXPECT_EQ(pause_after(30.0), 2.0);
+    EXPECT_EQ(pause_after(59.0), 4.0);
+    EXPECT_EQ(pause_after(1.0), 4.0);  // the longest
+    EXPECT_EQ(pause_after(60.0), 0.5);  // on time for calm_s: back to the base
+    EXPECT_EQ(pause_after(0.1), 1.0);
+    LagGuard flat(200.0, 0.5, clock.fn());  // no max_pause_s: every pause is pause_s
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_TRUE(flat.observe(300.0));
+        EXPECT_EQ(flat.pause_s, 0.5);
+        clock.advance(0.6);
+    }
+    EXPECT_THROW(LagGuard(200.0, 0.5, clock.fn(), -1.0), std::invalid_argument);
+    EXPECT_THROW(LagGuard(200.0, 0.5, clock.fn(), 4.0, -1.0), std::invalid_argument);
+}
+
 // -------------------------------------------------------------- test_take_guard.py
 
 TEST(TakeGuard, ATakePausesTheSideItHitAndMoreTakesExtendIt) {

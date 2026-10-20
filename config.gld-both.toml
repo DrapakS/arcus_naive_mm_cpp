@@ -152,6 +152,10 @@ warmup_s = 300
 [lag]                         # market data read late = quoting blind: as BTC
 max_ms = 200
 pause_ms = 500
+max_pause_ms = 30000          # 20 Oct, the owner's: a stream that stays late keeps the bot out. A pause that starts under
+calm_ms = 60000               # calm_ms (60 s) after the last one ended runs twice as long as that one (0.5, 1, 2, 4 .. 30 s);
+                              # 60 s of on-time data brings it back to 500 ms. Binance futures read 200-250 ms late in bursts
+                              # (BTC 14:27-14:29 p99 233 ms) that a flat 500 ms pause traded between.
 
 [imbalance]                   # OFF until measured on this market
 levels = 5

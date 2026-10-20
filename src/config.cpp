@@ -144,6 +144,7 @@ template <class F> void fields(TrendConfig& c, F&& f) {
 }
 template <class F> void fields(LagConfig& c, F&& f) {
     f("max_ms", c.max_ms); f("pause_ms", c.pause_ms); f("bybit_max_ms", c.bybit_max_ms);
+    f("max_pause_ms", c.max_pause_ms); f("calm_ms", c.calm_ms);
 }
 template <class F> void fields(ImbalanceConfig& c, F&& f) {
     f("levels", c.levels); f("ratio", c.ratio); f("factor", c.factor); f("hold_ms", c.hold_ms); f("sides", c.sides);
@@ -603,6 +604,9 @@ void Config::validate() const {
         throw std::invalid_argument("lag needs max_ms 0 (off) or within 20..60000, and pause_ms within 0..600000");
     if (lg.bybit_max_ms && !(lg.max_ms <= lg.bybit_max_ms && lg.bybit_max_ms <= 60'000))
         throw std::invalid_argument("lag.bybit_max_ms needs 0 (Bybit never pauses) or max_ms..60000");
+    if ((lg.max_pause_ms && !(lg.pause_ms <= lg.max_pause_ms && lg.max_pause_ms <= 600'000)) || lg.max_pause_ms < 0
+        || !(0 <= lg.calm_ms && lg.calm_ms <= 3'600'000))
+        throw std::invalid_argument("lag needs max_pause_ms 0 (pauses never grow) or pause_ms..600000, and calm_ms within 0..3600000");
     const ImbalanceConfig& imb = imbalance;
     if ((imb.ratio && !(1 <= imb.levels && imb.levels <= agent.depth)) || (imb.ratio && imb.ratio <= 1) || imb.ratio < 0 || imb.factor < 1)
         throw std::invalid_argument("imbalance needs 1 <= levels <= agent.depth, ratio 0 (off) or > 1, factor >= 1");

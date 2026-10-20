@@ -77,6 +77,7 @@ Config as_long(Config both_cfg, const Config& long_cfg) {
     both_cfg.futures.pause_ms = long_cfg.futures.pause_ms;
     both_cfg.takes = long_cfg.takes;
     both_cfg.portfolio = long_cfg.portfolio;  // the class's lean across the bots (19 Oct): two-sided crypto bots only
+    both_cfg.lag.max_pause_ms = long_cfg.lag.max_pause_ms;  // pauses growing while the data stays late: the live ones (20 Oct)
     return both_cfg;
 }
 
@@ -347,6 +348,7 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     same.trading.order_size = live.trading.order_size;  // ~$2000 within $3750 here from 20 Oct
     same.trading.max_position_usd = live.trading.max_position_usd;
     same.ml = live.ml;  // the 10 s refit here from 20 Oct
+    same.lag = live.lag;  // on here from 20 Oct, its pauses growing while the data stays late
     EXPECT_EQ(text(same), text(live));
     EXPECT_EQ(ml_both.ml.target_window_s, 10.0);
     EXPECT_EQ(ml_both.pricing.model, "ml");

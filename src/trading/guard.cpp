@@ -204,8 +204,10 @@ std::optional<std::tuple<std::string, int, double, bool>> TakeGuard::score(const
 
 // -------------------------------------------------------------------- LagGuard
 
-LagGuard::LagGuard(double max_ms, double pause_s, Clock clock) : Pauses(pause_s, std::move(clock)), max_ms(max_ms) {
-    if (!(max_ms > 0) || pause_s < 0) throw std::invalid_argument("LagGuard needs max_ms > 0 and pause_s >= 0");
+LagGuard::LagGuard(double max_ms, double pause_s, Clock clock, double max_pause_s, double calm_s)
+    : Pauses(pause_s, std::move(clock)), max_ms(max_ms), base_pause_s(pause_s), max_pause_s(max_pause_s), calm_s(calm_s) {
+    if (!(max_ms > 0) || pause_s < 0 || max_pause_s < 0 || calm_s < 0)
+        throw std::invalid_argument("LagGuard needs max_ms > 0 and pause_s, max_pause_s, calm_s >= 0");
     reference = "limit";
 }
 
@@ -216,6 +218,10 @@ std::optional<std::pair<Trip, Trip>> LagGuard::observe(double lag_ms) {
         if (trips["BUY"]) paused_s_ += until["BUY"] - since["BUY"];
         previous_worst = worst;
         worst = 0.0;
+        calm_for = trips["BUY"] ? now - until["BUY"] : -1.0;
+        // late again before the data was on time for calm_s: twice the last pause, up to max_pause_s
+        bool again = calm_for >= 0 && calm_for < calm_s && max_pause_s > base_pause_s;
+        pause_s = again ? std::min(std::max(pause_s * 2, base_pause_s), max_pause_s) : base_pause_s;
     }
     worst = std::max(worst, lag_ms);
     Trip buy = trip("BUY", max_ms, now);

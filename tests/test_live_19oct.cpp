@@ -92,7 +92,21 @@ TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     cpp.trading.max_position_usd = live.trading.max_position_usd;
     EXPECT_EQ(cpp.ml.target_window_s, 10.0);  // the BTC refit of 20 Oct on the 10 s target
     cpp.ml = live.ml;
+    EXPECT_EQ(cpp.lag.max_ms, 200.0);  // on (20 Oct, the owner's)
+    cpp.lag = live.lag;
     EXPECT_EQ(describe(cpp), describe(cfg("btc-ml-okx-only")));
+}
+
+// Every live bot pulls its orders on late data and stays out while the data keeps coming late (20 Oct, the owner's:
+// Binance futures read 200-250 ms late in bursts).
+TEST(Live19Oct, EveryLiveBotStaysOutWhileTheDataKeepsComingLate) {
+    for (const char* name : {"btc-ml-both", "eth-ml-both", "sol-basic", "gld-both", "nvda-both", "spy-both", "qqq-both"}) {
+        const LagConfig lag = cfg(name).lag;
+        EXPECT_EQ(lag.max_ms, 200.0) << name;
+        EXPECT_EQ(lag.pause_ms, 500.0) << name;
+        EXPECT_EQ(lag.max_pause_ms, 30'000.0) << name;
+        EXPECT_EQ(lag.calm_ms, 60'000.0) << name;
+    }
 }
 
 // C++ checkout: config.spy-both.toml, a base paper config for SPY-USD: the Binance SPYUSDT perp its only feed.
@@ -154,5 +168,6 @@ TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
     b.bybit = s.bybit;  // all else as SOL's
     b.okx = s.okx;
     b.drift = s.drift;
+    b.lag.max_pause_ms = s.lag.max_pause_ms;  // the live bots' growing pauses (20 Oct)
     EXPECT_EQ(describe(b), describe(s));
 }

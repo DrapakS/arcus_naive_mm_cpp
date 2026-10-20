@@ -178,11 +178,15 @@ high = 2.0
 warmup_s = 300
 
 [lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
-max_ms = 0                    # OFF here: only the OKX guard
+max_ms = 200                  # ON (20 Oct, the owner's; was OFF): read 200 ms or
 pause_ms = 500                # and nothing is placed until 500 ms after the last such reading. 15 Oct from 13:35 UTC five
                               # bots on one core read futures 2-45 s late for 4 h and kept quoting: 1089 orders refused as
                               # crossing, -$3.80 in a rally. Fills read 100-200 ms late lost 1.0 bp 5 s later, 200-500 ms
                               # 1.8-2.2 bp (under 100 ms: nothing). The health line gives the share of time it held placing.
+max_pause_ms = 30000          # 20 Oct, the owner's: a stream that stays late keeps the bot out. A pause that starts under
+calm_ms = 60000               # calm_ms (60 s) after the last one ended runs twice as long as that one (0.5, 1, 2, 4 .. 30 s);
+                              # 60 s of on-time data brings it back to 500 ms. Binance futures read 200-250 ms late in bursts
+                              # (BTC 14:27-14:29 p99 233 ms) that a flat 500 ms pause traded between.
 
 [imbalance]                   # OFF for BTC. Keep this section even so: without it the defaults apply (ratio 5, x5),
 levels = 5                    # as in run 17, where the book was 5x lopsided 69% of the time. On BTC (run 17) thin bids

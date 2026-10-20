@@ -359,6 +359,11 @@ struct LagConfig {
     double pause_ms = 500.0;
     // A Bybit ticker read late pauses the same way only from this lag (ms, at least max_ms); 0: never.
     double bybit_max_ms = 0.0;
+    // A stream that stays late: a pause that starts under `calm_ms` after the last one ended runs
+    // twice as long as that one, up to `max_pause_ms`; on-time data for `calm_ms` brings it back to
+    // `pause_ms`. max_pause_ms 0: every pause is pause_ms.
+    double max_pause_ms = 0.0;
+    double calm_ms = 60'000.0;
 };
 
 struct ImbalanceConfig {

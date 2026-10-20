@@ -229,6 +229,12 @@ max_ms = 200
 pause_ms = 500
 bybit_max_ms = 0     # a Bybit ticker read late pauses only from this lag (ms, >= max_ms); 0 = never: Bybit is
                      # an ML feature (5 s ahead), not the price
+# A stream that stays late: a pause that starts under `calm_ms` after the last one ended runs
+# twice as long as that one, up to `max_pause_ms`; on-time data for `calm_ms` brings it back to
+# `pause_ms`. So a feed late in bursts keeps the bot out until it has been on time a while,
+# instead of quoting between its late readings. max_pause_ms = 0: every pause is pause_ms.
+max_pause_ms = 0
+calm_ms = 60000
 
 [imbalance]
 # Lopsided Arcus book: when one side has more than `ratio` times the volume of the other
