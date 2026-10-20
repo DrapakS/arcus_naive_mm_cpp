@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
+#include <format>
 #include <stdexcept>
 #include <vector>
 
@@ -43,6 +44,11 @@ const Json* jget(const Json& v, std::string_view key) {
 }
 
 const Json* jget(const Json* v, std::string_view key) { return v == nullptr ? nullptr : jget(*v, key); }
+
+const Json& jneed(const Json& v, std::string_view key) {
+    if (const Json* field = jget(v, key)) return *field;
+    throw std::invalid_argument(std::format("no field '{}'", key));
+}
 
 bool truthy(const Json* v) {
     if (v == nullptr) return false;

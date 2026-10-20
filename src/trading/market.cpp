@@ -28,7 +28,7 @@ int64_t exact_units(const Decimal& value, const Decimal& unit, const char* what)
 
 MarketSpec MarketSpec::from_json(const Json& m) {
     MarketSpec spec;
-    spec.market_id = to_int(*jget(m, "marketId"));
+    spec.market_id = to_int(jneed(m, "marketId"));
     spec.symbol = to_str(jget(m, "marketDisplayName"));
     spec.tick_size = decimal_field(m, "tickSize");
     if (const Json* tiers = jget(m, "tickTiers"); tiers != nullptr && tiers->is_array()) {

@@ -422,8 +422,10 @@ void QuoteStrategy::evaluate(const MarketView& view) {
     }
     OrderPtr o = gw->order();
     // A placement not yet acknowledged can still be cancelled (by clientId), so a move right after
-    // placing is acted on at once; anything else in flight waits for its answer.
-    if (gw->busy() && (!o || o->state != OrderState::PENDING_NEW || gw->cooling_down())) return;
+    // placing is acted on at once; anything else in flight waits for its answer. A pause after a
+    // rejected placement holds back placing only.
+    bool cancellable = o && (o->state == OrderState::OPEN || o->state == OrderState::PENDING_NEW) && !gw->cancel_cooling_down();
+    if (gw->busy() && !cancellable) return;
     auto quote = target(view, gw->position());
     if (o) {
         if (auto reason = cancel_reason(o, quote, view)) gw->cancel(o, *reason);
@@ -438,8 +440,9 @@ void QuoteStrategy::evaluate(const MarketView& view) {
 void QuoteStrategy::evaluate_both(const MarketView& view) {
     // Both sides at once: each side's order on its own, as one side's alone. A side waiting for an
     // answer (a cancel in flight) holds back only itself.
+    // A pause after a rejected placement holds back placing, not cancelling.
     Gateway* gw = gateway;
-    if (gw->cooling_down()) return;
+    if (gw->cancel_cooling_down()) return;
     auto quotes = targets(view, gw->position());
     for (const auto& s : BOTH_SIDES) {
         auto it = gw->orders.find(s);
@@ -450,7 +453,7 @@ void QuoteStrategy::evaluate_both(const MarketView& view) {
                 if (auto reason = cancel_reason(o, quote, view)) gw->cancel(o, *reason);
             continue;
         }
-        if (!quote || paused(s)) continue;
+        if (!quote || paused(s) || gw->cooling_down()) continue;
         if (clock() - get_or(came_at_, s, NEG_INF) < REPLACE_AFTER_CAME_S) continue;
         place(*quote, view);
     }
@@ -606,7 +609,7 @@ void QuoteStrategy::place(const Quote& quote, const MarketView& view) {
 
 void QuoteStrategy::check_cancel(const MarketView& view) {
     Gateway* gw = gateway;
-    if (!gw->can_cancel() || gw->cooling_down()) return;
+    if (!gw->can_cancel() || gw->cancel_cooling_down()) return;
     if (both) {
         std::vector<OrderPtr> working;
         std::vector<std::string> sides;
@@ -638,7 +641,7 @@ void QuoteStrategy::pull(const std::string& s, const std::string& why) {
     if (it == gw->orders.end()) return;
     OrderPtr o = it->second;
     if (o->state != OrderState::OPEN && o->state != OrderState::PENDING_NEW) return;
-    if (gw->can_cancel() && !gw->cooling_down()) gw->cancel(o, why);
+    if (gw->can_cancel() && !gw->cancel_cooling_down()) gw->cancel(o, why);
 }
 
 std::optional<std::string> QuoteStrategy::cancel_reason(const OrderPtr& o, const std::optional<Quote>& quote, const MarketView& view) {

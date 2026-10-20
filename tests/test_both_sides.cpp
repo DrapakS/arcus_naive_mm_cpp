@@ -140,6 +140,40 @@ TEST(BothSides, FlatItQuotesBothSidesAndAFullSideStopsUntilThePositionComesBack)
     EXPECT_TRUE(contains(log.messages().back(), "buying again, under the limit")) << log.messages().back();
 }
 
+TEST(BothSides, ARejectedPlacementHoldsBackPlacingButNotCancelling) {
+    // 20 Oct review: the pause after a rejected placement held back every cancel too, a guard's pull
+    // and the other side's re-price included, for 0.5-30 s
+    boost::asio::io_context ioc;  // the cooldown's timer
+    set_loop(ioc);
+    auto [gw, s] = both();
+    s->evaluate(view(100'000.0));
+    EXPECT_EQ(sides_of(actions(*gw)), (std::vector<std::string> {"BUY", "SELL"}));
+    gw->ack("SELL");
+    gw->finish(gw->orders.at("BUY"), OrderState::REJECTED, "insufficient margin");
+    ASSERT_TRUE(gw->cooling_down());
+    EXPECT_FALSE(gw->cancel_cooling_down());
+    s->evaluate(view(100'000.0));
+    EXPECT_EQ(actions(*gw), Actions {});  // no buy placed again while it cools down
+    s->pull("SELL", "late data");  // a guard's pull goes at once
+    EXPECT_EQ(sides_of(actions(*gw)), (std::vector<std::string> {"SELL"}));
+    EXPECT_EQ(gw->why, "late data");
+    gw->cancelled("SELL");
+    s->evaluate(view(100'000.0));
+    EXPECT_EQ(actions(*gw), Actions {});  // nor a sell
+}
+
+TEST(BothSides, ARejectedPlacementLetsTheOtherSideBeRepriced) {
+    boost::asio::io_context ioc;
+    set_loop(ioc);
+    auto [gw, s] = both();
+    s->evaluate(view(100'000.0));
+    actions(*gw);
+    gw->ack("SELL");
+    gw->finish(gw->orders.at("BUY"), OrderState::REJECTED, "insufficient margin");
+    s->evaluate(view(100'500.0));  // the market up 50 bp: the sell is far under its price now
+    EXPECT_EQ(moves(actions(*gw)), (std::vector<std::string> {"cancel SELL"}));
+}
+
 TEST(BothSides, EachSideIsCutToWhatKeepsThePositionWithinTheLimit) {
     {
         auto [gw, s] = both();

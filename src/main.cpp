@@ -29,6 +29,19 @@ using namespace nmm;
 
 namespace {
 
+// The event loop, its shutdown in reach. It outlives the agent, whose timers live on it (a timer
+// going after its loop is undefined behaviour), and is shut down before the agent goes: the
+// coroutines and handlers still pending in it point into the agent, so they go while it stands.
+struct EventLoop : asio::io_context {
+    using asio::io_context::io_context;
+    using asio::execution_context::shutdown;
+};
+
+struct ShutDownOnExit {
+    EventLoop& loop;
+    ~ShutDownOnExit() { loop.shutdown(); }
+};
+
 const char* USAGE =
     "usage: naive_mm [-h] [--config CONFIG] [--ladder] [--log-level LOG_LEVEL] [--trade {off,quote,paper,live}]\n"
     "                [--credentials CREDENTIALS] [--orders-log ORDERS_LOG] [--color {auto,always,never}]\n"
@@ -164,9 +177,10 @@ int main(int argc, char** argv) {
         if (!args.set.empty()) source = std::format("{} with --set {}", source.value_or("(defaults)"), join(args.set, ", "));
         std::string version = build_version();
         log_config(config, source, version);
+        EventLoop ioc(1);
         Agent agent(config, args.ladder, credentials);
+        ShutDownOnExit shut_down {ioc};
         get_logger(CONFIG_LOGGER).info("event loop: boost::asio, one thread");
-        asio::io_context ioc(1);
         set_loop(ioc);
         init_tls();
         // A closed terminal or a dropped ssh session (SIGHUP) shuts down cleanly too: killed by it,

@@ -200,8 +200,11 @@ public:
     bool is_working(const OrderPtr& order) const;
     // A cancel can go out now. Placing waits for `ready`; pulling an order must not.
     virtual bool can_cancel() const { return ready; }
-    // Pausing after a rejection or a refused cancel.
+    // Placing paused after a rejection or a refused cancel.
     bool cooling_down() const;
+    // Cancelling paused after a refused cancel (a rate limit): a rejected placement never holds a
+    // cancel back, so a guard's pull or a re-price of the other side still goes at once.
+    bool cancel_cooling_down() const;
     // True while a request is in flight or after a rejection.
     bool busy() const;
     // Place an order; `mid` (the Arcus mid now) only feeds the round-trip log.
@@ -240,6 +243,7 @@ protected:
 
     Decimal position_;
     double cooldown_until_ = 0.0;
+    double cancel_cooldown_until_ = 0.0;
     int rejects_ = 0;  // placements rejected in a row
     int64_t next_id_ = 1;
     std::vector<std::pair<std::string, OrderPtr>> recent_;  // finished orders by clientId, oldest first

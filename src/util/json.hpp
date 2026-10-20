@@ -42,6 +42,9 @@ inline Json keep(const Json& v) { return Json(v, boost::json::storage_ptr()); }
 // The field of an object; nullptr when `v` is no object or has no such key.
 const Json* jget(const Json& v, std::string_view key);
 const Json* jget(const Json* v, std::string_view key);
+// The field of an object, which must be there; throws std::invalid_argument when it is not (as
+// Python's KeyError: caught where the Python bot catches it, never a null dereference).
+const Json& jneed(const Json& v, std::string_view key);
 
 // Python truthiness: null, false, 0, "", [], {} and a missing field are false.
 bool truthy(const Json* v);

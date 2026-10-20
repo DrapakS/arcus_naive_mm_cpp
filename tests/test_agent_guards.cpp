@@ -322,6 +322,20 @@ TEST(AgentTakes, TheAgentPullsTheSideATakeHit) {
     EXPECT_TRUE(A::resume_timers(agent).count({agent.take_guard.get(), "BUY"}));
 }
 
+TEST(AgentTakes, ATakeWithoutAPriceIsSkipped) {
+    Loop loop;
+    Config config;
+    config.takes.pause_ms = 1000;
+    config.pricing.window = config.pricing.min_samples = 1;
+    Agent agent(config);
+    FakeGateway* gw = install(agent, opts(0.001, 0.01));
+    gw->place("BUY", Decimal("99000"), Decimal("0.001"));
+    gw->ack();
+    A::on_arcus_take(agent, parse_json(R"([{"side": "SELL", "size": "0.2", "takerAddress": "0x5c82bbe378"}])").get_array());
+    EXPECT_EQ(gw->kinds(), (Kinds {"place"}));  // no price: not scored, nothing pulled (was a null dereference)
+    EXPECT_FALSE(agent.take_guard->paused("BUY"));
+}
+
 TEST(AgentTakes, TheAgentLogsAQuietTakerAndFeedsTheMid) {
     Loop loop;
     LogCapture log(ORDERS_LOGGER);

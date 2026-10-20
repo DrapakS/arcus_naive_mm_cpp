@@ -338,7 +338,7 @@ awaitable<void> Agent::exchange_watch() {
             for (int i = 0; i < CLOCK_SAMPLES; ++i) {
                 int64_t sent = time_ns();
                 HttpResponse resp = co_await http_get(rest + "/v1/time", {}, 5.0);
-                int64_t server = to_int(*jget(parse_json(resp.body), "timeNs"));
+                int64_t server = to_int(jneed(parse_json(resp.body), "timeNs"));
                 int64_t rtt = time_ns() - sent;
                 if (!best || rtt < best->first)
                     best = std::pair {rtt, (static_cast<double>(sent) + static_cast<double>(rtt) / 2 - static_cast<double>(server)) / 1e6};
@@ -362,8 +362,8 @@ awaitable<void> Agent::exchange_watch() {
                 Json body = parse_json(resp.body);
                 std::vector<std::string> pools;
                 for (const char* name : {"order", "cancel"}) {
-                    const Json& pool = *jget(body, name);
-                    int64_t used = to_int(*jget(pool, "used")), cap = to_int(*jget(pool, "cap"));
+                    const Json& pool = jneed(body, name);
+                    int64_t used = to_int(jneed(pool, "used")), cap = to_int(jneed(pool, "cap"));
                     std::string next = truthy(jget(pool, "nextAvailableMs")) ? std::format(", next in {} ms", to_str(*jget(pool, "nextAvailableMs"))) : "";
                     pools.push_back(std::format("{}s used {} of {} ({} left{})", name, used, cap, cap - used, next));
                 }
@@ -807,7 +807,7 @@ void Agent::on_arcus_take(const JsonArray& trades) {
     if (side != "BUY" && side != "SELL") return;
     double usd = 0.0;
     try {
-        for (const auto& t : trades) usd += to_float(*jget(t, "price")) * to_float(*jget(t, "size"));
+        for (const auto& t : trades) usd += to_float(jneed(t, "price")) * to_float(jneed(t, "size"));
     } catch (const std::exception&) {
         return;
     }

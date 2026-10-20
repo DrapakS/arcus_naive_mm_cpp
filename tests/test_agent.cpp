@@ -662,6 +662,33 @@ TEST(Agent, TheClockOffsetAndTheRequestPoolsAreLogged) {
         << join(messages, "\n");
 }
 
+TEST(Agent, AnArcusAnswerWithoutItsFieldsIsLoggedNotACrash) {
+    // A throttled or broken answer ({"message": "Too Many Requests"}) has none of the fields: a failed
+    // look, logged, as Python's KeyError (was a null dereference: the process died, orders resting)
+    Loop loop;
+    LogCapture log(ORDERS_LOGGER);
+    FakeServer server(loop.ioc);
+    server.on_get("/v1/time", [](const HttpRequest&) { return HttpReply(200, R"({"message": "Too Many Requests"})"); });
+    server.on_get("/v1/rateLimit", [](const HttpRequest&) { return HttpReply(200, R"({"message": "Too Many Requests"})"); });
+    server.start();
+    Config config;
+    config.trading.mode = "live";
+    config.arcus.rest_url = "http://" + server.base();
+    auto creds = ArcusCredentials::make("0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed", 1,
+                                        "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
+    Agent agent(config, false, creds);
+    agent.gateway = std::make_unique<FakeGateway>();
+    Task task = Task::spawn(A::exchange_watch(agent), "exchange-watch");
+    EXPECT_TRUE(run_until(loop.ioc, [&] { return any_starts(log.messages(), "--- request pools"); }));
+    task.cancel();
+    loop.run_for(0.02);
+    server.close();
+    auto messages = log.messages();
+    EXPECT_TRUE(contains(messages, "--- clock: GET /v1/time failed: no field 'timeNs'")) << join(messages, "\n");
+    EXPECT_TRUE(contains(messages, "--- request pools: GET /v1/rateLimit failed: no field 'order'")) << join(messages, "\n");
+    EXPECT_FALSE(agent.gateway->clock_offset_ms);
+}
+
 TEST(Agent, TheClosingMarkupCutIsChecked) {
     TempFile f;
     f.write("[trading]\nclose_markup_cut = 0.3\n");

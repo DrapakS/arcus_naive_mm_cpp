@@ -170,6 +170,8 @@ bool Gateway::is_working(const OrderPtr& o) const {
 
 bool Gateway::cooling_down() const { return monotonic() < cooldown_until_; }
 
+bool Gateway::cancel_cooling_down() const { return monotonic() < cancel_cooldown_until_; }
+
 bool Gateway::busy() const {
     if (cooling_down()) return true;
     return std::any_of(orders.begin(), orders.end(), [](const auto& kv) {
@@ -1139,7 +1141,7 @@ void ArcusGateway::on_message(const Json& msg) {
 }
 
 void ArcusGateway::on_response(const Json& msg, Conn& conn) {
-    int64_t request_id = to_int(*jget(msg, "id"));
+    int64_t request_id = to_int(jneed(msg, "id"));
     RequestPtr request;
     if (auto it = conn.requests.find(request_id); it != conn.requests.end()) {
         request = it->second;
@@ -1283,7 +1285,7 @@ void ArcusGateway::on_cancel_response(Conn& conn, int64_t request_id, const Requ
         o->cancel_sent.reset();
         o->cancel_sent_ns.reset();
         set_state(*o, o->seen_open ? OrderState::OPEN : OrderState::PENDING_NEW);
-        cooldown_until_ = monotonic() + REJECT_COOLDOWN_S;
+        cooldown_until_ = cancel_cooldown_until_ = monotonic() + REJECT_COOLDOWN_S;
         call_later(REJECT_COOLDOWN_S, [this] { on_change(); });
     }
 }
