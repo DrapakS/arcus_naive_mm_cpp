@@ -7,7 +7,7 @@
 # naive_mm config: Arcus NVDA-USD (a perp on NVIDIA stock) priced off the Binance NVDAUSDT perp, basis pricing, no ML.
 # Small to start: orders of ~$100 (0.46 NVDA). Paper first, then live (README, "Запуск").
 # Needs the code of branch claude/funny-wright-a95ao3 from 17 Oct evening: [arcus] feed_assets, off_hours_markup_factor,
-# skew_open / exit_after_s. No [add_guard]: the limit is one order, there is no adding to cut.
+# skew_open / exit_after_s. [add_guard] on from 20 Oct (the long config: none, its limit one order).
 # Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
 # This file never trades by itself: the command line passes --trade quote / paper / live.
 # NVDA-USD on Arcus (GET /v1/markets, 17 Oct): marketId 28, tick 0.01 (0.47 bp at $214: a coarse grid, coarser than
@@ -111,6 +111,12 @@ weight = 1.1                   # weight x position x mark (risk in BTC units: 1-
 limit_usd = 1500              # An order adding to the class's lean: markup x (1 + 0.9 u), one taking it back x (1 - 0.9 u),
 factor = 0.9                  # on top of the own skew; both quotes moved against the lean by 1 bp x u (20 Oct, the
 shift_bp = 1.0                # owner's: stronger than the crypto 0.3 / 0.3 bp). A stopped bot's file is left out after 30 s
+
+[add_guard]                   # NEW (20 Oct, the owner's): no adding past half the limit right after a futures move against
+window_s = 300                # the side. QQQ 20 Oct 13:45-14:20 UTC: +1% after the open, shorted to its limit into it (-$20).
+drawdown = 0.0005             # 5 bp from the 5-minute high (a fall: buys) or low (a rally: sells): NVDA's 1-min volatility ~1.1x BTC's (5 bp).
+pause_s = 60                  # Opening from flat still goes; for 60 s past the last such price the position on that side
+limit_share = 0.5             # may grow to 50% of max_position_usd at most
 
 [open_guard]                  # no adding around the opens (America/New_York, so daylight saving time is followed):
 opens = ["Sun 18:00", "Mon-Fri 04:00", "Mon-Fri 09:30"]  # the US index futures' Sunday reopen (18 Oct NVDA +117 bp in

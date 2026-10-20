@@ -98,6 +98,12 @@ limit_usd = 1500              # An order adding to the class's lean: markup x (1
 factor = 0.9                  # on top of the own skew; both quotes moved against the lean by 1 bp x u (20 Oct, the
 shift_bp = 1.0                # owner's: stronger than the crypto 0.3 / 0.3 bp). A stopped bot's file is left out after 30 s
 
+[add_guard]                   # NEW (20 Oct, the owner's): no adding past half the limit right after a futures move against
+window_s = 300                # the side. QQQ 20 Oct 13:45-14:20 UTC: +1% after the open, shorted to its limit into it (-$20).
+drawdown = 0.0002             # 2 bp from the 5-minute high (a fall: buys) or low (a rally: sells): SPY's ~0.35x BTC's (5 bp), rounded up.
+pause_s = 60                  # Opening from flat still goes; for 60 s past the last such price the position on that side
+limit_share = 0.5             # may grow to 50% of max_position_usd at most
+
 [open_guard]                  # no adding around the opens (America/New_York, so daylight saving time is followed), as NVDA:
 opens = ["Sun 18:00", "Mon-Fri 04:00", "Mon-Fri 09:30"]  # the US index futures' Sunday reopen (18 Oct NVDA +117 bp in
 tz = "America/New_York"       # the hour after it), the pre-market and the regular open. From 60 s before to 15 min after

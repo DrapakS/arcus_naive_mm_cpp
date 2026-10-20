@@ -369,7 +369,7 @@ TEST(BothSides, TheShippedNvdaConfigsSizeAndLimitAndDoubleTheMarkupOffHours) {
     EXPECT_EQ(t.skew_close, 1);
     EXPECT_EQ(t.exit_after_s, 0);
     EXPECT_EQ(t.exit_loss, 0);
-    EXPECT_EQ(both_cfg.add_guard.drawdown, 0);
+    EXPECT_EQ(both_cfg.add_guard.drawdown, 0.0005);  // on from 20 Oct (the owner's: QQQ shorted to its limit after the open)
     EXPECT_EQ(text(as_long(both_cfg, long_cfg)), text(long_cfg));
 }
 

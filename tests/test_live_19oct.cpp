@@ -111,6 +111,18 @@ TEST(Live19Oct, EveryLiveBotStaysOutWhileTheDataKeepsComingLate) {
     }
 }
 
+// No adding past half the limit right after a futures move against the side, on every stock bot (20 Oct, the
+// owner's: QQQ shorted to its limit into the rally after the open), as on the crypto ones.
+TEST(Live19Oct, TheStockBotsHoldAddingAfterAMoveAgainstThem) {
+    for (auto [name, drawdown] : {std::pair {"nvda-both", 0.0005}, {"spy-both", 0.0002}, {"qqq-both", 0.0003}, {"gld-both", 0.00025}}) {
+        const AddGuardConfig g = cfg(name).add_guard;
+        EXPECT_EQ(g.drawdown, drawdown) << name;
+        EXPECT_EQ(g.window_s, 300.0) << name;
+        EXPECT_EQ(g.pause_s, 60.0) << name;
+        EXPECT_EQ(g.limit_share, 0.5) << name;
+    }
+}
+
 // C++ checkout: config.spy-both.toml, a base paper config for SPY-USD: the Binance SPYUSDT perp its only feed.
 TEST(SpyConfig, TheSpyPaperConfigReadsTheBinancePerpOnly) {
     Config c = cfg("spy-both");
@@ -146,6 +158,8 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     q.binance.symbol = s.binance.symbol;
     q.trading.order_size = s.trading.order_size;
     q.portfolio.weight = s.portfolio.weight;  // its volatility over BTC's: QQQ 0.6, SPY 0.35
+    EXPECT_EQ(q.add_guard.drawdown, 0.0003);  // the same way: QQQ 3 bp, SPY 2 bp
+    q.add_guard.drawdown = s.add_guard.drawdown;
     EXPECT_EQ(describe(q), describe(s));
 }
 
