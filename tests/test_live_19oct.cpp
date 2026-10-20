@@ -99,6 +99,7 @@ TEST(SpyConfig, TheSpyPaperConfigReadsTheBinancePerpOnly) {
     EXPECT_FALSE(c.okx.enabled);
     EXPECT_FALSE(c.bybit.enabled);
     EXPECT_EQ(c.trading.direction, "both");
-    EXPECT_TRUE(900 < c.trading.order_size * 768 && c.trading.order_size * 768 < 1100);  // ~$1000
+    EXPECT_TRUE(190 < c.trading.order_size * 768 && c.trading.order_size * 768 < 210);  // ~$200
+    EXPECT_EQ(c.trading.max_position_usd, 500.0);
     EXPECT_FALSE(c.portfolio.enabled);
 }
