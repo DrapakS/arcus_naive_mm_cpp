@@ -181,11 +181,11 @@ TEST(OpenHaltConfig, IsCheckedAndTheStockConfigsTurnItOnForThe0930Open) {
     EXPECT_LOAD_ERROR(std::nullopt, (std::vector<std::string> {"open_halt.opens=[\"Mon-Fri 09:30\"]", "open_halt.tz=\"Mars/Olympus\""}),
                       "no time zone");
     EXPECT_LOAD_ERROR(std::nullopt, (std::vector<std::string> {"open_halt.after_s=7200"}), "open_halt needs");
-    // every stock: 15 min before to 15 min after (20 Oct, the owner's; was 60 s / 2 min)
+    // every stock: 10 min before to 10 min after (20 Oct, the owner's; was 60 s / 2 min, then 15 / 15 min)
     for (const std::string name : {"nvda", "nvda-both", "gld", "gld-both", "spy-both", "qqq-both"}) {
         auto h = load_config(repo("config." + name + ".toml")).open_halt;
         EXPECT_EQ(strings(h.opens), (std::vector<std::string> {"Mon-Fri 09:30"})) << name;
-        EXPECT_EQ(std::tie(h.tz, h.before_s, h.after_s), std::make_tuple(std::string("America/New_York"), 900.0, 900.0)) << name;
+        EXPECT_EQ(std::tie(h.tz, h.before_s, h.after_s), std::make_tuple(std::string("America/New_York"), 600.0, 600.0)) << name;
     }
     for (const std::string name : {"btc-both", "eth-both", "sol-both", "eth-ml-both", "btc-ml-both"})  // crypto has no open
         EXPECT_TRUE(load_config(repo("config." + name + ".toml")).open_halt.opens.empty()) << name;
