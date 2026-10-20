@@ -301,6 +301,15 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_EQ(pf.shift_bp, 0.3) << name;
         EXPECT_EQ(pf.interval_ms, 100.0) << name;
     }
-    for (const char* name : {"nvda-both", "gld-both"})  // one bot a class: its own skew is the class's
-        EXPECT_FALSE(load(name).portfolio.enabled) << name;
+    EXPECT_FALSE(load("gld-both").portfolio.enabled);  // one bot a class: its own skew is the class's
+    // C++ checkout: the US stock bots a class of their own (20 Oct, the owner's), weights their volatility over BTC's
+    for (auto [name, weight] : std::vector<std::pair<std::string, double>> {{"nvda-both", 1.1}, {"spy-both", 0.35}, {"qqq-both", 0.6}}) {
+        const PortfolioConfig pf = load(name).portfolio;
+        EXPECT_TRUE(pf.enabled) << name;
+        EXPECT_EQ(pf.asset_class, "stocks") << name;
+        EXPECT_EQ(pf.weight, weight) << name;
+        EXPECT_EQ(pf.limit_usd, 1500.0) << name;
+        EXPECT_EQ(pf.factor, 0.3) << name;
+        EXPECT_EQ(pf.shift_bp, 0.3) << name;
+    }
 }

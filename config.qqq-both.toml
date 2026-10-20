@@ -5,7 +5,7 @@
 # ($108-243M a weekday, 13-19 Oct). Off: Binance spot QQQBUSDT ($5-17M a day; its book is still read, as the bot
 # has no switch for it, but neither prices nor guards), its trades, OKX and Bybit.
 # QQQ-USD on Arcus (GET /v1/markets, 20 Oct): marketId 24, tick 0.01 (0.14 bp at $715), min order 0.001 QQQ and $5,
-# ~$24M a day. Hours as NVDA's and SPY's (the US extended session, read from Arcus). No [portfolio].
+# ~$24M a day. Hours as NVDA's and SPY's (the US extended session, read from Arcus). [portfolio]: the stocks class with NVDA, SPY and QQQ.
 # Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
 # This file never trades by itself: the command line passes --trade quote / paper.
 log_level = "INFO"
@@ -85,6 +85,15 @@ enabled = false
 window_ms = 3000
 drawdown = 0.00005            # 0.5 bp: ~4 ticks of the mid (it moves in half-ticks of 0.065 bp)
 pause_ms = 300
+
+[portfolio]                   # the US stock bots' positions across the host (NVDA, SPY, QQQ: 0.63-0.86 correlated over
+enabled = true                # 1 min, 13-19 Oct), as the crypto bots' (20 Oct, the owner's): each writes its position to a
+asset_class = "stocks"        # file in dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of
+weight = 0.6                   # weight x position x mark (risk in BTC units: 1-min volatility over BTC's in the US extended
+                              # session, Binance perps 13-19 Oct: NVDA 1.1, QQQ 0.6, SPY 0.35); u = exposure / limit_usd.
+limit_usd = 1500              # An order adding to the class's lean: markup x (1 + 0.3 u), one taking it back x (1 - 0.3 u),
+factor = 0.3                  # on top of the own skew; both quotes moved against the lean by 0.3 bp x u (the crypto
+shift_bp = 0.3                # values). A stopped bot's file is left out after 30 s
 
 [open_guard]                  # no adding around the opens (America/New_York, so daylight saving time is followed), as NVDA:
 opens = ["Sun 18:00", "Mon-Fri 04:00", "Mon-Fri 09:30"]  # the US index futures' Sunday reopen (18 Oct NVDA +117 bp in

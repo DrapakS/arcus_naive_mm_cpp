@@ -112,7 +112,8 @@ TEST(SpyConfig, TheSpyPaperConfigReadsTheBinancePerpOnly) {
     EXPECT_EQ(c.trading.direction, "both");
     EXPECT_TRUE(190 < c.trading.order_size * 768 && c.trading.order_size * 768 < 210);  // ~$200
     EXPECT_EQ(c.trading.max_position_usd, 500.0);
-    EXPECT_FALSE(c.portfolio.enabled);
+    EXPECT_TRUE(c.portfolio.enabled);  // the stocks class (20 Oct)
+    EXPECT_EQ(c.portfolio.asset_class, "stocks");
 }
 
 // C++ checkout: config.qqq-both.toml, config.spy-both.toml with QQQ's market and feeds.
@@ -128,6 +129,7 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     q.futures.symbol = s.futures.symbol;
     q.binance.symbol = s.binance.symbol;
     q.trading.order_size = s.trading.order_size;
+    q.portfolio.weight = s.portfolio.weight;  // its volatility over BTC's: QQQ 0.6, SPY 0.35
     EXPECT_EQ(describe(q), describe(s));
 }
 
