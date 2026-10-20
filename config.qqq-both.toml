@@ -91,9 +91,9 @@ enabled = true                # 1 min, 13-19 Oct), as the crypto bots' (20 Oct, 
 asset_class = "stocks"        # file in dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of
 weight = 0.6                   # weight x position x mark (risk in BTC units: 1-min volatility over BTC's in the US extended
                               # session, Binance perps 13-19 Oct: NVDA 1.1, QQQ 0.6, SPY 0.35); u = exposure / limit_usd.
-limit_usd = 1500              # An order adding to the class's lean: markup x (1 + 0.3 u), one taking it back x (1 - 0.3 u),
-factor = 0.3                  # on top of the own skew; both quotes moved against the lean by 0.3 bp x u (the crypto
-shift_bp = 0.3                # values). A stopped bot's file is left out after 30 s
+limit_usd = 1500              # An order adding to the class's lean: markup x (1 + 0.9 u), one taking it back x (1 - 0.9 u),
+factor = 0.9                  # on top of the own skew; both quotes moved against the lean by 1 bp x u (20 Oct, the
+shift_bp = 1.0                # owner's: stronger than the crypto 0.3 / 0.3 bp). A stopped bot's file is left out after 30 s
 
 [open_guard]                  # no adding around the opens (America/New_York, so daylight saving time is followed), as NVDA:
 opens = ["Sun 18:00", "Mon-Fri 04:00", "Mon-Fri 09:30"]  # the US index futures' Sunday reopen (18 Oct NVDA +117 bp in

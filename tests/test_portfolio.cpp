@@ -309,7 +309,7 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_EQ(pf.asset_class, "stocks") << name;
         EXPECT_EQ(pf.weight, weight) << name;
         EXPECT_EQ(pf.limit_usd, 1500.0) << name;
-        EXPECT_EQ(pf.factor, 0.3) << name;
-        EXPECT_EQ(pf.shift_bp, 0.3) << name;
+        EXPECT_EQ(pf.factor, 0.9) << name;  // stronger than crypto's (20 Oct)
+        EXPECT_EQ(pf.shift_bp, 1.0) << name;
     }
 }
