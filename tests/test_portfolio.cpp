@@ -297,8 +297,8 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_EQ(pf.weight, weight) << name;
         // the live ML bots: with their $2500 limit (19 Oct evening; C++ checkout: btc-ml-both is the live set)
         EXPECT_EQ(pf.limit_usd, name == "eth-ml-both" || name == "btc-ml-both" ? 2500.0 : 1500.0) << name;
-        EXPECT_EQ(pf.factor, 0.9) << name;
-        EXPECT_EQ(pf.shift_bp, 1.0) << name;
+        EXPECT_EQ(pf.factor, 0.6) << name;  // 0.6 from 20 Oct evening
+        EXPECT_EQ(pf.shift_bp, 0.65) << name;
         EXPECT_EQ(pf.interval_ms, 100.0) << name;
     }
     EXPECT_FALSE(load("gld-both").portfolio.enabled);  // one bot a class: its own skew is the class's
@@ -309,7 +309,7 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_EQ(pf.asset_class, "stocks") << name;
         EXPECT_EQ(pf.weight, weight) << name;
         EXPECT_EQ(pf.limit_usd, 1500.0) << name;
-        EXPECT_EQ(pf.factor, 0.9) << name;  // stronger than crypto's (20 Oct)
-        EXPECT_EQ(pf.shift_bp, 1.0) << name;
+        EXPECT_EQ(pf.factor, 0.6) << name;  // as crypto, from 20 Oct evening
+        EXPECT_EQ(pf.shift_bp, 0.65) << name;
     }
 }
