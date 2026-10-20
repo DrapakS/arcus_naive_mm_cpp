@@ -351,7 +351,7 @@ TEST(AgentTakes, TheBtcAndEthConfigsTurnItOn) {
         // 300 ms from 19 Oct evening (C++ checkout: config.btc-ml-both.toml is config.btc-ml-okx-only.toml)
         bool live_ml = name == "eth-ml-both" || name == "btc-ml-okx-only" || name == "btc-ml-both";
         EXPECT_EQ(c.takes.min_usd, 0.0) << name;
-        EXPECT_EQ(c.takes.pause_ms, live_ml ? 300.0 : 500.0) << name;
+        EXPECT_EQ(c.takes.pause_ms, name == "btc-ml-both" ? 3000.0 : live_ml ? 300.0 : 500.0) << name;  // BTC C++: 3 s from 20 Oct
         EXPECT_EQ(c.takes.min_takes, 20) << name;
         EXPECT_EQ(c.takes.min_move, 0.00002) << name;
         EXPECT_EQ(c.takes.score_ms, 1000.0) << name;

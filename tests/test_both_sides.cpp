@@ -349,6 +349,7 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     same.trading.max_position_usd = live.trading.max_position_usd;
     same.ml = live.ml;  // the 10 s refit here from 20 Oct
     same.lag = live.lag;  // on here from 20 Oct, its pauses growing while the data stays late
+    same.takes.pause_ms = live.takes.pause_ms;  // 3 s here from 20 Oct
     EXPECT_EQ(text(same), text(live));
     EXPECT_EQ(ml_both.ml.target_window_s, 10.0);
     EXPECT_EQ(ml_both.pricing.model, "ml");
