@@ -302,7 +302,7 @@ TEST(AgentMl, TheMlPaperConfigPricesOnWhenTheSpotAndBybitBooksGoQuiet) {
     EXPECT_APPROX(pred->fair_bid, 81'120.05 * (1 + y) - 0.1, 1e-6, 1e-12);
 }
 
-// config.eth-ml-both.toml (19 Oct): config.eth-both.toml priced by the owner's ETH model, 26 features
+// config.eth-ml-both.toml (20 Oct refit, 10 s target): config.eth-both.toml priced by the owner's ETH model, 26 features
 // with the Bybit perp's. With the Arcus, spot, futures and Bybit books all live every feature is known
 // (none held), and the prediction is the scaled linear formula of the features the model saw.
 TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts26FeaturesWhenEveryBookRuns) {
@@ -312,7 +312,7 @@ TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts26FeaturesWhenEveryBookRuns) {
     EXPECT_TRUE(c.bybit.enabled && !c.bybit.drawdown);  // Bybit: the model's feed, no guard (19 Oct evening)
     EXPECT_TRUE(c.okx.enabled && c.okx.drawdown);  // OKX: a guard only, not the model
     EXPECT_EQ(c.ml.target_base, "futures");
-    EXPECT_EQ(c.ml.target_window_s, 30.0);
+    EXPECT_EQ(c.ml.target_window_s, 10.0);
     EXPECT_TRUE(c.ml.skip_missing);
     EXPECT_EQ(strings(c.ml.required), (std::vector<std::string> {"basis_pred_ema30s"}));
     std::set<std::string> names = keys(c.ml.weights);
@@ -322,7 +322,7 @@ TEST(AgentMl, TheEthMlPaperConfigKnowsAllIts26FeaturesWhenEveryBookRuns) {
     EXPECT_EQ(names, keys(c.ml.scale));
     Bot b = ml_agent(c.ml.weights, [&](MlConfig& m) {
         m.target_base = "futures";
-        m.target_window_s = 30.0;
+        m.target_window_s = 10.0;
         m.skip_missing = true;
         m.required = {ConfigValue::string("basis_pred_ema30s")};
         m.mean = c.ml.mean;

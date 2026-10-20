@@ -50,8 +50,11 @@ TEST(Live19Oct, EthMlLiveTheOkxGuardTheTakePauseAndTheDriftMarkupOnly) {
     EXPECT_EQ(c.takes.pause_ms, 300.0);
     EXPECT_EQ(c.drift.markup_factor, 2.0);
     for (double off : {c.guard.drawdown, c.futures.drawdown, c.trades.drawdown, c.bybit.drawdown, c.arcus_guard.drawdown,
-                       c.trend.drawdown, c.add_guard.drawdown, c.lag.max_ms})
+                       c.trend.drawdown, c.add_guard.drawdown})
         EXPECT_EQ(off, 0);
+    EXPECT_EQ(c.lag.max_ms, 200.0);  // the late-data pause ON (20 Oct)
+    EXPECT_EQ(c.lag.pause_ms, 500.0);
+    EXPECT_EQ(c.lag.bybit_max_ms, 0.0);
     EXPECT_TRUE(c.futures.enabled && c.bybit.enabled);  // the feeds stay: pricing, drift and the model read them
 }
 

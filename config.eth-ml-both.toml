@@ -193,7 +193,8 @@ high = 2.0
 warmup_s = 300
 
 [lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
-max_ms = 0                    # OFF (19 Oct evening, the owner's): no late-data pause
+max_ms = 200                  # ON again (20 Oct, the owner's; was OFF from 19 Oct evening): read 200 ms or
+                              # more after the exchange's own time for it, or the event loop that late, pulls both orders,
 pause_ms = 500                # and nothing is placed until 500 ms after the last such reading. 15 Oct from 13:35 UTC five
                               # bots on one core read futures 2-45 s late for 4 h and kept quoting: 1089 orders refused as
                               # crossing, -$3.80 in a rally. Fills read 100-200 ms late lost 1.0 bp 5 s later, 200-500 ms
@@ -219,9 +220,10 @@ quote_line_ms = 1000          # the buy/sell price lines at most every 1 s (was 
                               # every 100 ms tick (paper ETH ML, 18-19 Oct: 981k lines in 7 h, a 351 MB orders log,
                               # against 124k for basis). A change within it shows on the first update after it.
 
-[ml]                          # the owner's ETH model of 19 Oct on the notebook's target off futures; keep these as
+[ml]                          # the owner's ETH model of 20 Oct on the notebook's target off futures; keep these as
                               # the notebook had them (as config.btc-ml-both.toml)
-target_window_s = 30.0        # P_rel = P_next / f(t) - 1: the mean Arcus mid over the next 30 s over the futures mid now
+target_window_s = 10.0        # P_rel = P_next / f(t) - 1: the mean Arcus mid over the next 10 s over the futures mid now
+                              # (20 Oct: 10 s, was 30)
 target_base = "futures"       # the model predicts that whole: fair mid = futures mid x (1 + prediction), fair bid = that
                               # less the Arcus half spread now (intercept -9.4 bp: the usual ETH basis)
 target_price = "mid"
@@ -232,88 +234,88 @@ scaled = true                 # fit on StandardScaler-scaled features: [ml.mean]
 skip_missing = true           # a feature unknown now (a book silent, a window or mean not ready) keeps its last value
 required = ["basis_pred_ema30s"]  # ... but not the basis bot's own prediction: without it, no price
 
-[ml.weights]                  # coef_ of the owner's ETH model of 19 Oct, refit (26 features, Bybit perp among them;
-                              # on scaled features; nine weights are 0) and its intercept_
-intercept = -0.0009441347032520311
-basis_pred_ema30s = 0.0001530317785609053
-basis_bybit_mid_ema30s = 2.2130918970007062e-05
-binance_futures_imb1 = 1.892115078045165e-05
-binance_imb1 = 1.7113275893050593e-05
-bybit_imb1 = 1.5024280722537352e-05
-binance_futures_mid_r1s = 1.0248919004721126e-05
-binance_mid_d5s = 8.60666629227993e-06
-binance_mid_r1s = 6.2063988754653445e-06
-binance_futures_mid_d5s = 4.3492205724408e-06
-arcus_imb1_m1s = 4.315812261183358e-06
-arcus_imb1 = 3.362848815638685e-06
-binance_mid_r10s = 1.2554880680605483e-06
+[ml.weights]                  # coef_ of the owner's ETH model of 20 Oct, refit on the 10 s target (the same 26
+                              # features, on scaled features; five weights are 0) and its intercept_
+intercept = -0.0009228581543365774
+basis_pred_ema30s = 0.00014191008138250027
+basis_binance_futures_mid_ema30s = -2.9825918324086804e-05
+binance_futures_imb1 = 2.4934167916903152e-05
+binance_imb1 = 1.8328175052302855e-05
+binance_imb1_m1s = -1.491401737331699e-05
+binance_futures_imb1_m1s = -1.2016081965721624e-05
+binance_futures_mid_r1s = 1.1974532681059121e-05
+basis_bybit_mid_ema30s = 1.108655436284168e-05
+arcus_mid_r1s = -8.93228574824945e-06
+bybit_imb1 = 6.864507398802036e-06
+bybit_mid_r1s = -6.838550970570372e-06
+binance_mid_r1s = 6.396493731128978e-06
+binance_mid_r5s = 4.280112535761584e-06
+bybit_imb1_m1s = 3.3039685301573483e-06
+arcus_imb1_m1s = 2.488897855271772e-06
+binance_mid_d5s = 2.2144001304674116e-06
+arcus_mid_r10s = -1.8909901686423467e-06
+binance_futures_mid_d5s = 1.6795386437647406e-06
+bybit_mid_d5s = 1.2483519293726854e-06
+binance_mid_r10s = 3.4594773097039575e-07
+arcus_imb1 = -1.1544646967115511e-07
 arcus_mid_r5s = 0.0
-arcus_mid_r10s = 0.0
-binance_mid_r5s = 0.0
 binance_futures_mid_r5s = 0.0
 binance_futures_mid_r10s = 0.0
 bybit_mid_r5s = 0.0
 bybit_mid_r10s = 0.0
-bybit_mid_d5s = 0.0
-bybit_imb1_m1s = 0.0
-arcus_mid_r1s = -2.6601492985841733e-06
-bybit_mid_r1s = -4.5912510381983345e-06
-binance_futures_imb1_m1s = -5.845349807994015e-06
-binance_imb1_m1s = -9.613635697261926e-06
-basis_binance_futures_mid_ema30s = -8.374691881795145e-05
 
 [ml.mean]                     # the scaler's mean_ (fractions; the imbalances -1..1)
-basis_pred_ema30s = -0.0009445631368143833
-basis_bybit_mid_ema30s = 2.0884574648928813e-08
-binance_futures_imb1 = 0.016332333052615555
-binance_imb1 = -0.02960273961565971
-bybit_imb1 = 0.033359085195124746
-binance_futures_mid_r1s = 2.315263713406976e-09
-binance_mid_d5s = -1.7925310985624895e-08
-binance_mid_r1s = -3.73654493591806e-09
-binance_futures_mid_d5s = 4.4717173213702284e-11
-arcus_imb1_m1s = -0.03366938031597192
-arcus_imb1 = -0.033727463988720965
-binance_mid_r10s = 5.499585544898896e-09
-arcus_mid_r5s = 1.1146350156587328e-08
-arcus_mid_r10s = 2.9180251678665245e-08
-binance_mid_r5s = -6.778960829037566e-09
-binance_futures_mid_r5s = 1.119106732980103e-08
-binance_futures_mid_r10s = 5.145927740043259e-08
-bybit_mid_r5s = 5.013753362231695e-09
-bybit_mid_r10s = 2.4786094593643737e-08
-bybit_mid_d5s = -6.132596794355632e-09
-bybit_imb1_m1s = 0.03325825152336537
-arcus_mid_r1s = 9.071046420991389e-10
-bybit_mid_r1s = 1.4201647212350858e-09
-binance_futures_imb1_m1s = 0.016273447763024
-binance_imb1_m1s = -0.029669036941083308
-basis_binance_futures_mid_ema30s = -6.175228404799815e-08
+basis_pred_ema30s = -0.0009241816558551572
+basis_binance_futures_mid_ema30s = 3.7461842167837e-08
+binance_futures_imb1 = 0.015220826239893568
+binance_imb1 = -0.033794458480702005
+binance_imb1_m1s = -0.0328956921300442
+binance_futures_imb1_m1s = 0.015346364226707541
+binance_futures_mid_r1s = -1.5496663142837246e-07
+basis_bybit_mid_ema30s = -1.3397754803764348e-07
+arcus_mid_r1s = -1.5118091057041187e-07
+bybit_imb1 = 0.03318505746066596
+bybit_mid_r1s = -1.8276641950576459e-07
+binance_mid_r1s = -8.447673396491011e-08
+binance_mid_r5s = -3.9391992233178096e-08
+bybit_imb1_m1s = 0.033046440322915135
+arcus_imb1_m1s = -0.03227223667070217
+binance_mid_d5s = 1.1893797592794254e-07
+arcus_mid_r10s = -6.441927155427485e-08
+binance_futures_mid_d5s = -4.774983852348678e-08
+bybit_mid_d5s = -1.262985371721839e-07
+binance_mid_r10s = 7.443329054984785e-08
+arcus_imb1 = -0.032188868069666005
+arcus_mid_r5s = -1.5832996816112063e-07
+binance_futures_mid_r5s = -2.0607980668460746e-07
+binance_futures_mid_r10s = -1.0997239494087341e-07
+bybit_mid_r5s = -2.8462850533330456e-07
+bybit_mid_r10s = -2.0431251588933327e-07
 
 [ml.scale]                    # the scaler's scale_
-basis_pred_ema30s = 0.00015734634696404814
-basis_bybit_mid_ema30s = 5.1119917094290994e-05
-binance_futures_imb1 = 0.5753419450644196
-binance_imb1 = 0.6332924635511956
-bybit_imb1 = 0.643348965060004
-binance_futures_mid_r1s = 4.4248689643455665e-05
-binance_mid_d5s = 4.621511495688441e-05
-binance_mid_r1s = 4.1796515172070264e-05
-binance_futures_mid_d5s = 4.748737891576402e-05
-arcus_imb1_m1s = 0.7306161979765478
-arcus_imb1 = 0.833430536716605
-binance_mid_r10s = 0.00015121186584177133
-arcus_mid_r5s = 0.00010609423155953982
-arcus_mid_r10s = 0.00015372439175159895
-binance_mid_r5s = 0.00010355641657581691
-binance_futures_mid_r5s = 0.000106773798078394
-binance_futures_mid_r10s = 0.00015467189641842373
-bybit_mid_r5s = 0.00011235617639796734
-bybit_mid_r10s = 0.00015974893969546462
-bybit_mid_d5s = 4.449372525431488e-05
-bybit_imb1_m1s = 0.5593563884379787
-arcus_mid_r1s = 4.3496021849651826e-05
-bybit_mid_r1s = 4.879872608479366e-05
-binance_futures_imb1_m1s = 0.5203879114011485
-binance_imb1_m1s = 0.5960156536003182
-basis_binance_futures_mid_ema30s = 7.267760403515267e-05
+basis_pred_ema30s = 0.0001430415880944946
+basis_binance_futures_mid_ema30s = 3.4070534903616176e-05
+binance_futures_imb1 = 0.5645418852310704
+binance_imb1 = 0.6252548570944876
+binance_imb1_m1s = 0.5953593276247033
+binance_futures_imb1_m1s = 0.5162667204028922
+binance_futures_mid_r1s = 3.366666977647298e-05
+basis_bybit_mid_ema30s = 4.3214646484415605e-05
+arcus_mid_r1s = 3.3012421731688656e-05
+bybit_imb1 = 0.6401807647341623
+bybit_mid_r1s = 3.777069640957179e-05
+binance_mid_r1s = 3.090533524309636e-05
+binance_mid_r5s = 8.295101366010239e-05
+bybit_imb1_m1s = 0.5634842210224824
+arcus_imb1_m1s = 0.7514162347378508
+binance_mid_d5s = 3.593665061158241e-05
+arcus_mid_r10s = 0.00012722852480492376
+binance_futures_mid_d5s = 2.775240618192111e-05
+bybit_mid_d5s = 3.5107220112688704e-05
+binance_mid_r10s = 0.0001247589936521452
+arcus_imb1 = 0.8494913101267473
+arcus_mid_r5s = 8.596709567227492e-05
+binance_futures_mid_r5s = 8.720047282902946e-05
+binance_futures_mid_r10s = 0.00012908019174043907
+bybit_mid_r5s = 9.202205608228189e-05
+bybit_mid_r10s = 0.00013332773886967766
