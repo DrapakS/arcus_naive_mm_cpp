@@ -1,4 +1,4 @@
-# SPY quoted on BOTH sides at once: a base config for paper (not live yet), config.nvda-both.toml as it is on 20 Oct
+# SPY quoted on BOTH sides at once: live from 20 Oct with small sizes (~$200 orders within $500), config.nvda-both.toml as it is on 20 Oct
 # with SPY's feeds and sizes. Arcus SPY-USD (a perp on the SPDR S&P 500 ETF) priced off the Binance SPYUSDT perp, basis
 # pricing, no ML. The thresholds are NVDA's (BTC's), not measured on SPY yet: measure on the paper logs first.
 # Feeds: the Binance USD-M SPYUSDT perp only (20 Oct, the owner's): the fair and every guard of the market data
