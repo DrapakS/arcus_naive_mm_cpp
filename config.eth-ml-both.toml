@@ -74,7 +74,7 @@ exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exi
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0007: the same once that far under water at the Arcus mid)
 markup = 0.000015             # 0.15 bp (19 Oct evening, the owner's; was 0.125 bp)
 close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.0875 bp, ~2 ticks): out of a long sooner
-tol = 0.0000084               # 0.084 bp = 2 ticks at $2400 (20 Oct, the owner's; was 0.05 bp: 165k placements for 271 fills over a night). Before: 0.05 bp (was 0.03): a 1-tick move (0.04 bp) no longer re-places the order. Run 12: 34% of
+tol = 0.000005                # 0.05 bp (20 Oct evening, the owner's; 0.084 bp = 2 ticks earlier on 20 Oct, 0.05 bp before)
                               # the cancels toward the market were a single tick; 1063 placements/h, 242 per fill.
                               # Under the closing sell's markup (0.125 bp x 0.7 = 0.0875 bp): a sell that drifts one
                               # step toward the market still keeps >= 0.04 bp (a tick). Run 16 (0.03 bp, a falling

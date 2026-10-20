@@ -380,7 +380,7 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     Config ml_both = load("config.btc-ml-both.toml"), ml_long = load("config.btc-ml.toml"), live = load("config.btc-ml-okx-only.toml");
     Config same = ml_both;
     same.trading.markup = live.trading.markup;  // 0.1 bp here from 20 Oct
-    same.trading.order_size = live.trading.order_size;  // ~$2000 within $3750 here from 20 Oct
+    same.trading.order_size = live.trading.order_size;  // ~$1000 within $3750 here (20 Oct evening)
     same.trading.max_position_usd = live.trading.max_position_usd;
     same.ml = live.ml;  // the 10 s refit here from 20 Oct
     same.lag = live.lag;  // on here from 20 Oct, its pauses growing while the data stays late
