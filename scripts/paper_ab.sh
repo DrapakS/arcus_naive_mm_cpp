@@ -12,6 +12,8 @@
 #   bash scripts/paper_ab.sh start basis-both ml-both            BTC: basis vs ML, both sides
 #   bash scripts/paper_ab.sh start eth-basis-both eth-ml-both    ETH: the same A/B
 #   bash scripts/paper_ab.sh start basis-both basis-both-nodrift    the drift guard A/B
+#   bash scripts/paper_ab.sh start eth-ml-both eth-basic-both   ETH: the live ML bot vs the same with the basis pricing
+#                                            (config.eth-ml-both.toml, pricing.model = "basis": guards, markup, size, tol as live)
 #   bash scripts/paper_ab.sh start eth-ml-both eth-ml-okx-only   ETH ML as live vs the same with every guard off but OKX's
 #                                            (Binance spot/futures/trades, Bybit, Arcus, trend, add, lag, takes guards and
 #                                            the drift markup off; the Bybit feed stays, the model reads it)
@@ -32,13 +34,14 @@ ALL="basis:config.recommended.toml ml:config.btc-ml.toml gld:config.gld.toml
      basis-both:config.btc-both.toml ml-both:config.btc-ml-both.toml
      basis-both-nodrift:config.btc-both.toml@drift.markup_factor=1
      eth-basis-both:config.eth-both.toml eth-ml-both:config.eth-ml-both.toml
+     eth-basic-both:config.eth-ml-both.toml@pricing.model=basis
      eth-ml-okx-only:config.eth-ml-both.toml@guard.drawdown=0@futures.drawdown=0@trades.drawdown=0@bybit.drawdown=0@arcus_guard.drawdown=0@trend.drawdown=0@add_guard.drawdown=0@lag.max_ms=0@takes.pause_ms=0@drift.markup_factor=1
      btc-ml-okx-only:config.btc-ml-both.toml@guard.drawdown=0@futures.drawdown=0@trades.drawdown=0@bybit.drawdown=0@arcus_guard.drawdown=0@trend.drawdown=0@add_guard.drawdown=0@lag.max_ms=0@takes.pause_ms=0@drift.markup_factor=1@okx.enabled=true@okx.connections=1"
 cmd=${1:-start}
 [ $# -gt 0 ] && shift
 names="$*"
 if [ -z "$names" ]; then
-    if [ "$cmd" = start ]; then names="basis ml"; else names="basis ml gld basis-both ml-both basis-both-nodrift eth-basis-both eth-ml-both eth-ml-okx-only btc-ml-okx-only"; fi
+    if [ "$cmd" = start ]; then names="basis ml"; else names="basis ml gld basis-both ml-both basis-both-nodrift eth-basis-both eth-ml-both eth-basic-both eth-ml-okx-only btc-ml-okx-only"; fi
 fi
 RUNS=""
 for name in $names; do
@@ -47,7 +50,7 @@ for name in $names; do
         if [ "${run%%:*}" = "$name" ]; then match=$run; fi
     done
     if [ -z "$match" ]; then
-        echo "unknown run $name: basis, ml, gld, basis-both, ml-both, basis-both-nodrift, eth-basis-both, eth-ml-both, eth-ml-okx-only or btc-ml-okx-only" >&2; exit 2
+        echo "unknown run $name: basis, ml, gld, basis-both, ml-both, basis-both-nodrift, eth-basis-both, eth-ml-both, eth-basic-both, eth-ml-okx-only or btc-ml-okx-only" >&2; exit 2
     fi
     RUNS="$RUNS $match"
 done
@@ -119,7 +122,7 @@ stop)
     done
     ;;
 *)
-    echo "usage: bash scripts/paper_ab.sh [start|status|stop] [basis ml gld basis-both ml-both eth-basis-both eth-ml-both eth-ml-okx-only]" >&2
+    echo "usage: bash scripts/paper_ab.sh [start|status|stop] [basis ml gld basis-both ml-both eth-basis-both eth-ml-both eth-basic-both eth-ml-okx-only]" >&2
     exit 2
     ;;
 esac
