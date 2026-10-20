@@ -1,4 +1,4 @@
-# SPY quoted on BOTH sides at once: live from 20 Oct with small sizes (~$200 orders within $500), config.nvda-both.toml as it is on 20 Oct
+# SPY quoted on BOTH sides at once: live from 20 Oct (~$200 orders within $500; ~$1000 within $2500, markup 0.2 bp from 20 Oct afternoon), config.nvda-both.toml as it is on 20 Oct
 # with SPY's feeds and sizes. Arcus SPY-USD (a perp on the SPDR S&P 500 ETF) priced off the Binance SPYUSDT perp, basis
 # pricing, no ML. The thresholds are NVDA's (BTC's), not measured on SPY yet: measure on the paper logs first.
 # Feeds: the Binance USD-M SPYUSDT perp only (20 Oct, the owner's): the fair and every guard of the market data
@@ -32,21 +32,21 @@ min_samples = 100
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 500        # the position either way stays within $500 (20 Oct, the owner's, the first live); a side at the limit is not quoted
+max_position_usd = 2500       # the position either way stays within $2500 (20 Oct, the owner's; was $500); a side at the limit is not quoted
 max_position_resume = 0.95    # ... and comes back once the position on that side is under $475
 skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
 skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $500, none at the limit
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
                               # joined the best price with no markup after 10 min). The closing order keeps its markup
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0005: the same once that far under water at the Arcus mid)
-markup = 0.000025             # 0.25 bp (NVDA's of 20 Oct) = ~2 ticks of SPY under the fair bid
-close_markup_cut = 0.3        # the closing order takes 30% less markup (0.175 bp, rounded to the tick)
+markup = 0.00002              # 0.2 bp (20 Oct, the owner's; was 0.25 bp) = ~1.5 ticks of SPY under the fair bid
+close_markup_cut = 0.3        # the closing order takes 30% less markup (0.14 bp, rounded to the tick)
 off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New York, Mon-Fri; holidays by Arcus
                               # isOutsideRth) both sides take twice the markup: 0.5 bp, ~4 ticks
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
 tol_away = 0.00005            # 0.5 bp (19 Oct evening, the owner's; was 1 bp): a buy left that far behind is placed again
 close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
-order_size = 0.26             # SPY, ~$200 at $768 (20 Oct, the owner's, the first live). Arcus minimum 0.001 SPY and $5; step 0.0000001
+order_size = 1.31             # SPY, ~$1000 at $765.7 (20 Oct, the owner's; was 0.26, ~$200). Arcus minimum 0.001 SPY and $5; step 0.0000001
 never_lead = false            # may improve the best price (20 Oct, the owner's; was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)

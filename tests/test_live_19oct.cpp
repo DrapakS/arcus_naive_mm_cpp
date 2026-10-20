@@ -108,8 +108,9 @@ TEST(SpyConfig, TheSpyPaperConfigReadsTheBinancePerpOnly) {
     EXPECT_FALSE(c.okx.enabled);
     EXPECT_FALSE(c.bybit.enabled);
     EXPECT_EQ(c.trading.direction, "both");
-    EXPECT_TRUE(190 < c.trading.order_size * 768 && c.trading.order_size * 768 < 210);  // ~$200
-    EXPECT_EQ(c.trading.max_position_usd, 500.0);
+    EXPECT_TRUE(980 < c.trading.order_size * 766 && c.trading.order_size * 766 < 1020);  // ~$1000
+    EXPECT_EQ(c.trading.max_position_usd, 2500.0);
+    EXPECT_DOUBLE_EQ(c.trading.markup, 0.00002);  // 0.2 bp
     EXPECT_FALSE(c.portfolio.enabled);
 }
 
@@ -120,7 +121,7 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     EXPECT_EQ(q.futures.symbol, "QQQUSDT");
     EXPECT_EQ(q.binance.symbol, "QQQBUSDT");
     EXPECT_EQ(strings(q.arcus.feed_assets), (std::vector<std::string> {"QQQB"}));
-    EXPECT_TRUE(190 < q.trading.order_size * 715 && q.trading.order_size * 715 < 210);  // ~$200
+    EXPECT_TRUE(980 < q.trading.order_size * 715 && q.trading.order_size * 715 < 1020);  // ~$1000
     q.arcus.market = s.arcus.market;  // all else as SPY's
     q.arcus.feed_assets = s.arcus.feed_assets;
     q.futures.symbol = s.futures.symbol;
