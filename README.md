@@ -157,7 +157,7 @@ bash bench/paper_pair.sh stop               # SIGTERM обоим, как Ctrl+C
 Именованные пары — как боты в `scripts/paper_ab.sh`: `basis`, `basis-both`, `ml`, `ml-both` (здесь — живой
 набор, см. «Live рядом с Python-ботами»),
 `ml-okx-only` (`config.btc-ml-okx-only.toml`: BTC ML, из гардов только OKX), `eth-basis-both`, `eth-ml-both`, `gld`,
-`spy-both` (`config.spy-both.toml`: SPY с двух сторон) и `qqq-both` (`config.qqq-both.toml`: QQQ так же) — есть только в этом checkout; можно и любой конфиг: `start config.sol-both.toml sol`. Оба
+`spy-both` (`config.spy-both.toml`: SPY с двух сторон) и `qqq-both` (`config.qqq-both.toml`: QQQ так же), `sol-basic` (`config.sol-basic.toml`: SOL с двух сторон, все гарды) — есть только в этом checkout; можно и любой конфиг: `start config.sol-both.toml sol`. Оба
 бота читают один и тот же файл (из этого checkout), Python-версия должна быть на коде, с которого
 сделан порт (ветка `claude/funny-wright-a95ao3`, `58cacaf` или новее), — `start` печатает коммиты
 обоих, а `compare` — версии из логов. За гео-блоком Binance — те же зеркала через `SETS`:

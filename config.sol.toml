@@ -46,7 +46,7 @@ close_tol_away = 0.000012     # 0.12 bp (= tol, back from 0.6 bp): the exit foll
                               # The run used 0.12 bp; requests are far from short (the order pool 13% used)
 order_size = 4.7              # SOL, ~$500 at $106: the owner's $500 from 16 Oct (1.0, ~$100, up to run 25; minimum
                               # 0.01 SOL and $5, step 0.000001). 1 bp = ~$0.05 per fill
-never_lead = true             # join, never improve; pull when the book comes to the order
+never_lead = false             # 20 Oct, the owner's: off everywhere (was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
 dms_timeout_s = 60            # per-market switch, independent of the other bots' switches

@@ -44,14 +44,14 @@ min_samples = 100
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 500        # the position either way stays within $500 (19 Oct; was $100); a side at the limit is not quoted
+max_position_usd = 2000       # the position either way stays within $2000 (20 Oct, the owner's; was $500); a side at the limit is not quoted
 max_position_resume = 0.95    # ... and comes back once the position on that side is under $475
 skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
 skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $500, none at the limit
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
                               # joined the best price with no markup after 10 min). The closing order keeps its markup
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0005: the same once that far under water at the Arcus mid)
-markup = 0.00005              # 0.5 bp = ~1 tick under the fair bid. BTC's 0.25 bp is half a tick here: the grid, not the
+markup = 0.000025             # 0.25 bp (20 Oct, the owner's: half; was 0.5 bp) = ~half a tick under the fair bid. BTC's 0.25 bp is half a tick here: the grid, not the
                               # volatility, sets the floor (as on GLD)
 close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.35 bp, rounded to the tick)
 off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New York, Mon-Fri; holidays by Arcus
@@ -59,8 +59,8 @@ off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
 tol_away = 0.00005            # 0.5 bp (19 Oct evening, the owner's; was 1 bp): a buy left that far behind is placed again
 close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
-order_size = 2.3              # NVDA, ~$500 at $217 (19 Oct; was 0.46, ~$98). Arcus minimum 0.01 NVDA and $5; step 0.01
-never_lead = true             # join, never improve; pull when the book comes to the order
+order_size = 4.6              # NVDA, ~$1000 at $217 (20 Oct, the owner's; was 2.3, ~$500). Arcus minimum 0.01 NVDA and $5; step 0.01
+never_lead = false            # may improve the best price (20 Oct, the owner's; was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
 dms_timeout_s = 60            # per-market switch, independent of the other bots' switches

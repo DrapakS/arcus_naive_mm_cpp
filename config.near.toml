@@ -48,7 +48,7 @@ close_tol_away = 0.000005     # 0.05 bp (= tol, back from 2.5 bp): the exit foll
                               # (one trip held 2 h, -378 bp). The run used 0.05 bp, and requests are not short: at
                               # 05:10 the account's order pool was 13% used (171k of 1.29M)
 order_size = 21               # NEAR, ~$101 at $4.82 (the owner's ~$100)
-never_lead = true             # join, never improve; pull when the book comes to the order
+never_lead = false             # 20 Oct, the owner's: off everywhere (was true: join, never improve)
 dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
 cancel_lanes = 1
 presign_cancel_s = 1

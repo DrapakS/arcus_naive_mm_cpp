@@ -74,7 +74,7 @@ order_size = 0.0122           # BTC, ~$1000 at $82k: the owner's $1000 from 16 O
                               # 0.0012, ~$100, up to run 25; Arcus minimum 0.0001 BTC and $5; step 1e-8). 1 bp = ~$0.10 per
                               # fill: run 26's worst trip (-15 bp) would cost ~$1.5 at this size, run 16's 12:30 crash trip
                               # (-102 bp) ~$10. A long already open (from an older run) is sold whole first: the sell is the position
-never_lead = true             # unchanged: join, never improve; pull when the book comes to the order
+never_lead = false             # 20 Oct, the owner's: off everywhere (was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
 dms_timeout_s = 60            # unchanged: the exchange cancels our order after 60 s of silence (re-armed every 30 s)

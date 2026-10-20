@@ -42,7 +42,7 @@ tol_away = 0.0003             # 3 bp (BTC 1 bp x 2.8): a buy left deeper waits f
 close_tol_away = 0.00001      # = tol: the closing order follows the market at once (run 20: the exit sell at its
                               # target all the time, at the best ask 26-38% against 8-10% before)
 order_size = 0.09             # ZEC, ~$104 at $1156 (the owner's ~$100)
-never_lead = true             # join, never improve; pull when the book comes to the order
+never_lead = false             # 20 Oct, the owner's: off everywhere (was true: join, never improve)
 dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
 cancel_lanes = 1
 presign_cancel_s = 1

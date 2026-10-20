@@ -40,10 +40,11 @@ TEST(Live19Oct, EthMlLiveTheOkxGuardTheTakePauseAndTheDriftMarkupOnly) {
     Config c = cfg("eth-ml-both");
     const TradingConfig& t = c.trading;
     EXPECT_EQ(t.markup, 0.000015);
-    EXPECT_EQ(t.order_size, 0.414);
-    EXPECT_EQ(t.max_position_usd, 2500.0);
+    EXPECT_EQ(t.order_size, 0.627);
+    EXPECT_EQ(t.max_position_usd, 4000.0);
     EXPECT_FALSE(t.never_lead);
-    EXPECT_TRUE(950 < t.order_size * 2'415 && t.order_size * 2'415 < 1050);
+    EXPECT_TRUE(1450 < t.order_size * 2'393 && t.order_size * 2'393 < 1550);  // ~$1500 (19 Oct night)
+    EXPECT_TRUE(2 * 0.01 / 2'400 < t.tol && t.tol < 2.2 * 0.01 / 2'400);  // 2 ticks (20 Oct)
     EXPECT_TRUE(c.okx.enabled);
     EXPECT_EQ(c.okx.drawdown, 0.00002);
     EXPECT_EQ(c.takes.pause_ms, 300.0);
@@ -56,8 +57,8 @@ TEST(Live19Oct, EthMlLiveTheOkxGuardTheTakePauseAndTheDriftMarkupOnly) {
 
 TEST(Live19Oct, GoldOrdersOf500) {
     const TradingConfig t = cfg("gld-both").trading;
-    EXPECT_EQ(t.order_size, 1.31);
-    EXPECT_TRUE(480 < t.order_size * 380 && t.order_size * 380 < 520);
+    EXPECT_EQ(t.order_size, 2.63);
+    EXPECT_TRUE(980 < t.order_size * 380 && t.order_size * 380 < 1020);
     EXPECT_EQ(t.max_position_usd, 3000.0);
 }
 
@@ -118,4 +119,26 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     q.binance.symbol = s.binance.symbol;
     q.trading.order_size = s.trading.order_size;
     EXPECT_EQ(describe(q), describe(s));
+}
+
+// C++ checkout: config.sol-basic.toml, config.sol-both.toml with every guard on (ETH's Bybit, OKX and drift ones,
+// over one tick of SOL's perps).
+TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
+    Config b = cfg("sol-basic"), s = cfg("sol-both");
+    EXPECT_EQ(b.arcus.market, "SOL-USD");
+    EXPECT_TRUE(b.bybit.enabled);
+    EXPECT_EQ(b.bybit.symbol, "SOLUSDT");
+    EXPECT_EQ(b.bybit.drawdown, 0.00015);
+    EXPECT_TRUE(b.okx.enabled);
+    EXPECT_EQ(b.okx.inst_id, "SOL-USDT-SWAP");
+    EXPECT_EQ(b.okx.drawdown, 0.00015);
+    EXPECT_EQ(b.drift.markup_factor, 2.5);
+    EXPECT_EQ(b.drift.threshold, 0.0001);
+    for (double on : {b.guard.drawdown, b.futures.drawdown, b.trades.drawdown, b.arcus_guard.drawdown, b.trend.drawdown,
+                      b.add_guard.drawdown, b.lag.max_ms, b.takes.pause_ms})
+        EXPECT_GT(on, 0);
+    b.bybit = s.bybit;  // all else as SOL's
+    b.okx = s.okx;
+    b.drift = s.drift;
+    EXPECT_EQ(describe(b), describe(s));
 }

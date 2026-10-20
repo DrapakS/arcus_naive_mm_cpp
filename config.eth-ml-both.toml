@@ -65,7 +65,7 @@ min_samples = 100             # samples (any update of either book) before the f
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 2500       # 19 Oct evening, the owner's $2500 (was $1500)
+max_position_usd = 4000       # 19 Oct night, the owner's $4000 (was $2500, before that $1500)
 max_position_resume = 0.95    # ... and comes back once the position on that side is under 95% of it
 skew_open = 1.0               # the order that adds to the position: markup x (1 + u), u = position / limit (x2 at it)
 skew_close = 1.0              # the order that closes it: its markup x (1 - u) (none at the limit): out sooner
@@ -74,7 +74,7 @@ exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exi
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0007: the same once that far under water at the Arcus mid)
 markup = 0.000015             # 0.15 bp (19 Oct evening, the owner's; was 0.125 bp)
 close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.0875 bp, ~2 ticks): out of a long sooner
-tol = 0.000005                # 0.05 bp (was 0.03): a 1-tick move (0.04 bp) no longer re-places the order. Run 12: 34% of
+tol = 0.0000084               # 0.084 bp = 2 ticks at $2400 (20 Oct, the owner's; was 0.05 bp: 165k placements for 271 fills over a night). Before: 0.05 bp (was 0.03): a 1-tick move (0.04 bp) no longer re-places the order. Run 12: 34% of
                               # the cancels toward the market were a single tick; 1063 placements/h, 242 per fill.
                               # Under the closing sell's markup (0.125 bp x 0.7 = 0.0875 bp): a sell that drifts one
                               # step toward the market still keeps >= 0.04 bp (a tick). Run 16 (0.03 bp, a falling
@@ -87,7 +87,7 @@ close_tol_away = 0.00001      # 0.1 bp: a sell left above a target that fell is 
                               # its target was at the best ask 54%. Run 20 at 0.05 bp: at its target all the time, at the
                               # best ask 38%, but ~1.1 sells a second while exiting (603 in one 511 s exit); 0.1 bp to
                               # halve that. Same price rule, not a stop: only no lag behind it.
-order_size = 0.414            # ETH, ~$1000 at $2415 (19 Oct evening, the owner's; was 0.312, ~$750)
+order_size = 0.627            # ETH, ~$1500 at $2393 (19 Oct night, the owner's; was 0.414, ~$1000)
 never_lead = false            # OFF from 19 Oct evening (was true: join, never improve; pull when the book comes to the
                               # order): the order may be the best price alone, and is not pulled when the book comes to it
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick

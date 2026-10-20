@@ -81,7 +81,7 @@ order_size = 0.0092           # BTC, ~$750 at $81.6k: the owner's $750 from 18 O
                               # and $5; step 1e-8). 1 bp = ~$0.075 per fill: run 26's worst trip (-15 bp) would cost ~$1.1
                               # at this size, run 16's 12:30 crash trip (-102 bp) ~$7.7. Each side ~$750; a long left by the long bot is no trip of this one: it is set aside,
                               # and only the sell quotes while it is at the limit
-never_lead = true             # unchanged: join, never improve; pull when the book comes to the order
+never_lead = false             # 20 Oct, the owner's: off everywhere (was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
 dms_timeout_s = 60            # unchanged: the exchange cancels our order after 60 s of silence (re-armed every 30 s)

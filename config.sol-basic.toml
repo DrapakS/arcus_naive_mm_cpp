@@ -1,0 +1,183 @@
+# SOL quoted on BOTH sides at once, basis pricing, every guard on (20 Oct, the owner's): config.sol-both.toml (the
+# Python bot's SOL config: its sizes, markup, tolerances and its tick-scaled thresholds) with the guards of
+# config.eth-both.toml that SOL's was without: the Bybit and OKX perps' and the drift markup. C++ checkout only.
+# Every perp of SOL quotes in ticks of 0.01 (0.96 bp at $104: Binance spot and futures, Bybit SOLUSDT, OKX
+# SOL-USDT-SWAP), so ETH's 0.2 bp thresholds would trip on every tick here: the perps' guards are over one tick
+# (1.5 bp, as the futures guard), and the drift markup takes a move of over one tick (1 bp).
+# Volumes (19 Oct): Bybit SOLUSDT ~$432M a day, OKX SOL-USDT-SWAP ~$635M; Arcus SOL-USD ~$5.4M (marketId 3, tick
+# 0.001 = 0.10 bp, step 0.000001, min order 0.01 SOL and $5).
+# The notes of config.sol-both.toml follow.
+# SOL quoted on BOTH sides at once (direction = "both"): config.sol.toml with the direction, the limit and the inventory controls changed, orders ~$500 (4.7 SOL): six filled orders in a row put the position at the limit.
+# 17 Oct (live logs 06:38-11:04): the losses came from positions of the whole $1000 limit held through 7-35 bp
+# moves, with only the closing side quoted. Now: limit $3000 (orders unchanged, so a fill no longer fills the limit),
+# quotes skewed by the position, no adding past half the
+# limit right after a futures move against it; the closing order is the bigger of the whole position and one
+# order (a position over one order goes in one order). All maker only.
+# The position may go either way up to $3000 (max_position_usd); whichever order shrinks it takes the cut markup
+# (close_markup_cut) and close_tol_away; the trend guard holds buys after a fall and sells after a rally. No stop-loss
+# and no taker. NOT next to the long SOL bot on the same subaccount (one position per market): stop that one first.
+# Needs the code of 17 Oct evening (the inventory controls; older code refuses skew_open, exit_after_s and
+# [add_guard]). Below: the notes of the long config.
+# naive_mm live config: Arcus SOL-USD from the Tokyo host. Use the latest code of branch claude/funny-wright-a95ao3
+# (5789db9 or later: [lag] is a new key, and older code refuses keys it does not know).
+# First values from Binance 1-minute closes (14 Oct) and the Arcus book of that evening, scaled from the
+# ETH config by volatility and tick size. Live since the night of 14-15 Oct (50 trips, -$1.96;
+# 61% of the fills came right after a Binance spot sweep: [trades] below). Then run 22 (15 Oct 06:02-07:38 UTC:
+# 6 trips, +$0.42) and 23, the first with [trades] (07:38-11:04, market down 0.4%: 9 trips, -$0.40; two holds
+# of 11-14 min in the slide -$0.97). Run 25, the night of 15-16 Oct with a CPU core per bot: 24 trips, +$1.47 at
+# ~$100 orders (one +76 bp trip), fills 5 s later 0.00 bp each. Orders of ~$500 from 16 Oct.
+# The host needs a free CPU core per bot (README, "Хост").
+# Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
+# Every symbol below must stay SOL (the bot refuses to start when an enabled feed's symbol is not the arcus.market
+# asset). This file never trades by itself: the command line passes --trade quote / paper / live.
+# SOL-USD on Arcus (GET /v1/markets): marketId 3, tick 0.001 (0.10 bp at $104), step 0.000001, min order
+# 0.01 SOL and $5 notional. Arcus SOL-USD: ~$8.5M a day, ~12.7k trades; spread 1 tick, top sizes $0.3-4k,
+# top-10 ~$200k a side.
+# Volatility (std of 1-minute returns on Binance spot): 10.9 bp, 1.80x BTC (ETH 1.36x). Binance ticks are coarse
+# here: 0.01 = 0.96 bp, so the futures fair jumps by ~1 bp at a time (10 Arcus ticks).
+log_level = "INFO"
+
+[binance]                     # spot: the spot guard, the price lines and the logs (pricing is off futures)
+symbol = "SOLUSDT"            # tick 0.01 (0.96 bp). Behind a geo-block (HTTP 451) use
+                              # wss://data-stream.binance.vision + https://data-api.binance.vision
+
+[arcus]
+market = "SOL-USD"
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected (a stream that stopped
+                              # while the connection still answers pings; needs the 15 Oct code)
+
+[pricing]
+reference = "futures"         # as BTC and ETH: futures move first (14 Oct check over six runs)
+basis_s = 30
+window = 1000                 # used only with basis_s = 0
+min_samples = 100
+
+[trading]
+mode = "off"                  # the command line sets --trade quote / paper / live
+direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
+max_position_usd = 3000       # the position either way stays within $3000 (17 Oct: $1000, one order filled it); a side
+                              # at the limit is not quoted. SOL moves ~2x BTC: 8 bp; one 4.7 order is ~$500, a sixth of the limit
+max_position_resume = 0.95    # ... and comes back once the position on that side is under 95% of it
+skew_open = 1.0               # the order that adds to the position: markup x (1 + u), u = position / limit (x2 at it)
+skew_close = 1.0              # the order that closes it: its markup x (1 - u) (none at the limit): out sooner
+exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
+                              # joined the best price with no markup after 10 min). The closing order keeps its markup
+exit_loss = 0                 # OFF from 18 Oct as well (was 0.0008: the same once that far under water at the Arcus mid)
+markup = 0.00006              # 0.6 bp from 18 Oct, the owner's x2 (was 0.3 bp: twice the first 0.15 bp, ETH's 0.125 bp x
+                              # 1.3 for volatility): ~6 Arcus ticks. Paper, 14 Oct: every buy filled into a falling market
+close_markup_cut = 0.3        # the closing order takes 30% less markup (0.42 bp)
+tol = 0.000012                # 0.12 bp: 1.2 Arcus ticks, so a one-tick move of the target does not re-place
+tol_away = 0.0002             # 2 bp (ETH 1.5 bp x 1.3): a buy left deeper waits for a 2 bp gap
+close_tol_away = 0.000012     # 0.12 bp (= tol, back from 0.6 bp): the exit follows a falling target at once. Replay
+                              # of the night's targets: 0.6 bp would cut the placements ~48% but leave the exit sell
+                              # at the best ask 32% of its time instead of 48%, and SOL's losses were holds in the crash.
+                              # The run used 0.12 bp; requests are far from short (the order pool 13% used)
+order_size = 4.7              # SOL, ~$500 at $106: the owner's $500 from 16 Oct (1.0, ~$100, up to run 25; minimum
+                              # 0.01 SOL and $5, step 0.000001). 1 bp = ~$0.05 per fill
+never_lead = false             # 20 Oct, the owner's: off everywhere (was true: join, never improve)
+came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
+                              # behind it instead (SOL: 12% of the placements went straight back there, 56 a minute)
+dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
+cancel_lanes = 1
+presign_cancel_s = 1
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+[guard]                       # Binance spot best bid vs its time-weighted mean: a backup for the futures guard
+window_ms = 300
+drawdown = 0.00015            # 1.5 bp: over one Binance tick (0.96 bp), else every tick trips it
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: the main guard and the fair
+enabled = true
+symbol = "SOLUSDT"
+stale_timeout_s = 5
+window_ms = 300
+drawdown = 0.00015            # 1.5 bp: over one futures tick (0.01 = 0.96 bp); ETH 0.6 bp x 1.3 would be under it
+pause_ms = 200
+
+[trades]                      # NEW: Binance spot trades (<symbol>@aggTrade), the earliest sign of a sweep. A trade a tick
+enabled = true                # (0.01 = 0.97 bp) under the high of the last 300 ms pulls the buy at once (over the low: the
+window_ms = 300               # sell), no buy for 200 ms. Night of 14-15 Oct: 61% of SOL fills came >= 20 ms after such a
+drawdown = 0.00005            # trade, at -2.5 bp each 5 s later (the other fills -1.2); by 30 s those fills had lost $2.21,
+pause_ms = 200                # the whole night $1.96. Pauses a side 2-5% of a calm hour.
+                              # Run 23 live: 20 fills, 5 s later -1.30 bp each (night -1.93); the rule saw the trade
+                              # >= 20 ms before the match on 4 of them, and the bot read all 4 late (84-262 ms: the
+                              # host's loop stalls). Paused a side 2.8% of the time.
+
+[bybit]                       # ON, a guard (as ETH's): the Bybit perp's best bid vs its own 300 ms mean
+enabled = true
+category = "linear"
+symbol = "SOLUSDT"            # tick 0.01 (0.96 bp), ~$432M a day
+window_ms = 300               # ETH: 200 ms / 0.2 bp / 300 ms; here over one tick, as the futures guard
+drawdown = 0.00015            # 1.5 bp
+pause_ms = 300
+
+[okx]                         # ON, the same guard on the OKX swap's best bid (bbo-tbt)
+enabled = true
+inst_id = "SOL-USDT-SWAP"     # 1 SOL a contract, tick 0.01 (0.96 bp), ~$635M a day
+window_ms = 300
+drawdown = 0.00015            # 1.5 bp
+pause_ms = 300
+
+[arcus_guard]                 # Arcus mid vs its own 3 s mean: sweeps Binance does not show
+window_ms = 3000
+drawdown = 0.0002             # 2 bp (ETH 1.5 bp x 1.3)
+pause_ms = 300
+
+[takes]                       # NEW 18 Oct for SOL, as BTC and ETH: a taker order in the Arcus public trades pulls our
+min_usd = 0                   # order on the side it hit and pauses that side 500 ms after the last such take; takers
+pause_ms = 500                # whose last takes (20 at least) moved the Arcus mid their way by under 0.2 bp on average
+min_takes = 20                # 1 s later pause nothing
+min_move = 0.00002
+score_ms = 1000
+
+[portfolio]                   # the crypto bots' positions across the host (BTC, ETH, SOL: 0.86-0.91 correlated over 1 min),
+enabled = true                # each bot still its own process on its own market: it writes its position to a file in
+asset_class = "crypto"        # dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of weight x position x
+weight = 1.7                  # mark (risk in BTC units: 1-min volatility over BTC's, 19 Oct: BTC 1.0, ETH 1.36, SOL
+                              # 1.70); u = exposure / limit_usd (-1..1). An order
+limit_usd = 1500              # adding to the class's lean: markup x (1 + 0.3 u), one taking it back x (1 - 0.3 u), on top
+factor = 0.3                  # of the own skew. 19 Oct, 6 h live: BTC and ETH the same way 26% of the time, at worst
+                              # $1670 together; a stopped bot's file is left out after 30 s
+shift_bp = 0.3                # and both quotes moved against the lean by 0.3 bp x u (the class short at its limit: both
+                              # 0.3 bp higher). 19 Oct 16:27-17:47: the class short 82% of the time, u = -1 18%; x0.7..x1.3
+                              # of a 0.15-0.2 bp markup was 1 tick on ETH, 5 on BTC
+
+[add_guard]                   # no adding past half the limit right after a futures move against the side (17 Oct: BTC
+window_s = 300                # added up to its limit after -4.8 bp in 5 min, just before -12 bp: -$0.72). Opening
+drawdown = 0.0008             # from flat still goes. 8 bp from the 5-minute high (a fall: buys) or low (a rally: sells)
+pause_s = 60
+limit_share = 0.5             # adding allowed up to 50% of max_position_usd while it holds
+
+[drift]                       # ON (as ETH's x2.5): a side the futures mid moved against over the last 10 s takes 2.5x its
+window_s = 10                 # markup. ETH's 0.2 bp would be any tick here (the futures mid moves in half-ticks of
+threshold = 0.0001            # 0.48 bp): 1 bp, a move of over one tick
+hold_s = 2
+markup_factor = 2.5
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
+window_s = 120                # sell back: no stop-loss, no taker, only fewer entries
+drawdown = 0.005              # 50 bp under its 2-minute high: night of 14-15 Oct 6 pauses, 3.1% of 8.5 h, all 02:21-03:20;
+pause_s = 60                  # the 5 trips bought in them -$1.05 of the night's -$1.96
+
+[vol_markup]                  # the markup scaled by volatility (19 Oct): the reference mid (Binance futures) each second,
+enabled = true                # its squared returns in an exponential mean over 60 s (now) and one over 30 min (the
+short_s = 60                  # usual); every order's markup x sqrt(now / usual), x0.8 in a quiet spell to x2 in a burst
+long_s = 1800                 # (x1 for the first 5 min). 6 h of 19 Oct at these windows: mean x1.0, median x0.87-0.94,
+low = 0.8                     # p90 x1.45; at x0.8 31-41% of the time, at x2 1-2%
+high = 2.0
+warmup_s = 300
+
+[lag]                         # NEW: market data read late = quoting blind. A futures ticker or a spot trade read 200 ms or
+max_ms = 200                  # more after the exchange's own time for it, or the event loop that late, pulls both orders,
+pause_ms = 500                # and nothing is placed until 500 ms after the last such reading. 15 Oct from 13:35 UTC five
+                              # bots on one core read futures 2-45 s late for 4 h and kept quoting: 1089 orders refused as
+                              # crossing, -$3.80 in a rally. Fills read 100-200 ms late lost 1.0 bp 5 s later, 200-500 ms
+                              # 1.8-2.2 bp (under 100 ms: nothing). The health line gives the share of time it held placing.
+
+[imbalance]                   # OFF until measured on this market (ETH: only ratios of 200+ were worth the x5)
+levels = 5
+ratio = 0
+factor = 5
+hold_ms = 300
+sides = "open"

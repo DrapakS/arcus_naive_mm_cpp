@@ -68,6 +68,7 @@ Config as_long(Config both_cfg, const Config& long_cfg) {
     t.exit_after_s = lt.exit_after_s;
     t.exit_loss = lt.exit_loss;
     t.order_size = lt.order_size;
+    t.markup = lt.markup;  // GLD and NVDA two-sided at half from 20 Oct (the long-only configs kept theirs)
     both_cfg.add_guard = long_cfg.add_guard;
     both_cfg.drift = long_cfg.drift;  // the drift markup: on for BTC and ETH so far
     // from 18 Oct BTC and ETH: the faster futures guard and the Arcus take guard
@@ -317,11 +318,13 @@ TEST(BothSides, TheShippedTwoSidedConfigsAreTheirLongOnesButForTheDirectionLimit
     }
 }
 
-TEST(BothSides, TheShippedNvdaConfigsQuote500AndDoubleTheMarkupOffHours) {
+TEST(BothSides, TheShippedNvdaConfigsSizeAndLimitAndDoubleTheMarkupOffHours) {
     Config both_cfg = load("config.nvda-both.toml"), long_cfg = load("config.nvda.toml");
     EXPECT_EQ(both_cfg.trading.direction, "both");
-    EXPECT_EQ(both_cfg.trading.max_position_usd, 500.0);
-    double usd = long_cfg.trading.order_size * 214;  // ~$500 orders (19 Oct): one fills the limit
+    EXPECT_EQ(both_cfg.trading.max_position_usd, 2000.0);  // 20 Oct, the owner's
+    double both_usd = both_cfg.trading.order_size * 217;  // ~$1000 orders (20 Oct; were $500)
+    EXPECT_TRUE(980 < both_usd && both_usd < 1020) << both_usd;
+    double usd = long_cfg.trading.order_size * 214;  // the long-only one as it was: ~$500
     EXPECT_TRUE(480 < usd && usd < 500) << usd;
     EXPECT_EQ(both_cfg.trading.off_hours_markup_factor, 2.0);
     EXPECT_EQ(long_cfg.trading.off_hours_markup_factor, 2.0);

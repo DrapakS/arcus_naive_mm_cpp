@@ -13,7 +13,7 @@
 # Named pairs, as scripts/paper_ab.sh names its bots: basis (config.recommended.toml, BTC long, priced by the
 # basis off Binance futures), basis-both (config.btc-both.toml, BTC both sides), ml (config.btc-ml.toml),
 # ml-both (config.btc-ml-both.toml: in this checkout the live BTC ML set, = btc-ml-okx-only), ml-okx-only (config.btc-ml-okx-only.toml: BTC ML, the OKX guard only), eth-basis-both (config.eth-both.toml), eth-ml-both (config.eth-ml-both.toml),
-# gld (config.gld.toml), spy-both (config.spy-both.toml: SPY both sides), qqq-both (config.qqq-both.toml: QQQ the same). Both bots read the very same file (this checkout's), so they run one config.
+# gld (config.gld.toml), spy-both (config.spy-both.toml: SPY both sides), qqq-both (config.qqq-both.toml: QQQ the same), sol-basic (config.sol-basic.toml: SOL both sides, every guard on). Both bots read the very same file (this checkout's), so they run one config.
 #
 # Logs: paper-pair/<name>-py.log and <name>-cpp.log (+ .err). An earlier run's logs are kept under a name
 # with the time they were moved aside. SETS: --set overrides for both, e.g. behind Binance's geo-block
@@ -32,7 +32,8 @@ OUT=paper-pair
 PAIRS="basis:config.recommended.toml basis-both:config.btc-both.toml ml:config.btc-ml.toml ml-both:config.btc-ml-both.toml
        ml-okx-only:config.btc-ml-okx-only.toml
        eth-basis-both:config.eth-both.toml eth-ml-both:config.eth-ml-both.toml gld:config.gld.toml
-       spy-both:config.spy-both.toml qqq-both:config.qqq-both.toml"
+       spy-both:config.spy-both.toml qqq-both:config.qqq-both.toml
+       sol-basic:config.sol-basic.toml"
 mkdir -p "$OUT"
 
 cmd=${1:-status}
