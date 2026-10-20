@@ -133,7 +133,7 @@ pause_ms = 300
 
 [takes]                       # Arcus taker waves. Any taker order (min_usd 0) in the Arcus public trades pulls our order
 min_usd = 0                   # on the side it hit and pauses that side 500 ms after the last such take. 18 Oct tape: 29-64%
-pause_ms = 3000               # 3 s (20 Oct, the owner's; was 300 ms, run with --set from 20 Oct): against 0x20449d7f's momentum sweeps
+pause_ms = 0                  # OFF (20 Oct evening, the owner's; was 3 s from 20 Oct morning, 300 ms before): took each side out 40-60% of the time
 min_takes = 20                # NEW 18 Oct: quiet takers pause nothing. A taker whose last takes (20 at least, 100 at most)
 min_move = 0.00002            # moved the Arcus mid its way by under 0.2 bp on average 1 s later. Paused at 1000 ms with
 score_ms = 1000               # every taker counted, BTC 12:19-14:55: buys 23%, sells 17% of the time (0x38bdc44a alone 10%)

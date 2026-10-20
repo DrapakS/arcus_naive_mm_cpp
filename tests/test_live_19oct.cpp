@@ -94,7 +94,7 @@ TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     cpp.ml = live.ml;
     EXPECT_EQ(cpp.lag.max_ms, 200.0);  // on (20 Oct, the owner's)
     cpp.lag = live.lag;
-    EXPECT_EQ(cpp.takes.pause_ms, 3000.0);  // 3 s against momentum sweeps (20 Oct, the owner's)
+    EXPECT_EQ(cpp.takes.pause_ms, 0.0);  // off (20 Oct evening, the owner's)
     cpp.takes.pause_ms = live.takes.pause_ms;
     EXPECT_EQ(describe(cpp), describe(cfg("btc-ml-okx-only")));
 }
