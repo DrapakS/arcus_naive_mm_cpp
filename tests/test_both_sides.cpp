@@ -340,18 +340,18 @@ TEST(BothSides, TheShippedNvdaConfigsSizeAndLimitAndDoubleTheMarkupOffHours) {
 
 TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     // C++ checkout: config.btc-ml-both.toml is the live BTC ML set, config.btc-ml-okx-only.toml as it is
-    // (Python's is the ML model with config.btc-both.toml's controls); the model is config.btc-ml.toml's
+    // (Python's is the ML model with config.btc-both.toml's controls); the model the BTC 10 s refit of 20 Oct
     Config ml_both = load("config.btc-ml-both.toml"), ml_long = load("config.btc-ml.toml"), live = load("config.btc-ml-okx-only.toml");
     Config same = ml_both;
     same.trading.markup = live.trading.markup;  // 0.1 bp here from 20 Oct
     same.trading.order_size = live.trading.order_size;  // ~$2000 within $3750 here from 20 Oct
     same.trading.max_position_usd = live.trading.max_position_usd;
+    same.ml = live.ml;  // the 10 s refit here from 20 Oct
     EXPECT_EQ(text(same), text(live));
+    EXPECT_EQ(ml_both.ml.target_window_s, 10.0);
     EXPECT_EQ(ml_both.pricing.model, "ml");
     EXPECT_EQ(ml_both.trading.direction, "both");
-    Config model_only = ml_both;
-    model_only.ml = ml_long.ml;
-    EXPECT_EQ(text(model_only), text(ml_both));  // the same model as the long ML config
+    EXPECT_EQ(ml_long.ml.target_window_s, 30.0);  // the long ML config keeps the 30 s model of 19 Oct
     // ETH (18 Oct night): config.eth-both.toml as it is, only the pricing is the model
     Config eth_ml = load("config.eth-ml-both.toml"), eth = load("config.eth-both.toml");
     EXPECT_EQ(eth_ml.pricing.model, "ml");

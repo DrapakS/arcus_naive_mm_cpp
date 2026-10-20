@@ -80,7 +80,7 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst2500) {
 }
 
 // C++ checkout: config.btc-ml-both.toml is the live BTC ML set, config.btc-ml-okx-only.toml as it is but for the
-// markup (0.1 bp from 20 Oct), for the C++ bot live next to the Python bots on one host.
+// markup, the size and the model (20 Oct), for the C++ bot live next to the Python bots on one host.
 TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     Config cpp = cfg("btc-ml-both");
     EXPECT_EQ(cpp.trading.markup, 0.00001);
@@ -90,6 +90,8 @@ TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     cpp.trading.markup = live.trading.markup;
     cpp.trading.order_size = live.trading.order_size;
     cpp.trading.max_position_usd = live.trading.max_position_usd;
+    EXPECT_EQ(cpp.ml.target_window_s, 10.0);  // the BTC refit of 20 Oct on the 10 s target
+    cpp.ml = live.ml;
     EXPECT_EQ(describe(cpp), describe(cfg("btc-ml-okx-only")));
 }
 
