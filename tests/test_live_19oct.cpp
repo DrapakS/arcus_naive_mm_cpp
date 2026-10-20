@@ -159,6 +159,8 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     q.futures.symbol = s.futures.symbol;
     q.binance.symbol = s.binance.symbol;
     q.trading.order_size = s.trading.order_size;
+    EXPECT_EQ(q.trading.markup, 0.00005);  // 0.5 bp, twice SPY's (20 Oct evening, the owner's)
+    q.trading.markup = s.trading.markup;
     q.portfolio.weight = s.portfolio.weight;  // its volatility over BTC's: QQQ 0.6, SPY 0.35
     EXPECT_EQ(q.add_guard.drawdown, 0.0003);  // the same way: QQQ 3 bp, SPY 2 bp
     q.add_guard.drawdown = s.add_guard.drawdown;
