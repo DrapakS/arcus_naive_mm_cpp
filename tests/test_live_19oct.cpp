@@ -70,12 +70,12 @@ TEST(Live19Oct, NvdaTolAwayHalfABp) {
     for (const char* name : {"nvda-both", "nvda"}) EXPECT_EQ(cfg(name).trading.tol_away, 0.00005) << name;
 }
 
-TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst5000) {
+TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst3500) {
     for (const char* name : {"btc-ml-okx-only", "btc-ml-both", "eth-ml-both", "sol-basic", "sol-ml-both"}) {
         const PortfolioConfig pf = cfg(name).portfolio;
         EXPECT_TRUE(pf.enabled) << name;
         EXPECT_EQ(pf.asset_class, "crypto") << name;
-        EXPECT_EQ(pf.limit_usd, 5000.0) << name;  // 21 Oct, the owner's (was $2500)
+        EXPECT_EQ(pf.limit_usd, 3500.0) << name;  // 21 Oct, the owner's (was $5000)
         EXPECT_EQ(pf.factor, 0.4) << name;  // 0.4 from 21 Oct
     }
 }
@@ -251,7 +251,7 @@ TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
     b.okx = s.okx;
     b.drift = s.drift;
     b.lag.max_pause_ms = s.lag.max_pause_ms;  // the live bots' growing pauses (20 Oct)
-    EXPECT_EQ(b.portfolio.limit_usd, 5000.0);  // the class lean over $5000 (21 Oct)
+    EXPECT_EQ(b.portfolio.limit_usd, 3500.0);  // the class lean over $3500 (21 Oct)
     b.portfolio.limit_usd = s.portfolio.limit_usd;
     b.vol_markup = s.vol_markup;  // and their x0.8..3 at ^0.75 (20 Oct evening)
     EXPECT_EQ(describe(b), describe(s));

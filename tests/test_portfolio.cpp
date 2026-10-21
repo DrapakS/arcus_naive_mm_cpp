@@ -295,8 +295,8 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_TRUE(pf.enabled) << name;
         EXPECT_EQ(pf.asset_class, "crypto") << name;
         EXPECT_EQ(pf.weight, weight) << name;
-        // the live ML bots: $5000 from 21 Oct (the owner's; $2500 from 19 Oct evening; C++ checkout: btc-ml-both is the live set)
-        EXPECT_EQ(pf.limit_usd, name == "eth-ml-both" || name == "btc-ml-both" ? 5000.0 : 1500.0) << name;
+        // the live ML bots: $3500 from 21 Oct evening (the owner's; $5000 earlier, $2500 from 19 Oct evening; C++ checkout: btc-ml-both is the live set)
+        EXPECT_EQ(pf.limit_usd, name == "eth-ml-both" || name == "btc-ml-both" ? 3500.0 : 1500.0) << name;
         EXPECT_EQ(pf.factor, 0.4) << name;  // 0.4 from 21 Oct
         EXPECT_EQ(pf.shift_bp, 0.3) << name;  // crypto 0.3 bp from 21 Oct
         EXPECT_EQ(pf.interval_ms, 100.0) << name;

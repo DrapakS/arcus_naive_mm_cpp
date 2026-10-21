@@ -143,7 +143,7 @@ enabled = true                # each bot still its own process on its own market
 asset_class = "crypto"        # dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of weight x position x
 weight = 1.0                  # mark (risk in BTC units: 1-min volatility over BTC's, 19 Oct: BTC 1.0, ETH 1.36, SOL
                               # 1.70); u = exposure / limit_usd (-1..1). An order
-limit_usd = 5000              # the class's lean over $5000 (21 Oct, the owner's: as ETH and SOL; $2500 before)
+limit_usd = 3500              # the class's lean over $3500 (21 Oct, the owner's; $5000 before)
 factor = 0.4                  # 0.4 (21 Oct, the owner's; 0.3 before): markup x (1 +- 0.4 u)
                               # on top of the own skew. 19 Oct, 6 h live: BTC and ETH the same way 26% of the time, at worst
                               # $1670 together; a stopped bot's file is left out after 30 s
