@@ -71,7 +71,7 @@ TEST(Live19Oct, NvdaTolAwayHalfABp) {
 }
 
 TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst5000) {
-    for (const char* name : {"btc-ml-okx-only", "eth-ml-both", "sol-basic", "sol-ml-both"}) {  // C++ BTC: $2500 (below)
+    for (const char* name : {"btc-ml-okx-only", "btc-ml-both", "eth-ml-both", "sol-basic", "sol-ml-both"}) {
         const PortfolioConfig pf = cfg(name).portfolio;
         EXPECT_TRUE(pf.enabled) << name;
         EXPECT_EQ(pf.asset_class, "crypto") << name;
@@ -95,8 +95,6 @@ TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     cpp.ml = live.ml;
     EXPECT_EQ(cpp.lag.max_ms, 200.0);  // on (20 Oct, the owner's)
     cpp.lag = live.lag;
-    EXPECT_EQ(cpp.portfolio.limit_usd, 2500.0);  // back to $2500 (21 Oct, the owner's)
-    cpp.portfolio.limit_usd = live.portfolio.limit_usd;
     EXPECT_EQ(cpp.takes.pause_ms, 0.0);  // off (20 Oct evening, the owner's)
     cpp.takes.pause_ms = live.takes.pause_ms;
     EXPECT_EQ(cpp.vol_markup.high, 3.0);  // x0.8..3 at ^0.75 (20 Oct evening, the owner's)
