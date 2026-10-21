@@ -1,0 +1,152 @@
+# SNDK (SanDisk) quoted on BOTH sides at once, live from 21 Oct (the owner's): orders ~$200 (0.145 SNDK) within $500 either
+# way. Built as config.nvda-both.toml (basis pricing off the Binance perp, no ML), its thresholds scaled to SNDK's volatility.
+# Units: markup / tol / tol_away / drawdown are FRACTIONS (0.00001 = 0.1 bp); *_ms milliseconds; *_s seconds.
+# This file never trades by itself: the command line passes --trade quote / paper / live.
+# SNDK-USD on Arcus (GET /v1/markets, 21 Oct): marketId 33, ~$1376, tick 0.01 (0.07 bp: a fine grid), min order 0.01 SNDK
+# and $5, step 1e-7; ~$25.9M a day, ~59k trades (median ~$150); spread ~0.7 bp (from the trades). Hours 04:00-20:00
+# New York, Mon-Fri; outside them a 15% initial margin (10% in) and the markup x2 below.
+# Feeds (21 Oct): Binance USD-M SNDKUSDT, the most liquid SanDisk perp (billions a day in August); OKX SNDK-USDT-SWAP
+# (1 contract = 1 SNDK, ~$440M a day, 1 tick = 0.1 = 0.7 bp spread); Binance spot SNDKBUSDT (the SanDisk bStock token,
+# ~$23M a day). Binance symbols not checked from where this was written (Binance blocked there): see the commands below.
+#   curl -s "https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=SNDKUSDT"
+#   curl -s "https://api.binance.com/api/v3/ticker/24hr?symbol=SNDKBUSDT"
+# Volatility, OKX perps' 1-min returns, 500 minutes to 21 Oct ~14:00 UTC: BTC 6.0 bp, SNDK 16.4 bp (x2.7), NVDA 6.8 (x1.1,
+# its portfolio weight), QQQ 3.5 (x0.6), SPY 1.8 (x0.3). The price thresholds below are NVDA's x2.4 (SNDK over NVDA).
+log_level = "INFO"
+
+[binance]                     # spot: the spot guard, the trades guard, the price lines (pricing is off futures)
+symbol = "SNDKBUSDT"          # the Binance spot SanDisk: base asset SNDKB, so [arcus] feed_assets below.
+                              # Behind a geo-block (HTTP 451) use wss://data-stream.binance.vision + https://data-api.binance.vision
+
+[arcus]
+market = "SNDK-USD"
+feed_assets = ["SNDKB"]       # the spot symbol is SNDKB-USDT, not SNDK: without this the bot refuses it
+stale_timeout_s = 30          # a link that brings no book update for 30 s is reconnected
+
+[pricing]
+reference = "futures"         # fair SNDK bid = Binance SNDKUSDT futures mid x the basis (Arcus bid / futures mid)
+basis_s = 30                  # as BTC and NVDA: 30 s, futures move first
+window = 1000                 # used only with basis_s = 0
+min_samples = 100
+
+[trading]
+mode = "off"                  # the command line sets --trade quote / paper / live
+direction = "both"            # a buy and a sell at once, order_size each
+max_position_usd = 500        # $500 (21 Oct, the owner's, the first live); a side at the limit is not quoted
+max_position_resume = 0.95    # ... and comes back once the position on that side is under $475
+skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
+skew_close = 1.0              # closing one's x (1 - position/limit)
+exit_after_s = 0              # no urgent exit (as every bot from 18 Oct)
+exit_loss = 0
+markup = 0.00006              # 0.6 bp (~9 ticks): SOL's for a volatility of ~1.7 BTC's; SNDK ~2.7, Arcus spread ~0.7 bp
+close_markup_cut = 0.3        # the closing order takes 30% less markup
+off_hours_markup_factor = 2   # outside 04:00-20:00 New York, Mon-Fri (holidays by Arcus isOutsideRth): twice the markup
+tol = 0.00001                 # 0.1 bp (~1.5 ticks): an order that far on the danger side of its target is re-placed at once
+tol_away = 0.0001             # 1 bp: an order the market left that far behind is placed again
+close_tol_away = 0.00001      # = tol: the closing order follows the market tick by tick
+order_size = 0.145            # SNDK, ~$200 at $1376 (21 Oct, the owner's). Arcus minimum 0.01 SNDK and $5; step 1e-7
+never_lead = false            # may improve the best price
+came_hold_ms = 300
+dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
+cancel_lanes = 1
+presign_cancel_s = 1
+orders_log = ""               # the command line gives each run its own file with --orders-log
+
+[guard]                       # Binance spot SNDKB best bid vs its time-weighted mean: a backup for the futures guard
+window_ms = 300
+drawdown = 0.00012            # 1.2 bp (NVDA's 0.5 x 2.4)
+pause_ms = 200
+
+[futures]                     # Binance USD-M futures bookTicker: the fair and the main guard
+enabled = true
+symbol = "SNDKUSDT"           # the SanDisk perp (a TradFi perpetual, USDT-settled)
+stale_timeout_s = 30
+max_book_age_s = 10           # as NVDA: off hours the perp's top can stand still for seconds
+window_ms = 300
+drawdown = 0.00012            # 1.2 bp (NVDA's 0.5 x 2.4)
+pause_ms = 200
+
+[trades]                      # Binance spot SNDKB trades: a trade under the high of the last 300 ms pulls the buy
+enabled = true                # (over the low: the sell)
+window_ms = 300
+drawdown = 0.00007            # 0.7 bp (NVDA's 0.3 x 2.4)
+pause_ms = 200
+
+[okx]                         # OKX SNDK-USDT-SWAP, the second most liquid SanDisk perp: a guard of its own (as on BTC/ETH)
+enabled = true
+connections = 1
+inst_id = "SNDK-USDT-SWAP"
+window_ms = 200
+drawdown = 0.00005            # 0.5 bp: BTC's 0.2 bp x 2.7 (the tick there is 0.7 bp: a move of a tick trips it)
+pause_ms = 300
+
+[bybit]                       # OFF, as on every basis bot
+enabled = false
+category = "linear"
+drawdown = 0
+
+[arcus_guard]                 # Arcus SNDK mid vs its own 3 s mean: sweeps the Binance feeds do not show
+window_ms = 3000
+drawdown = 0.00012            # 1.2 bp (NVDA's 0.5 x 2.4)
+pause_ms = 300
+
+[portfolio]                   # the US stock bots' positions across the host (NVDA, SPY, QQQ, SNDK), as theirs
+enabled = true
+asset_class = "stocks"
+weight = 2.7                  # SNDK's 1-min volatility over BTC's (OKX perps, 21 Oct): 2.7 (NVDA 1.1, QQQ 0.6, SPY 0.35)
+limit_usd = 1500              # as the other stock bots
+factor = 0.3                  # as the other stock bots: markup x (1 +- 0.3 u)
+shift_bp = 0.3                # both quotes moved against the class's lean by 0.3 bp x u
+
+[add_guard]                   # no adding past half the limit right after a futures move against the side
+window_s = 300
+drawdown = 0.0012             # 12 bp from the 5-minute high (a fall: buys) or low (a rally: sells): NVDA's 5 bp x 2.4
+pause_s = 60
+limit_share = 0.5             # adding allowed up to 50% of max_position_usd while it holds
+
+[open_guard]                  # no adding around the opens (America/New_York), as NVDA
+opens = ["Sun 18:00", "Mon-Fri 04:00", "Mon-Fri 09:30"]
+tz = "America/New_York"
+before_s = 60                 # from 60 s before to 15 min after each: no order that opens or adds to the position;
+after_s = 900                 # the closing order as usual, but not through zero
+limit_share = 0
+
+[open_halt]                   # no opening at the US stock open (09:30 New York), as every stock bot: from 10 min before
+opens = ["Mon-Fri 09:30"]     # to 10 min after it nothing opens or adds; the closing order goes, of the position's size
+tz = "America/New_York"
+before_s = 600
+after_s = 600
+closing = true
+
+[trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms); never holds the sell back
+window_s = 120
+drawdown = 0.007              # 70 bp under its 2-minute high (NVDA's 30 bp x 2.4)
+pause_s = 60
+
+[vol_markup]                  # the markup scaled by volatility, as every bot
+enabled = true
+short_s = 60
+long_s = 1800
+low = 0.8
+high = 3
+warmup_s = 300
+power = 0.75
+
+[drift]                       # the futures mid moved 0.5 bp or more against a side within 10 s: that side's markup x2
+window_s = 10                 # while it lasts and 2 s more (BTC's 0.2 bp x 2.7)
+threshold = 0.00005
+hold_s = 2
+markup_factor = 2
+
+[lag]                         # market data read late = quoting blind: as every bot
+max_ms = 200
+pause_ms = 500
+max_pause_ms = 30000
+calm_ms = 60000
+
+[imbalance]                   # OFF until measured on this market
+levels = 5
+ratio = 0
+factor = 5
+hold_ms = 300
+sides = "open"

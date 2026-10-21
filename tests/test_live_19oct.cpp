@@ -146,6 +146,32 @@ TEST(SpyConfig, TheSpyPaperConfigReadsTheBinancePerpOnly) {
     EXPECT_EQ(c.portfolio.asset_class, "stocks");
 }
 
+// C++ checkout: config.sndk-both.toml, SanDisk live from 21 Oct (the owner's): ~$200 orders within $500, priced off the
+// Binance SNDKUSDT perp, an OKX SNDK-USDT-SWAP guard, the stock bots' class lean and open rules.
+TEST(SpyConfig, TheSndkConfigQuotesSanDiskOffTheBinancePerpWithAnOkxGuard) {
+    Config c = cfg("sndk-both");
+    EXPECT_EQ(c.arcus.market, "SNDK-USD");
+    EXPECT_EQ(strings(c.arcus.feed_assets), (std::vector<std::string> {"SNDKB"}));
+    EXPECT_EQ(c.binance.symbol, "SNDKBUSDT");
+    EXPECT_TRUE(c.futures.enabled);
+    EXPECT_EQ(c.futures.symbol, "SNDKUSDT");
+    EXPECT_EQ(c.pricing.reference, "futures");
+    EXPECT_TRUE(c.okx.enabled);
+    EXPECT_EQ(c.okx.inst_id, "SNDK-USDT-SWAP");
+    EXPECT_FALSE(c.bybit.enabled);
+    EXPECT_EQ(c.trading.direction, "both");
+    EXPECT_TRUE(195 < c.trading.order_size * 1376 && c.trading.order_size * 1376 < 205);  // ~$200
+    EXPECT_EQ(c.trading.max_position_usd, 500.0);
+    EXPECT_EQ(c.portfolio.asset_class, "stocks");
+    EXPECT_EQ(c.portfolio.weight, 2.7);
+    EXPECT_TRUE(c.open_halt.closing);
+    EXPECT_EQ(strings(c.open_halt.opens), (std::vector<std::string> {"Mon-Fri 09:30"}));
+    for (double on : {c.guard.drawdown, c.futures.drawdown, c.trades.drawdown, c.okx.drawdown, c.arcus_guard.drawdown, c.trend.drawdown,
+                      c.add_guard.drawdown, c.lag.max_ms})
+        EXPECT_GT(on, 0);
+    EXPECT_EQ(c.drift.markup_factor, 2.0);
+}
+
 // C++ checkout: config.qqq-both.toml, config.spy-both.toml with QQQ's market and feeds.
 TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     Config q = cfg("qqq-both"), s = cfg("spy-both");
