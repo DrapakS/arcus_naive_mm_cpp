@@ -122,7 +122,7 @@ weight = 1.7                  # mark (risk in BTC units: 1-min volatility over B
 limit_usd = 1500              # adding to the class's lean: markup x (1 + 0.3 u), one taking it back x (1 - 0.3 u), on top
 factor = 0.3                  # 0.3 as the night of 19-20 Oct (20 Oct evening, the owner's; 0.6 / 0.9 earlier on 20 Oct): markup x (1 +- 0.3 u)
                               # $1670 together; a stopped bot's file is left out after 30 s
-shift_bp = 0.3                # 0.3 bp as that night (0.65 / 1.0 earlier on 20 Oct): both quotes moved against the class's lean by 0.3 bp x u
+shift_bp = 0.2                # 0.2 bp (21 Oct, the owner's; 0.3 bp before): both quotes moved against the class's lean by 0.2 bp x u
                               # 0.3 bp higher). 19 Oct 16:27-17:47: the class short 82% of the time, u = -1 18%; x0.7..x1.3
                               # of a 0.15-0.2 bp markup was 1 tick on ETH, 5 on BTC
 
