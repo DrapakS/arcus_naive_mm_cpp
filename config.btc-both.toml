@@ -62,7 +62,7 @@ markup = 0.000025             # 0.25 bp, the owner's choice (half the 0.5 bp the
                               # Not wider: run 17 at 5 bp got no fill in 41 min (the Arcus ask never came within
                               # 2.5 bp under the fair), and in run 16 a 5 bp buy would have filled only in the
                               # 12:30 crash (-71 and -93 bp 30 s later).
-close_markup_cut = 0.3        # the closing order (the sell of a long, the buy of a short) takes 30% less markup (0.175
+close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
                               # bp): out of the position sooner. Run 13 (long only): the
                               # sell waited 0.8 bp over the mid (night 11: 0.35), median hold 149 s (64 s), and most of
                               # the loss came from holding the long while the price fell. Run 17 replay of this exit:
@@ -72,7 +72,7 @@ tol_away = 0.0001             # 1 bp (was 0.3 bp): an order left deeper waits fo
                               # Same fills as 0.3 bp (and as 2-5 bp) in the queue replay, fewer placements. Note: a
                               # deep order is not lifted for moves under 1 bp; the threshold applies to new placements.
                               # For the order that opens or adds; the one that shrinks the position has close_tol_away.
-close_tol_away = 0.000005     # 0.05 bp (= tol): a closing order left behind its target is re-placed at once, so the exit
+close_tol_away = 0.0001       # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
                               # follows a falling market. Run 19 at tol_away 1 bp: the exit sell sat behind its target 56%
                               # of the time and at the best ask 10%, while its target was at the best ask 32%; trip #8
                               # held 23 min (-27 bp) with 279 sells. Same price rule, not a stop: only no lag behind it.

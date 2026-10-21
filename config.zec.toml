@@ -36,10 +36,10 @@ mode = "off"                  # the command line sets --trade quote / paper / li
 direction = "long"            # "short": sell first, then buy it back
 markup = 0.00005              # 0.5 bp, the owner's choice (twice the first 0.25 bp, ETH's 0.125 bp x 2.1 for
                               # volatility)
-close_markup_cut = 0.3        # the closing order takes 30% less markup (0.35 bp)
+close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
 tol = 0.00001                 # 0.1 bp (BTC/ETH 0.05 bp x 2): with a fine tick the target moves with every futures tick
 tol_away = 0.0003             # 3 bp (BTC 1 bp x 2.8): a buy left deeper waits for a 3 bp gap
-close_tol_away = 0.00001      # = tol: the closing order follows the market at once (run 20: the exit sell at its
+close_tol_away = 0.0003       # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
                               # target all the time, at the best ask 26-38% against 8-10% before)
 order_size = 0.09             # ZEC, ~$104 at $1156 (the owner's ~$100)
 never_lead = false             # 20 Oct, the owner's: off everywhere (was true: join, never improve)

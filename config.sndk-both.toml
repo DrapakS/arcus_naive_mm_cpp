@@ -39,11 +39,11 @@ skew_close = 1.0              # closing one's x (1 - position/limit)
 exit_after_s = 0              # no urgent exit (as every bot from 18 Oct)
 exit_loss = 0
 markup = 0.00006              # 0.6 bp (~9 ticks): SOL's for a volatility of ~1.7 BTC's; SNDK ~2.7, Arcus spread ~0.7 bp
-close_markup_cut = 0.3        # the closing order takes 30% less markup
+close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
 off_hours_markup_factor = 2   # outside 04:00-20:00 New York, Mon-Fri (holidays by Arcus isOutsideRth): twice the markup
 tol = 0.00001                 # 0.1 bp (~1.5 ticks): an order that far on the danger side of its target is re-placed at once
 tol_away = 0.0001             # 1 bp: an order the market left that far behind is placed again
-close_tol_away = 0.00001      # = tol: the closing order follows the market tick by tick
+close_tol_away = 0.0001       # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
 order_size = 0.145            # SNDK, ~$200 at $1376 (21 Oct, the owner's). Arcus minimum 0.01 SNDK and $5; step 1e-7
 never_lead = false            # may improve the best price
 came_hold_ms = 300

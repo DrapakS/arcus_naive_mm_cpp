@@ -39,14 +39,14 @@ markup = 0.0000125            # 0.125 bp, the owner's choice (half of 0.25; BTC 
                               # futures-fair gap is tighter on ETH (std 0.20 bp vs 0.35). Run 16 at 0.15 bp (8 trips,
                               # -13 bp, all of it the market falling 123 bp while long; entries beat random moments at
                               # 30 and 120 s): n tiny, nothing yet says how much worse each fill gets below that.
-close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.0875 bp, ~2 ticks): out of a long sooner
+close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
 tol = 0.000005                # 0.05 bp (was 0.03): a 1-tick move (0.04 bp) no longer re-places the order. Run 12: 34% of
                               # the cancels toward the market were a single tick; 1063 placements/h, 242 per fill.
                               # Under the closing sell's markup (0.125 bp x 0.7 = 0.0875 bp): a sell that drifts one
                               # step toward the market still keeps >= 0.04 bp (a tick). Run 16 (0.03 bp, a falling
                               # hour): 3474 placements/h; 0.05 bp would have saved only 0.5-1.5% there. Pools: far off.
 tol_away = 0.00015            # 1.5 bp (BTC 1 bp x ETH/BTC volatility ~1.5): a buy left deeper waits for a 1.5 bp gap
-close_tol_away = 0.00001      # 0.1 bp: a sell left above a target that fell is re-placed once it is 0.1 bp behind. Run 19
+close_tol_away = 0.00015      # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
                               # at 1.5 bp: the exit sell sat behind its target 66% of the time and at the best ask 7%, while
                               # its target was at the best ask 54%. Run 20 at 0.05 bp: at its target all the time, at the
                               # best ask 38%, but ~1.1 sells a second while exiting (603 in one 511 s exit); 0.1 bp to

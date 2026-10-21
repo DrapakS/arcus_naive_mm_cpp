@@ -73,7 +73,7 @@ exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exi
                               # joined the best price with no markup after 10 min). The closing order keeps its markup
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0007: the same once that far under water at the Arcus mid)
 markup = 0.000015             # 0.15 bp (19 Oct evening, the owner's; was 0.125 bp)
-close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.0875 bp, ~2 ticks): out of a long sooner
+close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
 tol = 0.000005                # 0.05 bp (20 Oct evening, the owner's; 0.084 bp = 2 ticks earlier on 20 Oct, 0.05 bp before)
                               # the cancels toward the market were a single tick; 1063 placements/h, 242 per fill.
                               # Under the closing sell's markup (0.125 bp x 0.7 = 0.0875 bp): a sell that drifts one
@@ -82,7 +82,7 @@ tol = 0.000005                # 0.05 bp (20 Oct evening, the owner's; 0.084 bp =
 tol_away = 0.000075           # 0.75 bp (19 Oct; was 1.5 bp): an opening order the market left re-placed at 0.75 bp. Paper
                               # 08:36-11:20: with every guard off but OKX's the bot filled half as often, 47 of the 77
                               # fills it missed found its order there but 0.45 bp further (the guards' pulls re-place it)
-close_tol_away = 0.00001      # 0.1 bp: a sell left above a target that fell is re-placed once it is 0.1 bp behind. Run 19
+close_tol_away = 0.000075     # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
                               # at 1.5 bp: the exit sell sat behind its target 66% of the time and at the best ask 7%, while
                               # its target was at the best ask 54%. Run 20 at 0.05 bp: at its target all the time, at the
                               # best ask 38%, but ~1.1 sells a second while exiting (603 in one 511 s exit); 0.1 bp to

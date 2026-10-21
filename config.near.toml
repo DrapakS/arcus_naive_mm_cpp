@@ -38,11 +38,11 @@ direction = "long"            # "short": sell first, then buy it back
 markup = 0.00006              # 0.6 bp, the owner's choice (twice the first 0.3 bp, ETH's 0.125 bp x 2.7 for
                               # volatility). Under a tick: the buy joins the best bid when the fair is >= 0.6 bp
                               # above it, else it rests a tick (2 bp) lower
-close_markup_cut = 0.3        # the closing order takes 30% less markup (0.42 bp)
+close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
 tol = 0.000005                # 0.05 bp: the target moves only by whole ticks, so any move re-places
 tol_away = 0.00025            # 2.5 bp, just over a tick: a buy one tick deep keeps its place in the queue,
                               # two ticks deep it is lifted
-close_tol_away = 0.000005     # 0.05 bp (= tol, back from 2.5 bp): the exit follows a falling target at once. Replay
+close_tol_away = 0.00025      # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
                               # of the night's targets: 2.5 bp would cut the placements 29% but leave the exit sell at
                               # the best ask 23% of its time instead of 34%, and NEAR's losses are long holds in a fall
                               # (one trip held 2 h, -378 bp). The run used 0.05 bp, and requests are not short: at
