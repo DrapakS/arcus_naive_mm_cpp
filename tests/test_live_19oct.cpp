@@ -85,8 +85,8 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst5000) {
 TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     Config cpp = cfg("btc-ml-both");
     EXPECT_EQ(cpp.trading.markup, 0.00002);  // 0.2 bp again (20 Oct evening)
-    EXPECT_EQ(cpp.trading.order_size, 0.0178);  // ~$1500 (21 Oct)
-    EXPECT_EQ(cpp.trading.max_position_usd, 6000.0);  // 21 Oct
+    EXPECT_EQ(cpp.trading.order_size, 0.0118);  // ~$1000 (21 Oct)
+    EXPECT_EQ(cpp.trading.max_position_usd, 4000.0);  // 21 Oct
     Config live = cfg("btc-ml-okx-only");
     cpp.trading.markup = live.trading.markup;
     cpp.trading.order_size = live.trading.order_size;
