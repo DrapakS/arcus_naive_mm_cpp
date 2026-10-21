@@ -384,6 +384,7 @@ TEST(BothSides, TheTwoSidedMlConfigIsTheMlOneWithTheTwoSidedBtcControls) {
     same.trading.max_position_usd = live.trading.max_position_usd;
     same.ml = live.ml;  // the 10 s refit here from 20 Oct
     same.lag = live.lag;  // on here from 20 Oct, its pauses growing while the data stays late
+    same.portfolio.limit_usd = live.portfolio.limit_usd;  // $2500 here (21 Oct), $5000 there
     same.takes.pause_ms = live.takes.pause_ms;  // off here from 20 Oct evening
     same.vol_markup = live.vol_markup;  // x0.8..3 at ^0.75 here from 20 Oct evening
     EXPECT_EQ(text(same), text(live));
