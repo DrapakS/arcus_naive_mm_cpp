@@ -130,11 +130,13 @@ before_s = 60                 # the bot sold seven times in a row into the move,
 after_s = 900                 # the night. From 60 s before to 15 min after each: no order that opens or adds to the
 limit_share = 0               # position (flat: nothing quoted); the closing order as usual, but not through zero
 
-[open_halt]                   # no trading at all at the US stock open (09:30 New York, daylight saving time followed): from
-opens = ["Mon-Fri 09:30"]     # 10 min before to 10 min after it every order is pulled, the closing one too, and none placed
+[open_halt]                   # no opening at the US stock open (09:30 New York, daylight saving time followed): from
+opens = ["Mon-Fri 09:30"]     # 10 min before to 10 min after it nothing opens or adds; the closing order goes (closing below)
 tz = "America/New_York"       # (20 Oct, the owner's, every stock; was 60 s / 2 min, then 15 / 15 min). NVDA, 19 Oct 13:30 UTC: -50 bp in the
 before_s = 600                # first 30 s; QQQ, 20 Oct 13:45-14:20 UTC: +1% after the open, shorted to its $2500 limit
 after_s = 600                 # into it (-$20). [open_guard] (no adding) runs on to 15 min after
+closing = true                # NEW (21 Oct, the owner's): within the window a position can still be closed (an order of its
+                              # size, not past zero); only opening or adding to it stops
 
 [trend]                       # no buy right after a sharp fall of the futures mid (minutes, not ms). Never holds the
 window_s = 120                # sell back: no stop-loss, no taker, only fewer entries

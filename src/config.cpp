@@ -123,7 +123,7 @@ template <class F> void fields(OpenGuardConfig& c, F&& f) {
     f("opens", c.opens); f("tz", c.tz); f("before_s", c.before_s); f("after_s", c.after_s); f("limit_share", c.limit_share);
 }
 template <class F> void fields(OpenHaltConfig& c, F&& f) {
-    f("opens", c.opens); f("tz", c.tz); f("before_s", c.before_s); f("after_s", c.after_s);
+    f("opens", c.opens); f("tz", c.tz); f("before_s", c.before_s); f("after_s", c.after_s); f("closing", c.closing);
 }
 template <class F> void fields(VolMarkupConfig& c, F&& f) {
     f("enabled", c.enabled); f("short_s", c.short_s); f("long_s", c.long_s); f("low", c.low); f("high", c.high);

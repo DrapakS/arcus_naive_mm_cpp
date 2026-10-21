@@ -187,7 +187,9 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     const OpenHaltConfig& oh = config.open_halt;  // [open_halt]: no trading at all around the US stock open
     if (!oh.opens.empty())
         open_halt = std::make_unique<OpenWindows>(strings(oh.opens), oh.tz, oh.before_s, oh.after_s, wall_time,
-                                                  "no trading: every order pulled, none placed", "", "trading again");
+                                                  oh.closing ? "closing only: nothing opens or adds, the closing order goes (not past zero)"
+                                                             : "no trading: every order pulled, none placed",
+                                                  "", "trading again");
     // The futures mid's move over the last few seconds: a side it went against takes a wider markup
     // (drift.markup_factor; 1 = off), and every placement and fill logs it either way.
     const DriftConfig& dr = config.drift;
@@ -413,6 +415,7 @@ StrategyOptions Agent::strategy_options() {
     o.open_limit_share = config.open_guard.limit_share;
     o.portfolio = portfolio.get();
     o.halt = open_halt.get();
+    o.halt_close = config.open_halt.closing;
     o.vol = vol_scale.get();
     return o;
 }

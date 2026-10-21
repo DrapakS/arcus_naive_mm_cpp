@@ -46,7 +46,8 @@
 // of the book. With an open_guard, around each open of the underlying no order
 // opens or adds to the position. With a halt (the same windows, shorter: the US
 // stock open) nothing trades at all: every order is pulled, the closing one too,
-// and none is placed until the window is over. With a session (a market with
+// and none is placed until the window is over; with halt_close the closing order
+// still goes (not past zero) and only opening or adding stops. With a session (a market with
 // trading hours), outside it every order takes off_hours_markup_factor times its
 // markup. With a vol (VolScale: the reference's volatility now over its usual),
 // every markup takes that factor, x0.8..x2 by default.
@@ -147,6 +148,7 @@ struct StrategyOptions {
     OpenWindows* open_guard = nullptr;
     double open_limit_share = 0.0;
     OpenWindows* halt = nullptr;
+    bool halt_close = false;  // within a halt window the closing order still goes (not past zero); nothing opens or adds
     VolScale* vol = nullptr;
     Portfolio* portfolio = nullptr;
 };
@@ -199,10 +201,13 @@ public:
     // Both sides: order_size cut to what keeps the position within max_position_usd at `price`;
     // none when no valid order fits or order_size itself is under the minimum notional.
     std::optional<Decimal> both_size(const std::string& side, const Decimal& position, const Decimal& price);
-    // Within a window of halt: nothing is traded.
+    // Within a window of halt (without halt_close): nothing is traded.
     bool halted() const;
-    // Within a market-open window of open_guard.
+    // Within a market-open window of open_guard, or of halt with halt_close: nothing opens or adds,
+    // the closing order goes, not past zero.
     bool at_open() const;
+    // Within a window of halt with halt_close: no opening order at all, whatever open_limit_share.
+    bool closing_only() const;
     // The cancel half of evaluate alone, cheap enough to run on every book frame.
     void check_cancel(const MarketView& view);
     // A guard holds off placing on `side` (or trading is halted around a market open).
@@ -224,7 +229,8 @@ public:
     TrendGuard* add_guard;
     Decimal add_limit_share;
     OpenWindows* open_guard;
-    OpenWindows* halt;  // within one of its windows: no order at all, the working ones pulled
+    OpenWindows* halt;  // within one of its windows: no order at all, the working ones pulled (halt_close: closing only)
+    bool halt_close;
     VolScale* vol;  // the volatility now over the usual: every order's markup factor
     Decimal open_limit_share;
     Portfolio* portfolio;  // the asset class's lean across the bots: its markup factor on each side

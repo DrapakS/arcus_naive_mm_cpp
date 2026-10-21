@@ -189,6 +189,9 @@ TEST(OpenHaltConfig, IsCheckedAndTheStockConfigsTurnItOnForThe0930Open) {
     }
     for (const std::string name : {"btc-both", "eth-both", "sol-both", "eth-ml-both", "btc-ml-both"})  // crypto has no open
         EXPECT_TRUE(load_config(repo("config." + name + ".toml")).open_halt.opens.empty()) << name;
+    EXPECT_FALSE(Config().open_halt.closing);  // by default the halt pulls the closing order too
+    for (const std::string name : {"nvda", "nvda-both", "gld", "gld-both", "spy-both", "qqq-both"})  // closing allowed (21 Oct)
+        EXPECT_TRUE(load_config(repo("config." + name + ".toml")).open_halt.closing) << name;
 }
 
 TEST(SessionConfig, TheMarketSpecReadsTheHours) {

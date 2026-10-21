@@ -533,6 +533,65 @@ TEST(BothSides, AtTheUsStockOpenNothingTradesTheClosingOrderTooThenTradingAgain)
     EXPECT_TRUE(contains(log.messages(), "--- market open window over: trading again"));
 }
 
+TEST(BothSides, AHaltWithClosingLetsThePositionCloseButNothingOpens) {
+    // [open_halt] closing = true (21 Oct, the owner's): around the US stock open nothing opens or adds,
+    // but a position can be closed at any moment, by an order of its size (not past zero).
+    LogCapture log(ORDERS_LOGGER);
+    FakeClock clock(US_OPEN - 120);
+    auto w = std::make_unique<OpenWindows>(std::vector<std::string> {"Mon-Fri 09:30"}, "America/New_York", 60.0, 120.0, clock.fn(),
+                                           "closing only", "", "trading again");
+    auto [gw, s] = both(0.001, 0.0002, SIZE, 1000.0, [&](StrategyOptions& o) {
+        o.halt = w.get();
+        o.halt_close = true;
+    });
+    s->evaluate(view(100'000.0));
+    EXPECT_EQ(moves(actions(*gw)), (std::vector<std::string> {"place BUY", "place SELL"}));  // before it: as usual
+    gw->ack("BUY");
+    gw->ack("SELL");
+    gw->fill("BUY", "0.004");  // a long; its closing sell is a whole order, past zero
+    clock.set(US_OPEN - 59);
+    s->check_cancel(view(100'000.0));
+    EXPECT_EQ(moves(actions(*gw)), (std::vector<std::string> {"cancel BUY", "cancel SELL"}));  // the buy would add; the sell is too big
+    gw->cancelled("BUY");
+    gw->cancelled("SELL");
+    for (double at : {US_OPEN - 59, US_OPEN, US_OPEN + 119}) {  // within the window: the long can go, by its own size
+        clock.set(at);
+        s->evaluate(view(100'000.0));
+        auto sent = actions(*gw);
+        if (at == US_OPEN - 59) {
+            EXPECT_EQ(side_sizes(sent), (std::vector<std::pair<std::string, Decimal>> {{"SELL", D("0.004")}}));
+            gw->ack("SELL");
+        } else {
+            EXPECT_EQ(sent, Actions {}) << at - US_OPEN;  // the sell works on; nothing on the buy side
+        }
+    }
+    gw->fill("SELL", "0.004");  // flat within the window: nothing at all
+    clock.set(US_OPEN + 60);
+    s->evaluate(view(100'000.0));
+    EXPECT_EQ(actions(*gw), Actions {});
+    EXPECT_FALSE(s->paused("BUY") || s->paused("SELL"));  // no guard pause: only what opens is held
+    clock.set(US_OPEN + 121);  // over: both sides again
+    s->evaluate(view(100'000.0));
+    EXPECT_EQ(moves(actions(*gw)), (std::vector<std::string> {"place BUY", "place SELL"}));
+}
+
+TEST(BothSides, AHaltWithClosingNamesThePulledOpeningOrder) {
+    FakeClock clock(US_OPEN - 120);
+    auto w = halt(clock);
+    auto [gw, s] = both(0.001, 0.0002, SIZE, 1000.0, [&](StrategyOptions& o) {
+        o.halt = w.get();
+        o.halt_close = true;
+    });
+    s->evaluate(view(100'000.0));
+    gw->ack("BUY");
+    gw->ack("SELL");
+    actions(*gw);
+    clock.set(US_OPEN);
+    s->check_cancel(view(100'000.0));  // flat: both would open
+    EXPECT_EQ(moves(actions(*gw)), (std::vector<std::string> {"cancel BUY", "cancel SELL"}));
+    EXPECT_EQ(gw->why, "market open: closing only");
+}
+
 TEST(BothSides, OneSidedTheHaltPullsTheSellOfWhatItHoldsToo) {
     FakeClock clock(US_OPEN + 30);
     auto w = halt(clock);

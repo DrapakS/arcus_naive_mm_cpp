@@ -283,6 +283,9 @@ struct OpenHaltConfig {
     std::string tz = "America/New_York";
     double before_s = 60.0;
     double after_s = 120.0;
+    // true: within a window the closing order still goes, as many as the position and not past zero;
+    // only opening or adding to it stops (an order already open that would is pulled).
+    bool closing = false;
 };
 
 struct PortfolioConfig {

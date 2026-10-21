@@ -88,7 +88,7 @@ std::string lopsided(const std::pair<std::string, double>& thin, bool held) {
 
 QuoteStrategy::QuoteStrategy(Gateway* gateway_, MarketSpec market_, StrategyOptions o)
     : direction(o.direction), both(o.direction == "both"), session(o.session), exit_after_s(o.exit_after_s),
-      add_guard(o.add_guard), open_guard(o.open_guard), halt(o.halt), vol(o.vol), portfolio(o.portfolio), drift(o.drift),
+      add_guard(o.add_guard), open_guard(o.open_guard), halt(o.halt), halt_close(o.halt_close), vol(o.vol), portfolio(o.portfolio), drift(o.drift),
       drift_factor_float(o.drift_factor), gateway(gateway_), market(std::move(market_)), guards(o.guards), never_lead(o.never_lead),
       imbalance(o.imbalance), came_hold_s(o.came_hold_s) {
     if (direction != "long" && direction != "short" && direction != "both")
@@ -523,15 +523,17 @@ std::optional<Decimal> QuoteStrategy::both_size(const std::string& s, const Deci
     return open_cap(s, *capped, position, p);
 }
 
-bool QuoteStrategy::halted() const { return halt != nullptr && halt->active(); }
+bool QuoteStrategy::halted() const { return halt != nullptr && !halt_close && halt->active(); }
 
-bool QuoteStrategy::at_open() const { return open_guard != nullptr && open_guard->active(); }
+bool QuoteStrategy::closing_only() const { return halt != nullptr && halt_close && halt->active(); }
+
+bool QuoteStrategy::at_open() const { return (open_guard != nullptr && open_guard->active()) || closing_only(); }
 
 std::optional<Decimal> QuoteStrategy::open_cap(const std::string& s, const Decimal& sz, const Decimal& position, const Decimal& p) const {
     // Both sides: within a market-open window an opening order is not placed, or with
     // open_limit_share takes the position on its side to that share of the limit at most.
     if (!at_open()) return sz;
-    if (!open_limit_share) return std::nullopt;
+    if (!open_limit_share || closing_only()) return std::nullopt;
     Decimal cap = max_position_usd * open_limit_share / p;
     Decimal room = s == "BUY" ? cap - position : cap + position;
     Decimal capped = room > 0 ? market.floor_size(min(sz, room)) : Decimal(0);
@@ -651,6 +653,7 @@ std::optional<std::string> QuoteStrategy::cancel_reason(const OrderPtr& o, const
             return std::format("position {} is at the limit of ${}", fmt(gateway->position()), fmt(max_position_usd));
         if (both && add_held_[o->side])
             return std::format("no adding past {}% of the limit after a move against it", (add_limit_share * Decimal(100)).fixed(0));
+        if (both && closing_only() && !closing(o->side)) return "market open: closing only";
         return "no price to quote at";
     }
     if (both && paused(o->side)) return "a guard holds this side";  // a trend move past both extremes pauses both sides at once
