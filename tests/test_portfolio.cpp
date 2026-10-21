@@ -308,7 +308,7 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_TRUE(pf.enabled) << name;
         EXPECT_EQ(pf.asset_class, "stocks") << name;
         EXPECT_EQ(pf.weight, weight) << name;
-        EXPECT_EQ(pf.limit_usd, 1500.0) << name;
+        EXPECT_EQ(pf.limit_usd, 2500.0) << name;  // $2500 from 21 Oct
         EXPECT_EQ(pf.factor, 0.4) << name;  // as crypto, from 21 Oct
         EXPECT_EQ(pf.shift_bp, 0.4) << name;  // stocks 0.4 bp from 21 Oct
     }

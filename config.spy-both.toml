@@ -94,7 +94,7 @@ enabled = true                # 1 min, 13-19 Oct), as the crypto bots' (20 Oct, 
 asset_class = "stocks"        # file in dir/live and reads the others' every 100 ms (live only: off in paper). Exposure = sum of
 weight = 0.35                  # weight x position x mark (risk in BTC units: 1-min volatility over BTC's in the US extended
                               # session, Binance perps 13-19 Oct: NVDA 1.1, QQQ 0.6, SPY 0.35); u = exposure / limit_usd.
-limit_usd = 1500              # An order adding to the class's lean: markup x (1 + 0.9 u), one taking it back x (1 - 0.9 u),
+limit_usd = 2500              # the stocks class's lean over $2500 (21 Oct, the owner's; $1500 before)
 factor = 0.4                  # 0.4 (21 Oct, the owner's; 0.3 before): markup x (1 +- 0.4 u)
 shift_bp = 0.4                # 0.4 bp (21 Oct, the owner's): both quotes moved against the class's lean by 0.4 bp x u
 

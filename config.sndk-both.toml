@@ -94,7 +94,7 @@ pause_ms = 300
 enabled = true
 asset_class = "stocks"
 weight = 2.7                  # SNDK's 1-min volatility over BTC's (OKX perps, 21 Oct): 2.7 (NVDA 1.1, QQQ 0.6, SPY 0.35)
-limit_usd = 1500              # as the other stock bots
+limit_usd = 2500              # the stocks class's lean over $2500 (21 Oct, the owner's; $1500 before)
 factor = 0.4                  # 0.4 (21 Oct, the owner's; 0.3 before): markup x (1 +- 0.4 u)
 shift_bp = 0.4                # 0.4 bp (21 Oct, the owner's): both quotes moved against the class's lean by 0.4 bp x u
 
