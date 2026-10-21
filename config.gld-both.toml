@@ -52,7 +52,7 @@ min_samples = 100
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 4500       # $4500 (20 Oct evening, the owner's: x1.5; $3000 before; 17 Oct: $1000, one order filled it); a side
+max_position_usd = 3000       # $3000 (21 Oct, the owner's; $4500 on 20 Oct evening, $3000 before; 17 Oct: $1000, one order filled it); a side
                               # at the limit is not quoted. gold moves half as much as BTC: 2.5 bp; one 0.5 order is ~$192
 max_position_resume = 0.95    # ... and comes back once the position on that side is under 95% of it
 skew_open = 1.0               # the order that adds to the position: markup x (1 + u), u = position / limit (x2 at it)
@@ -69,7 +69,7 @@ close_markup_cut = 0.3        # the closing sell takes 30% less markup (0.35 bp)
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
 tol_away = 0.00005            # 0.5 bp (BTC 1 bp x 0.5): a buy left deeper keeps its place in the queue until 2 ticks off
 close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
-order_size = 5.26             # GLD, ~$2000 at $380 (20 Oct evening, the owner's: x2; 2.63 ~$1000 earlier on 20 Oct, 1.31 before). Arcus minimum 0.01 GLD and $5; step 1e-7
+order_size = 3.95             # GLD, ~$1500 at $380 (21 Oct, the owner's; 5.26 ~$2000 on 20 Oct evening, 2.63 ~$1000 before). Arcus minimum 0.01 GLD and $5; step 1e-7
 never_lead = false            # may improve the best price (20 Oct, the owner's; was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)

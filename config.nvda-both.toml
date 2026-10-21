@@ -44,7 +44,7 @@ min_samples = 100
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 3000       # $3000 (20 Oct evening, the owner's: x1.5; $2000 earlier on 20 Oct, $500 before); a side at the limit is not quoted
+max_position_usd = 2000       # $2000 (21 Oct, the owner's; $3000 on 20 Oct evening, $2000 earlier, $500 before); a side at the limit is not quoted
 max_position_resume = 0.95    # ... and comes back once the position on that side is under $475
 skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
 skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $500, none at the limit
@@ -59,7 +59,7 @@ off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
 tol_away = 0.00005            # 0.5 bp (19 Oct evening, the owner's; was 1 bp): a buy left that far behind is placed again
 close_tol_away = 0.00001      # = tol: the closing sell follows a falling market tick by tick
-order_size = 9.2              # NVDA, ~$2000 at $217 (20 Oct evening, the owner's: x2; 4.6 ~$1000 earlier on 20 Oct, 2.3 before). Arcus minimum 0.01 NVDA and $5; step 0.01
+order_size = 4.6              # NVDA, ~$1000 at $217 (21 Oct, the owner's; 9.2 ~$2000 on 20 Oct evening, 4.6 earlier, 2.3 before). Arcus minimum 0.01 NVDA and $5; step 0.01
 never_lead = false            # may improve the best price (20 Oct, the owner's; was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)

@@ -60,9 +60,9 @@ TEST(Live19Oct, EthMlLiveTheOkxGuardTheTakePauseAndTheDriftMarkupOnly) {
 
 TEST(Live19Oct, GoldOrdersOf500) {
     const TradingConfig t = cfg("gld-both").trading;
-    EXPECT_EQ(t.order_size, 5.26);  // ~$2000, x2 (20 Oct evening, the owner's)
-    EXPECT_TRUE(1980 < t.order_size * 380 && t.order_size * 380 < 2020);
-    EXPECT_EQ(t.max_position_usd, 4500.0);  // x1.5
+    EXPECT_EQ(t.order_size, 3.95);  // ~$1500 (21 Oct, the owner's)
+    EXPECT_TRUE(1480 < t.order_size * 380 && t.order_size * 380 < 1520);
+    EXPECT_EQ(t.max_position_usd, 3000.0);
 }
 
 TEST(Live19Oct, NvdaTolAwayHalfABp) {

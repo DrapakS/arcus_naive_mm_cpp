@@ -334,7 +334,7 @@ TEST(BothSides, TheShippedTwoSidedConfigsAreTheirLongOnesButForTheDirectionLimit
         double limit;
     };
     for (auto [coin, long_name, limit] : {Case {"btc", "recommended", 1500.0}, Case {"eth", "eth", 1500.0}, Case {"sol", "sol", 3000.0},
-                                          Case {"gld", "gld", 4500.0}}) {
+                                          Case {"gld", "gld", 3000.0}}) {
         Config both_cfg = load(std::format("config.{}-both.toml", coin));
         Config long_cfg = load(std::format("config.{}.toml", long_name));
         const TradingConfig& t = both_cfg.trading;
@@ -357,9 +357,9 @@ TEST(BothSides, TheShippedTwoSidedConfigsAreTheirLongOnesButForTheDirectionLimit
 TEST(BothSides, TheShippedNvdaConfigsSizeAndLimitAndDoubleTheMarkupOffHours) {
     Config both_cfg = load("config.nvda-both.toml"), long_cfg = load("config.nvda.toml");
     EXPECT_EQ(both_cfg.trading.direction, "both");
-    EXPECT_EQ(both_cfg.trading.max_position_usd, 3000.0);  // x1.5 (20 Oct evening, the owner's)
-    double both_usd = both_cfg.trading.order_size * 217;  // ~$2000 orders (20 Oct evening: x2)
-    EXPECT_TRUE(1980 < both_usd && both_usd < 2020) << both_usd;
+    EXPECT_EQ(both_cfg.trading.max_position_usd, 2000.0);  // 21 Oct, the owner's
+    double both_usd = both_cfg.trading.order_size * 217;  // ~$1000 orders (21 Oct)
+    EXPECT_TRUE(980 < both_usd && both_usd < 1020) << both_usd;
     double usd = long_cfg.trading.order_size * 214;  // the long-only one as it was: ~$500
     EXPECT_TRUE(480 < usd && usd < 500) << usd;
     EXPECT_EQ(both_cfg.trading.off_hours_markup_factor, 2.0);
