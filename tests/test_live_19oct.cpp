@@ -1,4 +1,5 @@
 // test_live_19oct.py: the live configs as the owner set them on 19 Oct evening.
+#include <map>
 #include <gtest/gtest.h>
 
 #include "config.hpp"
@@ -144,6 +145,41 @@ TEST(SpyConfig, TheSpyPaperConfigReadsTheBinancePerpOnly) {
     EXPECT_EQ(c.trading.max_position_usd, 1000.0);
     EXPECT_TRUE(c.portfolio.enabled);  // the stocks class (20 Oct)
     EXPECT_EQ(c.portfolio.asset_class, "stocks");
+}
+
+// C++ checkout: config.sol-ml-both.toml, config.sol-basic.toml with the owner's SOL ML model of 21 Oct (10 s target),
+// ~$200 orders within $500, its feeds over one connection each as the other ML bots.
+TEST(SolConfig, TheSolMlConfigIsSolBasicWithTheModel) {
+    Config m = cfg("sol-ml-both"), b = cfg("sol-basic");
+    EXPECT_EQ(m.pricing.model, "ml");
+    EXPECT_EQ(m.ml.target_window_s, 10.0);
+    auto w = numbers(m.ml.weights), scale = numbers(m.ml.scale);
+    std::map<std::string, double> wm(w.begin(), w.end()), sm(scale.begin(), scale.end());
+    EXPECT_EQ(w.size(), 27u);  // 26 features and the intercept
+    EXPECT_EQ(wm.at("intercept"), -0.0010539515842669205);
+    EXPECT_EQ(wm.at("basis_pred_ema30s"), 8.401538382897203e-05);
+    EXPECT_EQ(sm.at("bybit_imb1_m1s"), 0.572591962687401);
+    EXPECT_EQ(sm.size(), 26u);
+    EXPECT_TRUE(195 < m.trading.order_size * 108 && m.trading.order_size * 108 < 205);  // ~$200
+    EXPECT_EQ(m.trading.max_position_usd, 500.0);
+    EXPECT_EQ(m.agent.quote_line_ms, 1000.0);
+    EXPECT_EQ(m.binance.connections, 1);
+    EXPECT_EQ(m.futures.connections, 1);
+    EXPECT_EQ(m.bybit.connections, 1);
+    EXPECT_EQ(m.okx.connections, 1);
+    EXPECT_EQ(m.trades.connections, 1);
+    EXPECT_EQ(m.arcus.connections, 2);
+    m.pricing.model = b.pricing.model;  // all else as sol-basic
+    m.ml = b.ml;
+    m.trading.order_size = b.trading.order_size;
+    m.trading.max_position_usd = b.trading.max_position_usd;
+    m.agent.quote_line_ms = b.agent.quote_line_ms;
+    m.binance.connections = b.binance.connections;
+    m.futures.connections = b.futures.connections;
+    m.bybit.connections = b.bybit.connections;
+    m.okx.connections = b.okx.connections;
+    m.trades.connections = b.trades.connections;
+    EXPECT_EQ(describe(m), describe(b));
 }
 
 // C++ checkout: config.sndk-both.toml, SanDisk live from 21 Oct (the owner's): ~$200 orders within $500, priced off the
