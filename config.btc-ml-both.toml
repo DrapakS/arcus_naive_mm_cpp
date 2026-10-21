@@ -50,7 +50,7 @@ min_samples = 100             # samples (any update of either book) before the f
 [trading]
 mode = "off"                  # the command line sets --trade live (or quote for a dry run)
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 3750       # 20 Oct, the owner's: x1.5 ($2500 from 19 Oct evening, $1500 before)
+max_position_usd = 6000       # $6000 (21 Oct, the owner's; $3750 from 20 Oct, $2500 from 19 Oct evening, $1500 before)
 max_position_resume = 0.95    # ... and comes back once the position on that side is under 95% of it
 skew_open = 1.0               # the order that adds to the position: markup x (1 + u), u = position / limit (x2 at it)
 skew_close = 1.0              # the order that closes it: its markup x (1 - u) (none at the limit): out sooner
@@ -73,7 +73,7 @@ close_tol_away = 0.000005     # 0.05 bp (= tol), as the basis config from 18 Oct
                               # A sell left above a target that fell is re-placed past this. Run 19 at tol_away 1 bp: the exit sell sat behind its target 56%
                               # of the time and at the best ask 10%, while its target was at the best ask 32%; trip #8
                               # held 23 min (-27 bp) with 279 sells. Same price rule, not a stop: only no lag behind it.
-order_size = 0.0122           # BTC, ~$1000 at $82k (20 Oct evening, the owner's: whole $2000 orders swept off 30 s -0.9 bp; 0.0244 on 20 Oct)
+order_size = 0.0178           # BTC, ~$1500 at $84.4k (21 Oct, the owner's; 0.0122 ~$1000 on 20 Oct evening, 0.0244 ~$2000 on 20 Oct)
 never_lead = false            # OFF (19 Oct evening, the owner's): the order may be the best price alone, not pulled when the book comes to it
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)

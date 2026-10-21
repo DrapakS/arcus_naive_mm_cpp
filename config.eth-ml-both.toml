@@ -65,7 +65,7 @@ min_samples = 100             # samples (any update of either book) before the f
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 4000       # 19 Oct night, the owner's $4000 (was $2500, before that $1500)
+max_position_usd = 6000       # $6000 (21 Oct, the owner's; $4000 from 19 Oct night, $2500 before that, $1500 before)
 max_position_resume = 0.95    # ... and comes back once the position on that side is under 95% of it
 skew_open = 1.0               # the order that adds to the position: markup x (1 + u), u = position / limit (x2 at it)
 skew_close = 1.0              # the order that closes it: its markup x (1 - u) (none at the limit): out sooner

@@ -153,6 +153,12 @@ warmup_s = 300
 power = 0.75                  # NEW (20 Oct evening, the owner's): (short / long) ^ 0.75, the ratio of the volatilities
                               # ^ 1.5: a 1.5x volatility gives x1.84 (was x1.5), 2x gives x2.83 (was x2); quieter: x0.8 sooner
 
+[drift]                       # NEW (21 Oct, the owner's): the futures mid moved 0.2 bp or more against a side within 10 s:
+window_s = 10                 # that side's markup x2 while it lasts and 2 s more (as BTC and ETH)
+threshold = 0.00002
+hold_s = 2
+markup_factor = 2
+
 [lag]                         # market data read late = quoting blind: as BTC
 max_ms = 200
 pause_ms = 500

@@ -41,7 +41,7 @@ TEST(Live19Oct, EthMlLiveTheOkxGuardTheTakePauseAndTheDriftMarkupOnly) {
     const TradingConfig& t = c.trading;
     EXPECT_EQ(t.markup, 0.000015);
     EXPECT_EQ(t.order_size, 0.627);
-    EXPECT_EQ(t.max_position_usd, 4000.0);
+    EXPECT_EQ(t.max_position_usd, 6000.0);  // 21 Oct, the owner's
     EXPECT_FALSE(t.never_lead);
     EXPECT_TRUE(1450 < t.order_size * 2'393 && t.order_size * 2'393 < 1550);  // ~$1500 (19 Oct night)
     EXPECT_EQ(t.tol, 0.000005);  // 0.05 bp (20 Oct evening)
@@ -84,8 +84,8 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst2500) {
 TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     Config cpp = cfg("btc-ml-both");
     EXPECT_EQ(cpp.trading.markup, 0.00002);  // 0.2 bp again (20 Oct evening)
-    EXPECT_EQ(cpp.trading.order_size, 0.0122);  // ~$1000 again (20 Oct evening)
-    EXPECT_EQ(cpp.trading.max_position_usd, 3750.0);  // x1.5 (20 Oct)
+    EXPECT_EQ(cpp.trading.order_size, 0.0178);  // ~$1500 (21 Oct)
+    EXPECT_EQ(cpp.trading.max_position_usd, 6000.0);  // 21 Oct
     Config live = cfg("btc-ml-okx-only");
     cpp.trading.markup = live.trading.markup;
     cpp.trading.order_size = live.trading.order_size;
@@ -140,8 +140,8 @@ TEST(SpyConfig, TheSpyPaperConfigReadsTheBinancePerpOnly) {
     EXPECT_FALSE(c.okx.enabled);
     EXPECT_FALSE(c.bybit.enabled);
     EXPECT_EQ(c.trading.direction, "both");
-    EXPECT_TRUE(190 < c.trading.order_size * 768 && c.trading.order_size * 768 < 210);  // ~$200
-    EXPECT_EQ(c.trading.max_position_usd, 500.0);
+    EXPECT_TRUE(395 < c.trading.order_size * 770 && c.trading.order_size * 770 < 405);  // ~$400 (21 Oct)
+    EXPECT_EQ(c.trading.max_position_usd, 1000.0);
     EXPECT_TRUE(c.portfolio.enabled);  // the stocks class (20 Oct)
     EXPECT_EQ(c.portfolio.asset_class, "stocks");
 }
@@ -153,7 +153,7 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     EXPECT_EQ(q.futures.symbol, "QQQUSDT");
     EXPECT_EQ(q.binance.symbol, "QQQBUSDT");
     EXPECT_EQ(strings(q.arcus.feed_assets), (std::vector<std::string> {"QQQB"}));
-    EXPECT_TRUE(190 < q.trading.order_size * 715 && q.trading.order_size * 715 < 210);  // ~$200
+    EXPECT_TRUE(395 < q.trading.order_size * 723 && q.trading.order_size * 723 < 405);  // ~$400 (21 Oct)
     q.arcus.market = s.arcus.market;  // all else as SPY's
     q.arcus.feed_assets = s.arcus.feed_assets;
     q.futures.symbol = s.futures.symbol;
