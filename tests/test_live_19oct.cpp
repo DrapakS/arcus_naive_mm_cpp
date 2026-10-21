@@ -76,7 +76,7 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst5000) {
         EXPECT_TRUE(pf.enabled) << name;
         EXPECT_EQ(pf.asset_class, "crypto") << name;
         EXPECT_EQ(pf.limit_usd, 5000.0) << name;  // 21 Oct, the owner's (was $2500)
-        EXPECT_EQ(pf.factor, 0.3) << name;  // 0.3 again from 20 Oct evening
+        EXPECT_EQ(pf.factor, 0.4) << name;  // 0.4 from 21 Oct
     }
 }
 

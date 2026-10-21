@@ -92,8 +92,8 @@ asset_class = "stocks"        # file in dir/live and reads the others' every 100
 weight = 0.6                   # weight x position x mark (risk in BTC units: 1-min volatility over BTC's in the US extended
                               # session, Binance perps 13-19 Oct: NVDA 1.1, QQQ 0.6, SPY 0.35); u = exposure / limit_usd.
 limit_usd = 1500              # An order adding to the class's lean: markup x (1 + 0.9 u), one taking it back x (1 - 0.9 u),
-factor = 0.3                  # 0.3 as the night of 19-20 Oct (20 Oct evening, the owner's; 0.6 / 0.9 earlier on 20 Oct): markup x (1 +- 0.3 u)
-shift_bp = 0.3                # 0.3 bp as that night (0.65 / 1.0 earlier on 20 Oct): both quotes moved against the class's lean by 0.3 bp x u
+factor = 0.4                  # 0.4 (21 Oct, the owner's; 0.3 before): markup x (1 +- 0.4 u)
+shift_bp = 0.4                # 0.4 bp (21 Oct, the owner's): both quotes moved against the class's lean by 0.4 bp x u
 
 [add_guard]                   # NEW (20 Oct, the owner's): no adding past half the limit right after a futures move against
 window_s = 300                # the side. QQQ 20 Oct 13:45-14:20 UTC: +1% after the open, shorted to its limit into it (-$20).
