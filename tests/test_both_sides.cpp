@@ -327,14 +327,14 @@ TEST(BothSides, PaperFillsEachSideAgainstTheTradesThatCrossIt) {
 }
 
 TEST(BothSides, TheShippedTwoSidedConfigsAreTheirLongOnesButForTheDirectionLimitAndInventoryControls) {
-    // BTC and ETH from 18 Oct afternoon: ~$750 orders within $1500; SOL and GLD: $3000
+    // BTC and ETH from 18 Oct afternoon: ~$750 orders within $1500; SOL $3000, GLD $1000 (22 Oct)
     struct Case {
         const char* coin;
         const char* long_name;
         double limit;
     };
     for (auto [coin, long_name, limit] : {Case {"btc", "recommended", 1500.0}, Case {"eth", "eth", 1500.0}, Case {"sol", "sol", 3000.0},
-                                          Case {"gld", "gld", 3000.0}}) {
+                                          Case {"gld", "gld", 1000.0}}) {
         Config both_cfg = load(std::format("config.{}-both.toml", coin));
         Config long_cfg = load(std::format("config.{}.toml", long_name));
         const TradingConfig& t = both_cfg.trading;
@@ -357,9 +357,9 @@ TEST(BothSides, TheShippedTwoSidedConfigsAreTheirLongOnesButForTheDirectionLimit
 TEST(BothSides, TheShippedNvdaConfigsSizeAndLimitAndDoubleTheMarkupOffHours) {
     Config both_cfg = load("config.nvda-both.toml"), long_cfg = load("config.nvda.toml");
     EXPECT_EQ(both_cfg.trading.direction, "both");
-    EXPECT_EQ(both_cfg.trading.max_position_usd, 2000.0);  // 21 Oct, the owner's
-    double both_usd = both_cfg.trading.order_size * 217;  // ~$1000 orders (21 Oct)
-    EXPECT_TRUE(980 < both_usd && both_usd < 1020) << both_usd;
+    EXPECT_EQ(both_cfg.trading.max_position_usd, 1000.0);  // 22 Oct, the owner's
+    double both_usd = both_cfg.trading.order_size * 218;  // ~$300 orders (22 Oct)
+    EXPECT_TRUE(295 < both_usd && both_usd < 305) << both_usd;
     double usd = long_cfg.trading.order_size * 214;  // the long-only one as it was: ~$500
     EXPECT_TRUE(480 < usd && usd < 500) << usd;
     EXPECT_EQ(both_cfg.trading.off_hours_markup_factor, 2.0);
