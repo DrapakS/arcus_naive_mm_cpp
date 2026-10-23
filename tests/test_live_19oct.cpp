@@ -61,9 +61,9 @@ TEST(Live19Oct, EthMlLiveTheOkxGuardTheTakePauseAndTheDriftMarkupOnly) {
 
 TEST(Live19Oct, GoldOrdersOf500) {
     const TradingConfig t = cfg("gld-both").trading;
-    EXPECT_EQ(t.order_size, 1.7775);  // ~$675 (23 Oct, the owner's)
-    EXPECT_TRUE(670 < t.order_size * 380 && t.order_size * 380 < 680);
-    EXPECT_EQ(t.max_position_usd, 1500.0);
+    EXPECT_EQ(t.order_size, 2.66625);  // ~$1013 (23 Oct evening, the owner's)
+    EXPECT_TRUE(1005 < t.order_size * 380 && t.order_size * 380 < 1020);
+    EXPECT_EQ(t.max_position_usd, 2250.0);
 }
 
 TEST(Live19Oct, NvdaTolAwayHalfABp) {
@@ -214,7 +214,9 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     EXPECT_EQ(q.futures.symbol, "QQQUSDT");
     EXPECT_EQ(q.binance.symbol, "QQQBUSDT");
     EXPECT_EQ(strings(q.arcus.feed_assets), (std::vector<std::string> {"QQQB"}));
-    EXPECT_TRUE(670 < q.trading.order_size * 715 && q.trading.order_size * 715 < 680);  // ~$675 (23 Oct)
+    EXPECT_TRUE(1005 < q.trading.order_size * 715 && q.trading.order_size * 715 < 1020);  // ~$1013 (23 Oct evening)
+    EXPECT_EQ(q.trading.max_position_usd, 2250.0);  // SPY $1500
+    q.trading.max_position_usd = s.trading.max_position_usd;
     q.arcus.market = s.arcus.market;  // all else as SPY's
     q.arcus.feed_assets = s.arcus.feed_assets;
     q.futures.symbol = s.futures.symbol;
