@@ -358,8 +358,8 @@ TEST(BothSides, TheShippedNvdaConfigsSizeAndLimitAndDoubleTheMarkupOffHours) {
     Config both_cfg = load("config.nvda-both.toml"), long_cfg = load("config.nvda.toml");
     EXPECT_EQ(both_cfg.trading.direction, "both");
     EXPECT_EQ(both_cfg.trading.max_position_usd, 1000.0);  // 22 Oct, the owner's
-    double both_usd = both_cfg.trading.order_size * 218;  // ~$300 orders (22 Oct)
-    EXPECT_TRUE(295 < both_usd && both_usd < 305) << both_usd;
+    double both_usd = both_cfg.trading.order_size * 218;  // ~$450 orders (23 Oct)
+    EXPECT_TRUE(445 < both_usd && both_usd < 455) << both_usd;
     double usd = long_cfg.trading.order_size * 214;  // the long-only one as it was: ~$500
     EXPECT_TRUE(480 < usd && usd < 500) << usd;
     EXPECT_EQ(both_cfg.trading.off_hours_markup_factor, 2.0);

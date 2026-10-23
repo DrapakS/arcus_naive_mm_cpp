@@ -59,7 +59,7 @@ off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
 tol_away = 0.00005            # 0.5 bp (19 Oct evening, the owner's; was 1 bp): a buy left that far behind is placed again
 close_tol_away = 0.00005      # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
-order_size = 1.38             # NVDA, ~$300 at $218 (22 Oct, the owner's; 4.6 ~$1000 on 21 Oct, 9.2 ~$2000 on 20 Oct evening). Arcus minimum 0.01 NVDA and $5; step 0.01
+order_size = 2.07             # NVDA, ~$450 at $218 (23 Oct, the owner's: x1.5; 1.38 before, 22 Oct, the owner's; 4.6 ~$1000 on 21 Oct, 9.2 ~$2000 on 20 Oct evening). Arcus minimum 0.01 NVDA and $5; step 0.01
 never_lead = false            # may improve the best price (20 Oct, the owner's; was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
