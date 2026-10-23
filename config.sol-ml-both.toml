@@ -301,7 +301,7 @@ bybit_mid_d5s = 4.4405477804845364e-05
 quote_line_ms = 1000          # the buy/sell price lines at most once a second: the ML fair moves on every frame
 
 [queue]                       # where the order stands among the others' levels on its side (23 Oct, the owner's)
-snap = true                   # ON: a tick past the others' level behind the markup's price (the same sweeps fill it, more edge)
+snap = false                  # OFF (23 Oct, the owner's: ETH only for now); on: a tick past the others' level behind the markup's price
 step_share = 0                # OFF live (paper first): step over a level of wall_x x order_size within this share of the markup
 wall_x = 3
 paper_queue = false           # paper: fill behind the queue at the order's price (set it on both arms of an A/B)

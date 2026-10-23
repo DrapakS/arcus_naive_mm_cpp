@@ -275,7 +275,7 @@ binance_imb1_m1s = 0.624658539672832
 basis_binance_futures_mid_ema30s = 4.6185351198352313e-05
 
 [queue]                       # where the order stands among the others' levels on its side (23 Oct, the owner's)
-snap = true                   # ON: a tick past the others' level behind the markup's price (the same sweeps fill it, more edge)
+snap = false                  # OFF (23 Oct, the owner's: ETH only for now); on: a tick past the others' level behind the markup's price
 step_share = 0                # OFF live (paper first): step over a level of wall_x x order_size within this share of the markup
 wall_x = 3
 paper_queue = false           # paper: fill behind the queue at the order's price (set it on both arms of an A/B)

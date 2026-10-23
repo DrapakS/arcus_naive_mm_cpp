@@ -155,11 +155,11 @@ TEST(Queue, PaperFillsBehindTheQueueAtTheOrdersPrice) {
     EXPECT_EQ(buy->state, OrderState::FILLED);
 }
 
-// Snap on in every live config (23 Oct, the owner's); the step and the paper queue model off there.
-TEST(Queue, TheLiveConfigsSnap) {
+// Snap on the live ETH bot only (23 Oct, the owner's); the step and the paper queue model off live.
+TEST(Queue, OnlyTheLiveEthBotSnaps) {
     for (std::string name : {"btc-ml-both", "eth-ml-both", "sol-ml-both", "gld-both", "nvda-both", "spy-both", "qqq-both", "sndk-both"}) {
         Config c = load_config(std::string(NMM_SOURCE_DIR) + "/config." + name + ".toml", {});
-        EXPECT_TRUE(c.queue.snap) << name;
+        EXPECT_EQ(c.queue.snap, name == "eth-ml-both") << name;
         EXPECT_EQ(c.queue.step_share, 0.0) << name;
         EXPECT_FALSE(c.queue.paper_queue) << name;
     }
