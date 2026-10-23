@@ -30,8 +30,8 @@ min_samples = 100
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 1000       # $1000 (21 Oct, the owner's, kept on 22 Oct; $500 from 20 Oct); a side at the limit is not quoted
-max_position_resume = 0.95    # ... and comes back once the position on that side is under $950
+max_position_usd = 1500       # $1500 (23 Oct, the owner's: x1.5; $1000 before: 21 Oct, the owner's, kept on 22 Oct; $500 from 20 Oct); a side at the limit is not quoted
+max_position_resume = 0.95    # ... and comes back once the position on that side is under $1425
 skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
 skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $500, none at the limit
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
@@ -44,7 +44,7 @@ off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New
 tol = 0.00001                 # 0.1 bp: an order a tick on the danger side of its target is re-placed at once
 tol_away = 0.00005            # 0.5 bp (19 Oct evening, the owner's; was 1 bp): a buy left that far behind is placed again
 close_tol_away = 0.00005      # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
-order_size = 0.63             # QQQ, ~$450 at $715 (23 Oct, the owner's: x1.5; 0.42 before, 22 Oct, the owner's; 0.553 ~$400 on 21 Oct, 0.28 ~$200 from 20 Oct). Arcus minimum 0.001 QQQ and $5; step 0.0000001
+order_size = 0.945            # QQQ, ~$675 at $715 (23 Oct, the owner's: x1.5 again; 0.63 before, 23 Oct, the owner's: x1.5; 0.42 before, 22 Oct, the owner's; 0.553 ~$400 on 21 Oct, 0.28 ~$200 from 20 Oct). Arcus minimum 0.001 QQQ and $5; step 0.0000001
 never_lead = false            # may improve the best price (20 Oct, the owner's; was true: join, never improve)
 came_hold_ms = 300            # NEW 18 Oct: after the book came to our order, not back at its price for 300 ms, one tick
                               # behind it instead (a flickering best: SOL re-placed there 12% of the time, ETH 3%)
