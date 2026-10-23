@@ -78,9 +78,9 @@ cancel_lanes = 1
 presign_cancel_s = 1
 orders_log = ""               # the command line gives each run its own file with --orders-log
 
-[guard]                       # Binance spot XAUT best bid vs its time-weighted mean: a backup for the futures guard
+[guard]                       # OFF (23 Oct, the owner's: no Binance spot guard on RWA). Was: Binance spot XAUT best bid vs its time-weighted mean: a backup for the futures guard
 window_ms = 300
-drawdown = 0.000025           # 0.25 bp (BTC 0.5 bp x 0.5)
+drawdown = 0                  # OFF (was 0.000025)
 pause_ms = 200
 
 [futures]                     # Binance USD-M futures bookTicker: the fair and the main guard
@@ -96,8 +96,8 @@ window_ms = 300
 drawdown = 0.000025           # 0.25 bp (BTC 0.5 bp x 0.5)
 pause_ms = 200
 
-[trades]                      # Binance spot XAUT trades: a trade 0.2 bp under the high of the last 300 ms pulls the buy
-enabled = true                # (over the low: the sell). Measured: after such a down trade GLD fell 0.76 bp in 5 s and
+[trades]                      # OFF (23 Oct, the owner's: no Binance spot guard on RWA). Was: Binance spot XAUT trades: a trade 0.2 bp under the high of the last 300 ms pulls the buy
+enabled = false               # (over the low: the sell). Measured: after such a down trade GLD fell 0.76 bp in 5 s and
 window_ms = 300               # 1.45 bp in 30 s (after an up trade +0.63 / +0.68), ~200 trips an hour, each side paused
 drawdown = 0.00002            # ~0.7% of the time (0.3 bp: 0.6%, the same moves after). The fair itself moves with gold at
 pause_ms = 200                # once; this covers the race with a taker in the first milliseconds
@@ -121,9 +121,9 @@ window_ms = 300
 drawdown = 0.000025           # 0.25 bp, as [futures]
 pause_ms = 200
 
-[arcus_guard]                 # Arcus GLD mid vs its own 3 s mean: sweeps the gold feeds do not show
+[arcus_guard]                 # OFF (23 Oct, the owner's: no Arcus mid guard on RWA). Was: Arcus GLD mid vs its own 3 s mean: sweeps the gold feeds do not show
 window_ms = 3000
-drawdown = 0.00005            # 0.5 bp = 2 ticks (not halved: the mid moves in half-ticks of 0.13 bp)
+drawdown = 0                  # OFF (was 0.00005)
 pause_ms = 300
 
 [add_guard]                   # no adding past half the limit right after a futures move against the side (17 Oct: BTC
@@ -162,11 +162,11 @@ warmup_s = 300
 power = 0.75                  # NEW (20 Oct evening, the owner's): (short / long) ^ 0.75, the ratio of the volatilities
                               # ^ 1.5: a 1.5x volatility gives x1.84 (was x1.5), 2x gives x2.83 (was x2); quieter: x0.8 sooner
 
-[drift]                       # NEW (21 Oct, the owner's): the futures mid moved 0.2 bp or more against a side within 10 s:
+[drift]                       # (23 Oct, the owner's: x2.5 for 5 s; x2 for 2 s before). Was: NEW (21 Oct, the owner's): the futures mid moved 0.2 bp or more against a side within 10 s:
 window_s = 10                 # that side's markup x2 while it lasts and 2 s more (as BTC and ETH)
 threshold = 0.00002
-hold_s = 2
-markup_factor = 2
+hold_s = 5                    # 5 s more after the move (23 Oct, the owner's; 2 s before)
+markup_factor = 2.5           # x2.5 (23 Oct, the owner's; x2 before)
 
 [lag]                         # market data read late = quoting blind: as BTC
 max_ms = 200

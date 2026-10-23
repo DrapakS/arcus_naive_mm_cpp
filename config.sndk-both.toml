@@ -52,9 +52,9 @@ cancel_lanes = 1
 presign_cancel_s = 1
 orders_log = ""               # the command line gives each run its own file with --orders-log
 
-[guard]                       # Binance spot SNDKB best bid vs its time-weighted mean: a backup for the futures guard
+[guard]                       # OFF (23 Oct, the owner's: no Binance spot guard on RWA). Was: Binance spot SNDKB best bid vs its time-weighted mean: a backup for the futures guard
 window_ms = 300
-drawdown = 0.00012            # 1.2 bp (NVDA's 0.5 x 2.4)
+drawdown = 0                  # OFF (was 0.00012)
 pause_ms = 200
 
 [futures]                     # Binance USD-M futures bookTicker: the fair and the main guard
@@ -66,8 +66,8 @@ window_ms = 300
 drawdown = 0.00012            # 1.2 bp (NVDA's 0.5 x 2.4)
 pause_ms = 200
 
-[trades]                      # Binance spot SNDKB trades: a trade under the high of the last 300 ms pulls the buy
-enabled = true                # (over the low: the sell)
+[trades]                      # OFF (23 Oct, the owner's: no Binance spot guard on RWA). Was: Binance spot SNDKB trades: a trade under the high of the last 300 ms pulls the buy
+enabled = false               # (over the low: the sell)
 window_ms = 300
 drawdown = 0.00007            # 0.7 bp (NVDA's 0.3 x 2.4)
 pause_ms = 200
@@ -85,9 +85,9 @@ enabled = false
 category = "linear"
 drawdown = 0
 
-[arcus_guard]                 # Arcus SNDK mid vs its own 3 s mean: sweeps the Binance feeds do not show
+[arcus_guard]                 # OFF (23 Oct, the owner's: no Arcus mid guard on RWA). Was: Arcus SNDK mid vs its own 3 s mean: sweeps the Binance feeds do not show
 window_ms = 3000
-drawdown = 0.00012            # 1.2 bp (NVDA's 0.5 x 2.4)
+drawdown = 0                  # OFF (was 0.00012)
 pause_ms = 300
 
 [portfolio]                   # the US stock bots' positions across the host (NVDA, SPY, QQQ, SNDK), as theirs
@@ -132,11 +132,11 @@ high = 3
 warmup_s = 300
 power = 0.75
 
-[drift]                       # the futures mid moved 0.5 bp or more against a side within 10 s: that side's markup x2
+[drift]                       # (23 Oct, the owner's: x2.5 for 5 s; x2 for 2 s before). Was: the futures mid moved 0.5 bp or more against a side within 10 s: that side's markup x2
 window_s = 10                 # while it lasts and 2 s more (BTC's 0.2 bp x 2.7)
 threshold = 0.00005
-hold_s = 2
-markup_factor = 2
+hold_s = 5                    # 5 s more after the move (23 Oct, the owner's; 2 s before)
+markup_factor = 2.5           # x2.5 (23 Oct, the owner's; x2 before)
 
 [lag]                         # market data read late = quoting blind: as every bot
 max_ms = 200

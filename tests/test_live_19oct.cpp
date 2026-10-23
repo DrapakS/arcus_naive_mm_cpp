@@ -202,10 +202,9 @@ TEST(SpyConfig, TheSndkConfigQuotesSanDiskOffTheBinancePerpWithAnOkxGuard) {
     EXPECT_EQ(c.portfolio.weight, 2.7);
     EXPECT_TRUE(c.open_halt.closing);
     EXPECT_EQ(strings(c.open_halt.opens), (std::vector<std::string> {"Mon-Fri 09:30"}));
-    for (double on : {c.guard.drawdown, c.futures.drawdown, c.trades.drawdown, c.okx.drawdown, c.arcus_guard.drawdown, c.trend.drawdown,
-                      c.add_guard.drawdown, c.lag.max_ms})
-        EXPECT_GT(on, 0);
-    EXPECT_EQ(c.drift.markup_factor, 2.0);
+    for (double on : {c.futures.drawdown, c.okx.drawdown, c.trend.drawdown, c.add_guard.drawdown, c.lag.max_ms}) EXPECT_GT(on, 0);
+    EXPECT_EQ(c.drift.markup_factor, 2.5);  // x2.5 for 5 s (23 Oct, the owner's)
+    EXPECT_EQ(c.drift.hold_s, 5.0);
 }
 
 // C++ checkout: config.qqq-both.toml, config.spy-both.toml with QQQ's market and feeds.
@@ -261,4 +260,18 @@ TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
     EXPECT_EQ(b.trading.markup, 0.00012);  // 1.2 bp (23 Oct, the owner's: x2; sol-both 0.6 bp)
     b.trading.markup = s.trading.markup;
     EXPECT_EQ(describe(b), describe(s));
+}
+
+// 23 Oct, the owner's: the RWA bots without the Binance spot guards ([guard], [trades]) and the Arcus mid
+// guard; the drift markup x2.5 for 5 s.
+TEST(SpyConfig, TheRwaBotsGuardOffTheFuturesOnly) {
+    for (std::string name : {"gld-both", "nvda-both", "spy-both", "qqq-both", "sndk-both"}) {
+        Config c = cfg(name);
+        EXPECT_EQ(c.guard.drawdown, 0.0) << name;
+        EXPECT_FALSE(c.trades.enabled) << name;
+        EXPECT_EQ(c.arcus_guard.drawdown, 0.0) << name;
+        EXPECT_GT(c.futures.drawdown, 0.0) << name;
+        EXPECT_EQ(c.drift.markup_factor, 2.5) << name;
+        EXPECT_EQ(c.drift.hold_s, 5.0) << name;
+    }
 }
