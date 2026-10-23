@@ -297,8 +297,9 @@ TEST(Portfolio, TheTwoSidedCryptoConfigsHaveItOn) {
         EXPECT_EQ(pf.weight, weight) << name;
         // the live ML bots: $3500 from 21 Oct evening (the owner's; $5000 earlier, $2500 from 19 Oct evening; C++ checkout: btc-ml-both is the live set)
         EXPECT_EQ(pf.limit_usd, name == "eth-ml-both" || name == "btc-ml-both" ? 3500.0 : 1500.0) << name;
-        EXPECT_EQ(pf.factor, 0.4) << name;  // 0.4 from 21 Oct
-        EXPECT_EQ(pf.shift_bp, 0.3) << name;  // crypto 0.3 bp from 21 Oct
+        bool live = name == "eth-ml-both" || name == "btc-ml-both";  // -15% on 23 Oct (the owner's)
+        EXPECT_EQ(pf.factor, live ? 0.34 : 0.4) << name;  // 0.4 from 21 Oct
+        EXPECT_EQ(pf.shift_bp, live ? 0.255 : 0.3) << name;  // crypto 0.3 bp from 21 Oct
         EXPECT_EQ(pf.interval_ms, 100.0) << name;
     }
     EXPECT_FALSE(load("gld-both").portfolio.enabled);  // one bot a class: its own skew is the class's

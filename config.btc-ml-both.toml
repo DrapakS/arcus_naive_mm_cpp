@@ -144,10 +144,10 @@ asset_class = "crypto"        # dir/live and reads the others' every 100 ms (liv
 weight = 1.0                  # mark (risk in BTC units: 1-min volatility over BTC's, 19 Oct: BTC 1.0, ETH 1.36, SOL
                               # 1.70); u = exposure / limit_usd (-1..1). An order
 limit_usd = 3500              # the class's lean over $3500 (21 Oct, the owner's; $5000 before)
-factor = 0.4                  # 0.4 (21 Oct, the owner's; 0.3 before): markup x (1 +- 0.4 u)
+factor = 0.34                 # 0.34 (23 Oct, the owner's: -15%; 0.4 from 21 Oct): markup x (1 +- 0.34 u)
                               # on top of the own skew. 19 Oct, 6 h live: BTC and ETH the same way 26% of the time, at worst
                               # $1670 together; a stopped bot's file is left out after 30 s
-shift_bp = 0.3                # 0.3 bp (21 Oct, the owner's): both quotes moved against the class's lean by 0.3 bp x u
+shift_bp = 0.255              # 0.255 bp (23 Oct, the owner's: -15%; 0.3 bp from 21 Oct): both quotes moved against the class's lean by 0.255 bp x u
                               # 0.3 bp higher). 19 Oct 16:27-17:47: the class short 82% of the time, u = -1 18%; x0.7..x1.3
                               # of a 0.15-0.2 bp markup was 1 tick on ETH, 5 on BTC
 

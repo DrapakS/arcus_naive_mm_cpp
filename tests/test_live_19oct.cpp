@@ -76,7 +76,8 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst3500) {
         EXPECT_TRUE(pf.enabled) << name;
         EXPECT_EQ(pf.asset_class, "crypto") << name;
         EXPECT_EQ(pf.limit_usd, 3500.0) << name;  // 21 Oct, the owner's (was $5000)
-        EXPECT_EQ(pf.factor, 0.4) << name;  // 0.4 from 21 Oct
+        EXPECT_EQ(pf.factor, 0.34) << name;  // 0.34 from 23 Oct (0.4 from 21 Oct)
+        EXPECT_EQ(pf.shift_bp, 0.255) << name;  // 0.255 bp from 23 Oct (0.3 from 21 Oct)
     }
 }
 
@@ -261,6 +262,8 @@ TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
     b.lag.max_pause_ms = s.lag.max_pause_ms;  // the live bots' growing pauses (20 Oct)
     EXPECT_EQ(b.portfolio.limit_usd, 3500.0);  // the class lean over $3500 (21 Oct)
     b.portfolio.limit_usd = s.portfolio.limit_usd;
+    b.portfolio.factor = s.portfolio.factor;  // -15% on 23 Oct (the owner's)
+    b.portfolio.shift_bp = s.portfolio.shift_bp;
     b.vol_markup = s.vol_markup;  // and their x0.8..3 at ^0.75 (20 Oct evening)
     EXPECT_FALSE(b.queue.snap);  // [queue] snap: ETH only (23 Oct, the owner's)
     b.queue = s.queue;
