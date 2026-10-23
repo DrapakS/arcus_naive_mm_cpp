@@ -222,7 +222,8 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     q.futures.symbol = s.futures.symbol;
     q.binance.symbol = s.binance.symbol;
     q.trading.order_size = s.trading.order_size;
-    EXPECT_EQ(q.trading.markup, 0.00005);  // 0.5 bp, twice SPY's (20 Oct evening, the owner's)
+    EXPECT_EQ(q.trading.markup, 0.0000375);  // 0.375 bp, twice SPY's (both -25% on 23 Oct evening, the owner's)
+    EXPECT_EQ(s.trading.markup, 0.00001875);
     q.trading.markup = s.trading.markup;
     q.portfolio.weight = s.portfolio.weight;  // its volatility over BTC's: QQQ 0.6, SPY 0.35
     EXPECT_EQ(q.add_guard.drawdown, 0.0003);  // the same way: QQQ 3 bp, SPY 2 bp
@@ -231,6 +232,8 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     EXPECT_EQ(q.ctrader.credentials, "../creds/ctrader_qqq.toml");  // a login of its own
     q.ctrader.symbol = s.ctrader.symbol;
     q.ctrader.credentials = s.ctrader.credentials;
+    EXPECT_TRUE(q.ctrader.enabled);  // 23 Oct, the owner's (SPY: by --set)
+    q.ctrader.enabled = s.ctrader.enabled;
     EXPECT_EQ(describe(q), describe(s));
 }
 

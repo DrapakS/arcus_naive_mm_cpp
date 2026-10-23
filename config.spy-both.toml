@@ -39,7 +39,7 @@ skew_close = 1.0              # closing one's x (1 - position/limit): with one o
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
                               # joined the best price with no markup after 10 min). The closing order keeps its markup
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0005: the same once that far under water at the Arcus mid)
-markup = 0.000025             # 0.25 bp (NVDA's of 20 Oct) = ~2 ticks of SPY under the fair bid
+markup = 0.00001875           # 0.1875 bp (23 Oct evening, the owner's: -25%; 0.25 bp before). Before: 0.25 bp (NVDA's of 20 Oct) = ~2 ticks of SPY under the fair bid
 close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
 off_hours_markup_factor = 2   # outside the US extended session (04:00-20:00 New York, Mon-Fri; holidays by Arcus
                               # isOutsideRth) both sides take twice the markup: 0.5 bp, ~4 ticks

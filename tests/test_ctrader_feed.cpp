@@ -488,13 +488,13 @@ TEST(CTraderFeed, Settings) {
     EXPECT_EQ(loaded.ctrader.credentials, "../creds/ctrader_qqq.toml");
 }
 
-// The stock bots carry the section, each with its broker symbol and a login file of its own; off until
-// that file is in place (a bot with it on and no file does not start).
+// The stock bots carry the section, each with its broker symbol and a login file of its own (a bot
+// with it on and no file does not start): on for QQQ and GLD from 23 Oct.
 TEST(CTraderFeed, TheStockConfigsNameTheirBrokerSymbols) {
     for (auto [name, symbol, drawdown] : std::initializer_list<std::tuple<std::string, std::string, double>> {
              {"spy", "US500", 0.00005}, {"qqq", "USTEC", 0.00005}, {"gld", "XAUUSD", 0.000025}, {"nvda", "NVDA", 0.00005}}) {
         Config c = load_config(repo("config." + name + "-both.toml"), {});
-        EXPECT_FALSE(c.ctrader.enabled) << name;
+        EXPECT_EQ(c.ctrader.enabled, name == "qqq" || name == "gld") << name;  // on from 23 Oct (SPY by --set, NVDA off)
         EXPECT_EQ(c.ctrader.symbol, symbol) << name;
         EXPECT_EQ(c.ctrader.credentials, "../creds/ctrader_" + name + ".toml") << name;
         EXPECT_EQ(c.ctrader.drawdown, drawdown) << name;  // as its [futures] guard
