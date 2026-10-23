@@ -78,6 +78,7 @@ Config as_long(Config both_cfg, const Config& long_cfg) {
     both_cfg.takes = long_cfg.takes;
     both_cfg.portfolio = long_cfg.portfolio;  // the class's lean across the bots (19 Oct): two-sided crypto bots only
     both_cfg.lag.max_pause_ms = long_cfg.lag.max_pause_ms;
+    both_cfg.ctrader = long_cfg.ctrader;  // the broker's price over cTrader FIX (23 Oct): the two-sided stock bots only
     both_cfg.vol_markup = long_cfg.vol_markup;  // x0.8..3 at ^0.75 on the live ones (20 Oct evening)  // pauses growing while the data stays late: the live ones (20 Oct)
     return both_cfg;
 }

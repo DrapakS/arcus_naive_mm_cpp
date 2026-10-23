@@ -226,6 +226,10 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     q.portfolio.weight = s.portfolio.weight;  // its volatility over BTC's: QQQ 0.6, SPY 0.35
     EXPECT_EQ(q.add_guard.drawdown, 0.0003);  // the same way: QQQ 3 bp, SPY 2 bp
     q.add_guard.drawdown = s.add_guard.drawdown;
+    EXPECT_EQ(q.ctrader.symbol, "USTEC");  // the Nasdaq-100 at the broker, SPY's US500
+    EXPECT_EQ(q.ctrader.credentials, "../creds/ctrader_qqq.toml");  // a login of its own
+    q.ctrader.symbol = s.ctrader.symbol;
+    q.ctrader.credentials = s.ctrader.credentials;
     EXPECT_EQ(describe(q), describe(s));
 }
 

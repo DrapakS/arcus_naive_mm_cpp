@@ -80,6 +80,26 @@ public:
     virtual int close_code() const = 0;
 };
 
+// One plain TCP (or TLS over TCP) connection carrying a byte stream: the cTrader FIX session.
+// Through the proxy the environment names for https (TLS) or http (plain), tunnelled by CONNECT.
+class StreamConnection {
+public:
+    virtual ~StreamConnection() = default;
+
+    // Connect (and the TLS handshake, `tls`) to host:port within `timeout_s`.
+    static awaitable<std::shared_ptr<StreamConnection>> connect(std::string host, std::string port, bool tls, double timeout_s = 10.0);
+
+    // The next bytes, as many as came; nullopt once the server has closed the connection.
+    // Throws on an error or close().
+    virtual awaitable<std::optional<std::string>> read() = 0;
+    // Queue `data`: it goes out after what is queued ahead of it. A failed write closes the
+    // connection (the read then fails).
+    virtual void write(std::string data) = 0;
+    // Close it at once: a read in progress fails.
+    virtual void close() = 0;
+    virtual bool closed() const = 0;
+};
+
 // The process-wide TLS settings: the system's CAs, or SSL_CERT_FILE.
 void init_tls();
 

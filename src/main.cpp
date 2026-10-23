@@ -148,6 +148,13 @@ int main(int argc, char** argv) {
     } catch (const std::exception& err) {
         usage_error(err.what());
     }
+    if (config.ctrader.enabled) {  // [ctrader]: its FIX settings read now, so --check and the start both stop on a bad file
+        try {
+            (void)load_ctrader_credentials(config.ctrader.credentials);
+        } catch (const std::exception& err) {
+            usage_error(err.what());
+        }
+    }
     if (args.check) return 0;
     if (args.trade) config.trading.mode = *args.trade;
     if (args.orders_log) config.trading.orders_log = *args.orders_log;

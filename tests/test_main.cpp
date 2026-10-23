@@ -223,7 +223,7 @@ TEST_F(OrdersLog, TheSettingsInEffectOpenIt) {
         }
     // every section, so a log shows all it ran with
     EXPECT_EQ(sections, (std::set<std::string> {"binance", "arcus", "pricing", "ml", "trading", "guard", "futures", "trades", "bybit",
-                                                "okx", "arcus_guard", "takes", "trend", "add_guard", "open_guard", "open_halt", "portfolio",
+                                                "okx", "ctrader", "arcus_guard", "takes", "trend", "add_guard", "open_guard", "open_halt", "portfolio",
                                                 "vol_markup", "drift", "lag", "imbalance", "agent"}));
 }
 

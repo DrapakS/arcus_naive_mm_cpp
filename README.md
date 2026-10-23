@@ -108,6 +108,38 @@ sudo bash scripts/pin_bots.sh          # копия из этого checkout: з
 - Ключи — тот же файл, что у Python (`~/.config/naive_mm/credentials.toml`, `$NAIVE_MM_CREDENTIALS` или
   `--credentials`). Остановка — `kill <pid>` (SIGTERM): ордера снимаются, `=== AT EXIT` в логе.
 
+### cTrader FIX как ещё один guard (`[ctrader]`, только C++)
+
+Цена брокера (IC Markets) через cTrader FIX API, ценовая сессия QUOTE (FIX 4.4, TLS, порт 5211): ещё одна
+защита по образцу `[okx]`, но по **mid**: если mid отходит от своего среднего за `window_ms` на
+`drawdown`, сторона снимается на `pause_ms`. Символы: SPY — `US500`, QQQ — `USTEC`, GLD — `XAUUSD`,
+NVDA — `NVDA` (находит и `NVDA.US` и т.п.; найденное имя пишется в лог). В конфигах акций секция есть,
+но выключена, пока нет файла с логином.
+
+**Один логин — одна ценовая сессия.** Второй вход тем же логином выбивает первый, поэтому каждому боту
+(и сборщику `ctrader_collector`) нужен свой счёт. Демо-счёт IC Markets подходит; в cTrader: Settings →
+FIX API (host, SenderCompID, пароль счёта).
+
+```bash
+cat > ../creds/ctrader_spy.toml <<'TOML'
+host = "demo.cfixapi.com"                  # из cTrader: Settings → FIX API
+port = 5211
+sender_comp_id = "demo.icmarkets.1234567"  # свой счёт на каждого бота
+password = "ПАРОЛЬ_СЧЁТА"
+TOML
+chmod 600 ../creds/ctrader_spy.toml
+build/naive_mm --config config.spy-both.toml --set ctrader.enabled=true --check   # проверяет и файл
+```
+
+Формат — тот же, что у `configs/ctrader_fix.toml` сборщика. Включить: `enabled = true` в конфиге или
+`--set ctrader.enabled=true`. Бот с включённой секцией и без файла (или с файлом шире `chmod 600`) не стартует.
+
+В логе: `logged on as ...`, `US500: subscribed to US500 (id 1), the spot price`; строка статуса
+`ctrader US500 ...`; срабатывание — `!!! DROP cTrader US500 mid ... under its mean ...`. Если символа нет у
+брокера — `US500: not in the broker's symbol list (alike: ...): the cTrader guard stays idle`, бот
+торгует дальше без этой защиты. Сессия, пропустившая сообщение (MsgSeqNum) или молчащая два heartbeat,
+строится заново; пока её нет, guard не срабатывает.
+
 ## Устройство
 
 Один поток с `boost::asio::io_context` вместо цикла asyncio: каждая корутина Python стала
@@ -130,7 +162,7 @@ Python считает во `float`, C++ считает в `double`, а печа�
 | `pricing.py`                | `pricing.*`                                              |
 | `ml.py`, `lgbm.py`          | `ml.*`, `lgbm.*`                                         |
 | `health.py`                 | `health.*`                                               |
-| `feeds/*.py`                | `feeds/*` (базовая лента, Binance спот/фьючерс/сделки, Bybit, OKX, Arcus) |
+| `feeds/*.py`                | `feeds/*` (базовая лента, Binance спот/фьючерс/сделки, Bybit, OKX, Arcus; только в C++: cTrader FIX, `feeds/ctrader.*`, `feeds/fix.*`) |
 | `trading/*.py`              | `trading/*` (шлюз Arcus и бумажный, стратегия, защиты, сессии, round trips, подпись) |
 | aiohttp, orjson, PyNaCl     | `net/net.*` (Beast + OpenSSL), `util/json.*` (Boost.JSON), `trading/signing.*` (OpenSSL Ed25519) |
 | asyncio, logging            | `util/aio.*`, `util/log.*`, `util/pyfmt.*` (форматирование как в Python) |

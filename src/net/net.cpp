@@ -295,6 +295,72 @@ private:
     bool closed_locally_ = false;
 };
 
+template <class Next>
+class StreamImpl : public StreamConnection, public std::enable_shared_from_this<StreamImpl<Next>> {
+public:
+    explicit StreamImpl(Next&& next) : stream_(std::move(next)) { beast::get_lowest_layer(stream_).expires_never(); }
+
+    awaitable<std::optional<std::string>> read() override {
+        auto self = this->shared_from_this();
+        char buffer[65536];
+        auto [ec, n] = co_await stream_.async_read_some(asio::buffer(buffer), asio::as_tuple(asio::use_awaitable));
+        if (ec == asio::error::eof || ec == ssl::error::stream_truncated) {
+            closed_ = true;
+            co_return std::nullopt;
+        }
+        if (ec) {
+            closed_ = true;
+            if (closed_locally_ && ec == asio::error::operation_aborted) {
+                co_await check_cancelled();  // a cancelled task stays cancelled
+                throw std::runtime_error("connection closed");
+            }
+            throw boost::system::system_error(ec);
+        }
+        co_return std::string(buffer, n);
+    }
+
+    void write(std::string data) override {
+        if (closed_) return;
+        queue_.push_back(std::move(data));
+        if (!writing_) write_next();
+    }
+
+    void close() override {
+        if (closed_locally_) return;
+        closed_locally_ = true;
+        closed_ = true;
+        beast::get_lowest_layer(stream_).close();
+    }
+
+    bool closed() const override { return closed_; }
+
+private:
+    void write_next() {
+        writing_ = true;
+        asio::async_write(stream_, asio::buffer(queue_.front()), [self = this->shared_from_this()](const boost::system::error_code& ec, size_t) {
+            self->queue_.pop_front();
+            if (ec) {
+                self->writing_ = false;
+                self->queue_.clear();
+                self->close();
+                return;
+            }
+            if (self->queue_.empty() || self->closed_) {
+                self->writing_ = false;
+                self->queue_.clear();
+            } else {
+                self->write_next();
+            }
+        });
+    }
+
+    Next stream_;
+    std::deque<std::string> queue_;
+    bool writing_ = false;
+    bool closed_ = false;
+    bool closed_locally_ = false;
+};
+
 }  // namespace
 
 std::string Url::host_header() const {
@@ -399,6 +465,16 @@ awaitable<std::shared_ptr<WsConnection>> WsConnection::connect(std::string url, 
     auto ws = std::make_shared<WsImpl<beast::tcp_stream>>(std::move(tcp_stream));
     co_await ws->handshake(u, heartbeat_s, timeout_s);
     co_return ws;
+}
+
+awaitable<std::shared_ptr<StreamConnection>> StreamConnection::connect(std::string host, std::string port, bool tls, double timeout_s) {
+    Url u {tls ? "https" : "http", std::move(host), std::move(port), "/"};
+    auto tcp_stream = co_await connect_tcp(u, timeout_s);
+    if (tls) {
+        auto stream = co_await tls_handshake(std::move(tcp_stream), u, timeout_s);
+        co_return std::make_shared<StreamImpl<beast::ssl_stream<beast::tcp_stream>>>(std::move(stream));
+    }
+    co_return std::make_shared<StreamImpl<beast::tcp_stream>>(std::move(tcp_stream));
 }
 
 }  // namespace nmm

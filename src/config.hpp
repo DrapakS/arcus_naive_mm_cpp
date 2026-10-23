@@ -239,6 +239,21 @@ struct OkxConfig {
     double pause_ms = 300.0;
 };
 
+struct CTraderConfig {
+    // The broker's spot price over the cTrader FIX API (QUOTE session; IC Markets: US500, USTEC,
+    // XAUUSD), one more input of the price guard: same rule as [guard] on the MID, with its own
+    // window (ms), drawdown and pause; drawdown 0 keeps the feed (on the status lines) without the
+    // guard. The FIX settings (host, SenderCompID, password) are in `credentials`, a TOML file only its
+    // owner reads: one login per bot, the broker gives a login one price session. Off unless enabled.
+    bool enabled = false;
+    std::string symbol;  // the broker's name: US500, USTEC, XAUUSD ("NVDA" also finds "NVDA.US")
+    std::string credentials = "~/.config/naive_mm/ctrader_fix.toml";
+    double heartbeat_s = 30.0;  // HeartBtInt: a session silent for twice this is built again
+    double window_ms = 300.0;
+    double drawdown = 0.00005;
+    double pause_ms = 200.0;
+};
+
 struct TakesConfig {
     // Arcus taker waves: a taker order of `min_usd` or more in the Arcus public trades pulls our
     // order on the side it hit and no order goes there for `pause_ms` after the last such take.
@@ -416,6 +431,7 @@ struct Config {
     TradesConfig trades;
     BybitConfig bybit;
     OkxConfig okx;
+    CTraderConfig ctrader;
     ArcusGuardConfig arcus_guard;
     TakesConfig takes;
     TrendConfig trend;

@@ -84,6 +84,15 @@ drawdown = 0
 [okx]                         # OFF: OKX SPY-USDT-SWAP, ~$4M a day (20 Oct, the owner's)
 enabled = false
 
+[ctrader]                     # the broker's spot price over cTrader FIX (QUOTE session), a guard on its MID (23 Oct, the owner's)
+enabled = false               # ON once credentials below hold this bot's own login (one login: one price session)
+symbol = "US500"              # S&P 500 CFD (IC Markets; its own price from the ES future, leads the Binance perp after 16:00 New York)
+credentials = "../creds/ctrader_spy.toml"  # host, port, sender_comp_id, password: the collector's configs/ctrader_fix.toml format, chmod 600
+heartbeat_s = 30
+window_ms = 300
+drawdown = 0.00005            # 0.5 bp, as [futures]
+pause_ms = 200
+
 [arcus_guard]                 # Arcus SPY mid vs its own 3 s mean: sweeps the Binance feeds do not show
 window_ms = 3000
 drawdown = 0.00005            # 0.5 bp: ~4 ticks of the mid (it moves in half-ticks of 0.065 bp)

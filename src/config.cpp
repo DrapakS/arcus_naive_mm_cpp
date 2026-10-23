@@ -112,6 +112,10 @@ template <class F> void fields(OkxConfig& c, F&& f) {
     f("enabled", c.enabled); f("inst_id", c.inst_id); f("ws_url", c.ws_url); f("stale_timeout_s", c.stale_timeout_s);
     f("connections", c.connections); f("window_ms", c.window_ms); f("drawdown", c.drawdown); f("pause_ms", c.pause_ms);
 }
+template <class F> void fields(CTraderConfig& c, F&& f) {
+    f("enabled", c.enabled); f("symbol", c.symbol); f("credentials", c.credentials); f("heartbeat_s", c.heartbeat_s);
+    f("window_ms", c.window_ms); f("drawdown", c.drawdown); f("pause_ms", c.pause_ms);
+}
 template <class F> void fields(TakesConfig& c, F&& f) {
     f("min_usd", c.min_usd); f("pause_ms", c.pause_ms); f("min_takes", c.min_takes); f("min_move", c.min_move);
     f("score_ms", c.score_ms);
@@ -159,7 +163,7 @@ template <class F> void fields(AgentConfig& c, F&& f) {
 template <class F> void sections(Config& c, F&& f) {
     f("binance", c.binance); f("arcus", c.arcus); f("pricing", c.pricing); f("ml", c.ml); f("trading", c.trading);
     f("guard", c.guard); f("futures", c.futures); f("trades", c.trades); f("bybit", c.bybit);
-    f("okx", c.okx); f("arcus_guard", c.arcus_guard); f("takes", c.takes); f("trend", c.trend); f("add_guard", c.add_guard);
+    f("okx", c.okx); f("ctrader", c.ctrader); f("arcus_guard", c.arcus_guard); f("takes", c.takes); f("trend", c.trend); f("add_guard", c.add_guard);
     f("open_guard", c.open_guard); f("open_halt", c.open_halt); f("portfolio", c.portfolio); f("vol_markup", c.vol_markup);
     f("drift", c.drift); f("lag", c.lag); f("imbalance", c.imbalance); f("agent", c.agent);
 }
@@ -453,7 +457,7 @@ void Config::validate() const {
              {"trading.markup", t.markup}, {"trading.tol", t.tol}, {"trading.tol_away", t.tol_away},
              {"trading.close_tol_away", t.close_tol_away}, {"guard.drawdown", guard.drawdown},
              {"futures.drawdown", futures.drawdown}, {"trades.drawdown", trades.drawdown},
-             {"bybit.drawdown", bybit.drawdown}, {"okx.drawdown", okx.drawdown},
+             {"bybit.drawdown", bybit.drawdown}, {"okx.drawdown", okx.drawdown}, {"ctrader.drawdown", ctrader.drawdown},
              {"arcus_guard.drawdown", arcus_guard.drawdown}}) {
         if (value > MAX_FRACTION)
             throw std::invalid_argument(std::format("{} = {} is {} bp: it is a fraction of the price (0.00001 = 0.1 bp), at most {}",
@@ -535,6 +539,13 @@ void Config::validate() const {
     if (!(1 <= okx.connections && okx.connections <= 4)) throw std::invalid_argument("okx.connections must be within 1..4");
     if (!guard_ok(okx.drawdown, okx.window_ms, okx.pause_ms))
         throw std::invalid_argument("okx needs 0 < window_ms <= 600000, 0 <= drawdown < 1, pause_ms within 0..60000");
+    if (!guard_ok(ctrader.drawdown, ctrader.window_ms, ctrader.pause_ms))
+        throw std::invalid_argument("ctrader needs 0 < window_ms <= 600000, 0 <= drawdown < 1, pause_ms within 0..60000");
+    if (ctrader.enabled && strip(ctrader.symbol).empty())
+        throw std::invalid_argument("ctrader.symbol is empty: the broker's name of the symbol (US500, USTEC, XAUUSD)");
+    if (ctrader.enabled && ctrader.credentials.empty())
+        throw std::invalid_argument("ctrader.credentials is empty: the TOML file of this bot's cTrader FIX login");
+    if (!(5 <= ctrader.heartbeat_s && ctrader.heartbeat_s <= 120)) throw std::invalid_argument("ctrader.heartbeat_s must be within 5..120");
     if (!guard_ok(arcus_guard.drawdown, arcus_guard.window_ms, arcus_guard.pause_ms))
         throw std::invalid_argument("arcus_guard needs 0 < window_ms <= 600000, 0 <= drawdown < 1, pause_ms within 0..60000");
     const TakesConfig& k = takes;

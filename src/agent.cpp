@@ -143,10 +143,14 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     const OkxConfig& o = config.okx;  // the OKX perpetual's best bid/ask: one more guard input, nothing else reads it
     if (o.enabled) okx_book = std::make_unique<OrderBook>("okx-swap", upper(o.inst_id));
     if (o.enabled && o.drawdown) okx_guard = std::make_unique<PriceGuard>(o.window_ms / 1000, o.drawdown, o.pause_ms / 1000);
+    const CTraderConfig& ct = config.ctrader;  // the broker's spot price over cTrader FIX: one more guard input, on the mid
+    if (ct.enabled) ctrader_book = std::make_unique<OrderBook>("ctrader", std::string(strip(ct.symbol)));
+    if (ct.enabled && ct.drawdown) ctrader_guard = std::make_unique<PriceGuard>(ct.window_ms / 1000, ct.drawdown, ct.pause_ms / 1000);
     // [agent] tob_lines: the label of each book whose best bid gets a line when its price changes
     if (config.agent.tob_lines) {
         for (auto [book, label] : {std::pair<const OrderBook*, const char*> {futures_book.get(), "BINANCE FUTURES"},
                                    {&reference_book, "BINANCE SPOT"}, {bybit_book.get(), "BYBIT"}, {okx_book.get(), "OKX"},
+                                   {ctrader_book.get(), "CTRADER"},
                                    {&venue_book, "ARCUS"}})
             if (book != nullptr) tob_labels_[book] = label;
     }
@@ -202,7 +206,7 @@ Agent::Agent(Config config_, bool show_ladder_, std::optional<ArcusCredentials> 
     if (k.pause_ms)
         take_guard = std::make_unique<TakeGuard>(k.min_usd, k.pause_ms / 1000, monotonic, k.min_takes, k.min_move, k.score_ms / 1000);
     for (Pauses* gp : std::initializer_list<Pauses*> {guard.get(), futures_guard.get(), trades_guard.get(), bybit_guard.get(),
-                                                      okx_guard.get(), arcus_guard.get(), trend_guard.get(), lag_guard.get(),
+                                                      okx_guard.get(), ctrader_guard.get(), arcus_guard.get(), trend_guard.get(), lag_guard.get(),
                                                       take_guard.get()})
         if (gp != nullptr) guards.push_back(gp);
     // the event loop's lag and the CPU share, for the health line; each lag is a reading of the lag guard
@@ -287,6 +291,9 @@ awaitable<void> Agent::run() {
     if (okx_book)
         feeds.push_back(std::make_unique<OkxTickerFeed>(*okx_book, cfg.okx.inst_id, cfg.okx.ws_url,
                                                         options(cfg.okx.stale_timeout_s, cfg.okx.connections)));
+    if (ctrader_book)  // the FIX settings read here: a missing or open file stops the bot at the start
+        feeds.push_back(std::make_unique<CTraderFeed>(*ctrader_book, std::string(strip(cfg.ctrader.symbol)), load_ctrader_credentials(cfg.ctrader.credentials),
+                                                      options(0.0, 1), cfg.ctrader.heartbeat_s));
     std::vector<Task> tasks;
     auto on_failure = [this](std::exception_ptr e) { fail(e); };
     auto spawn = [&](awaitable<void> aw, std::string name) { tasks.push_back(Task::spawn(std::move(aw), std::move(name), "naive_mm.agent", on_failure)); };
@@ -554,6 +561,10 @@ void Agent::on_book_update(OrderBook& book) {
         if (okx_guard) watch_moves(*okx_guard, book, "OKX swap");
         return;
     }
+    if (&book == ctrader_book.get()) {  // and for cTrader, on the mid: a broker's bid alone flickers with its spread
+        if (ctrader_guard) watch_moves(*ctrader_guard, book, "cTrader " + book.symbol, 0.0, true);
+        return;
+    }
     if (&book == &venue_book && futures_pricer) update_futures_fair(true);
     bool shadow_spot = spot_pricer != pricer;
     auto fair_before = fair_bid;
@@ -604,6 +615,8 @@ void Agent::on_ml_update(OrderBook& book) {
         if (bybit_guard) watch_moves(*bybit_guard, book, "Bybit " + cfg.bybit.category);
     } else if (&book == okx_book.get()) {
         if (okx_guard) watch_moves(*okx_guard, book, "OKX swap");
+    } else if (&book == ctrader_book.get()) {
+        if (ctrader_guard) watch_moves(*ctrader_guard, book, "cTrader " + book.symbol, 0.0, true);
     } else if (&book == &reference_book) {
         if (guard) watch_moves(*guard, book, "Binance", cfg.binance.max_book_age_s);
         if (&book == trend_book && trend_guard)  // [futures] off: spot it is
@@ -735,7 +748,7 @@ void Agent::watch_moves(Pauses& g, OrderBook& book, const std::string& label, do
     // how late the frame was read, from the exchange's stamp on it: each ticker of Binance futures
     // (and Bybit, OKX) carries one; the spot top comes from tickers without, the Arcus deltas have none
     bool stamped = book.exchange_ts_us && *book.exchange_ts_us &&
-                   (&book == futures_book.get() || &book == bybit_book.get() || &book == okx_book.get());
+                   (&book == futures_book.get() || &book == bybit_book.get() || &book == okx_book.get() || &book == ctrader_book.get());
     std::string seen = stamped ? std::format(" (read {:.0f} ms after the exchange's event)",
                                              static_cast<double>(book.local_ts_us - *book.exchange_ts_us) / 1e3)
                                : "";
@@ -1023,6 +1036,7 @@ void Agent::on_fill(const OrderPtr& order, const Decimal& size) {
                                        {"futures bid", futures_guard.get(), futures_book.get(), false},
                                        {"bybit bid", bybit_guard.get(), bybit_book.get(), false},
                                        {"okx bid", okx_guard.get(), okx_book.get(), false},
+                                       {"ctrader mid", ctrader_guard.get(), ctrader_book.get(), true},
                                        {"arcus mid", arcus_guard.get(), &venue_book, true}}) {
         if (g == nullptr || book == nullptr || !book->is_ready()) continue;
         auto mean = g->mean();
@@ -1336,6 +1350,7 @@ void Agent::log_status() {
     }
     for (auto [name, g] : {std::pair<const char*, Pauses*> {"guard", guard.get()}, {"futures guard", futures_guard.get()},
                            {"trades guard", trades_guard.get()}, {"bybit guard", bybit_guard.get()}, {"okx guard", okx_guard.get()},
+                           {"ctrader guard", ctrader_guard.get()},
                            {"arcus guard", arcus_guard.get()}, {"trend guard", trend_guard.get()}, {"take guard", take_guard.get()}}) {
         if (g == nullptr) continue;
         std::vector<std::string> pausing;

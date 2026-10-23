@@ -69,7 +69,7 @@ public:
     BookFeed& operator=(const BookFeed&) = delete;
 
     // Every link, until the task running it is cancelled.
-    awaitable<void> run();
+    virtual awaitable<void> run();
 
     int links_up() const;
     // "links 2/2 first 96/3% behind 0/8ms" for the status lines (several links).
