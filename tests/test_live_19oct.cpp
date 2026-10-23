@@ -17,7 +17,7 @@ TEST(Live19Oct, BtcMlLiveTheOkxAndFuturesGuardsTheTakePauseAndTheDriftMarkup) {
     const TradingConfig& t = c.trading;
     EXPECT_EQ(c.pricing.model, "ml");
     EXPECT_EQ(t.direction, "both");
-    EXPECT_EQ(t.markup, 0.00002);
+    EXPECT_EQ(t.markup, 0.00004);  // 0.4 bp (23 Oct, the owner's: x2)
     EXPECT_EQ(t.order_size, 0.0122);
     EXPECT_EQ(t.max_position_usd, 2500.0);
     EXPECT_FALSE(t.never_lead);
@@ -40,7 +40,7 @@ TEST(Live19Oct, BtcMlLiveTheOkxAndFuturesGuardsTheTakePauseAndTheDriftMarkup) {
 TEST(Live19Oct, EthMlLiveTheOkxGuardTheTakePauseAndTheDriftMarkupOnly) {
     Config c = cfg("eth-ml-both");
     const TradingConfig& t = c.trading;
-    EXPECT_EQ(t.markup, 0.000015);
+    EXPECT_EQ(t.markup, 0.00003);  // 0.3 bp (23 Oct, the owner's: x2)
     EXPECT_EQ(t.order_size, 0.627);
     EXPECT_EQ(t.max_position_usd, 6000.0);  // 21 Oct, the owner's
     EXPECT_FALSE(t.never_lead);
@@ -84,7 +84,7 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst3500) {
 // markup, the size and the model (20 Oct), for the C++ bot live next to the Python bots on one host.
 TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     Config cpp = cfg("btc-ml-both");
-    EXPECT_EQ(cpp.trading.markup, 0.00002);  // 0.2 bp again (20 Oct evening)
+    EXPECT_EQ(cpp.trading.markup, 0.00004);  // 0.4 bp (23 Oct, the owner's: x2)
     EXPECT_EQ(cpp.trading.order_size, 0.0118);  // ~$1000 (21 Oct)
     EXPECT_EQ(cpp.trading.max_position_usd, 4000.0);  // 21 Oct
     Config live = cfg("btc-ml-okx-only");
@@ -254,5 +254,7 @@ TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
     EXPECT_EQ(b.portfolio.limit_usd, 3500.0);  // the class lean over $3500 (21 Oct)
     b.portfolio.limit_usd = s.portfolio.limit_usd;
     b.vol_markup = s.vol_markup;  // and their x0.8..3 at ^0.75 (20 Oct evening)
+    EXPECT_EQ(b.trading.markup, 0.00012);  // 1.2 bp (23 Oct, the owner's: x2; sol-both 0.6 bp)
+    b.trading.markup = s.trading.markup;
     EXPECT_EQ(describe(b), describe(s));
 }

@@ -72,7 +72,7 @@ skew_close = 1.0              # the order that closes it: its markup x (1 - u) (
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
                               # joined the best price with no markup after 10 min). The closing order keeps its markup
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0007: the same once that far under water at the Arcus mid)
-markup = 0.000015             # 0.15 bp (19 Oct evening, the owner's; was 0.125 bp)
+markup = 0.00003              # 0.3 bp (23 Oct, the owner's: x2; was 0.15 bp). Before: 0.15 bp (19 Oct evening, the owner's; was 0.125 bp)
 close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
 tol = 0.000005                # 0.05 bp (20 Oct evening, the owner's; 0.084 bp = 2 ticks earlier on 20 Oct, 0.05 bp before)
                               # the cancels toward the market were a single tick; 1063 placements/h, 242 per fill.

@@ -72,7 +72,7 @@ skew_close = 1.0              # the order that closes it: its markup x (1 - u) (
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
                               # joined the best price with no markup after 10 min). The closing order keeps its markup
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.0008: the same once that far under water at the Arcus mid)
-markup = 0.00006              # 0.6 bp from 18 Oct, the owner's x2 (was 0.3 bp: twice the first 0.15 bp, ETH's 0.125 bp x
+markup = 0.00012              # 1.2 bp (23 Oct, the owner's: x2; was 0.6 bp). Before: 0.6 bp from 18 Oct, the owner's x2 (was 0.3 bp: twice the first 0.15 bp, ETH's 0.125 bp x
                               # 1.3 for volatility): ~6 Arcus ticks. Paper, 14 Oct: every buy filled into a falling market
 close_markup_cut = 0          # OFF (21 Oct, the owner's): the closing order takes the full markup (was 30% less)
 tol = 0.000012                # 0.12 bp: 1.2 Arcus ticks, so a one-tick move of the target does not re-place
