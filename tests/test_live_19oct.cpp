@@ -215,8 +215,8 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     EXPECT_EQ(q.futures.symbol, "QQQUSDT");
     EXPECT_EQ(q.binance.symbol, "QQQBUSDT");
     EXPECT_EQ(strings(q.arcus.feed_assets), (std::vector<std::string> {"QQQB"}));
-    EXPECT_TRUE(1005 < q.trading.order_size * 715 && q.trading.order_size * 715 < 1020);  // ~$1013 (23 Oct evening)
-    EXPECT_EQ(q.trading.max_position_usd, 2250.0);  // SPY $1500
+    EXPECT_TRUE(1310 < q.trading.order_size * 715 && q.trading.order_size * 715 < 1325);  // ~$1318 (23 Oct, x1.3)
+    EXPECT_EQ(q.trading.max_position_usd, 2925.0);  // SPY $1500
     q.trading.max_position_usd = s.trading.max_position_usd;
     q.arcus.market = s.arcus.market;  // all else as SPY's
     q.arcus.feed_assets = s.arcus.feed_assets;
