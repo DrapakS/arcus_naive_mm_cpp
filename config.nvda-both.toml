@@ -177,3 +177,9 @@ ratio = 0
 factor = 5
 hold_ms = 300
 sides = "open"
+
+[queue]                       # where the order stands among the others' levels on its side (23 Oct, the owner's)
+snap = true                   # ON: a tick past the others' level behind the markup's price (the same sweeps fill it, more edge)
+step_share = 0                # OFF live (paper first): step over a level of wall_x x order_size within this share of the markup
+wall_x = 3
+paper_queue = false           # paper: fill behind the queue at the order's price (set it on both arms of an A/B)

@@ -151,6 +151,15 @@ struct StrategyOptions {
     bool halt_close = false;  // within a halt window the closing order still goes (not past zero); nothing opens or adds
     VolScale* vol = nullptr;
     Portfolio* portfolio = nullptr;
+    // [queue]: the price placed among the others' levels on its side (our own order left out).
+    // queue_snap: an order between two of the others' levels fills on the same sweeps wherever it
+    // stands in the gap, so it goes one tick past the nearer level behind it (the deeper one), never
+    // past the price the markup gives. queue_step_share > 0: a level of queue_wall_x times
+    // order_size or more at that price, or past it within queue_step_share of the markup, is
+    // stepped over by one tick (ahead of its whole queue). An order standing between the two is kept.
+    bool queue_snap = false;
+    double queue_step_share = 0.0;
+    double queue_wall_x = 3.0;
 };
 
 class QuoteStrategy {
@@ -215,7 +224,9 @@ public:
     // Cancel the working order on `side` now, whatever its price: the guard tripped.
     void pull(const std::string& side, const std::string& why);
     // An order on `side` at `price` is too far from `target`.
-    bool needs_move(const std::string& side, const Decimal& price, const Decimal& target, bool strict = false) const;
+    // `bound` ([queue]): the most aggressive price allowed; an order between the target and it stays.
+    bool needs_move(const std::string& side, const Decimal& price, const Decimal& target, bool strict = false,
+                    const std::optional<Decimal>& bound = std::nullopt) const;
 
     std::string direction;
     bool both;
@@ -243,6 +254,8 @@ public:
     bool never_lead;
     std::optional<Imbalance> imbalance;
     double came_hold_s;
+    bool queue_snap;
+    Decimal queue_step_share, queue_wall_x;
     Clock clock = monotonic;
     bool thin_held = false;  // the latest thin_side answer comes from the hold, not from the book now
     Decimal markup, close_markup, tol, tol_away, close_tol_away, order_size;
@@ -274,6 +287,11 @@ private:
     std::map<std::string, double> came_at_;
     std::map<std::string, Decimal> came_price_;
     std::map<std::string, std::optional<Decimal>> held_back_;  // the hold the last price() met there
+    // [queue]: the most aggressive price the last price() allowed (the markup's, or the step over a
+    // wall), and what it did, for the placement line
+    std::map<std::string, std::optional<Decimal>> bound_;
+    std::map<std::string, std::string> queue_note_;
+    Decimal queue_price(const std::string& side, const MarketView& view, const Decimal& raw, const Decimal& budget, const Decimal& limit);
     std::map<std::string, double> thin_until_;  // side -> clock time its thin-side markup holds until
     std::map<std::string, double> thin_times_;  // side -> how lopsided the book was when last seen thin there
     bool warned_against_ = false;

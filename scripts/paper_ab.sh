@@ -20,6 +20,9 @@
 #   bash scripts/paper_ab.sh start ml-both btc-ml-okx-only       BTC the same: config.btc-ml-both.toml (the guards of the
 #                                            live BTC bot) vs the same with every guard off but an OKX one (BTC-USDT-SWAP,
 #                                            200 ms / 0.2 bp / 300 ms, one connection: the live BTC bot has no OKX guard)
+#   bash scripts/paper_ab.sh start eth-snap eth-step         ETH [queue]: as live (snap) vs the same stepping over walls
+#                                            within 25% of the markup (step_share 0.25); both fill behind the queue
+#                                            at their price (paper_queue); eth-nosnap: the same with snap off
 # Logs of an earlier run are kept: renamed with the time they were moved aside (paper-basis.20261016-2030.log).
 # Each bot wants a CPU core of its own: with more bots than cores (live ones included) it warns, as the event
 # loops then stall each other and the comparison measures the host rather than the pricing.
@@ -36,7 +39,10 @@ ALL="basis:config.recommended.toml ml:config.btc-ml.toml gld:config.gld.toml
      eth-basis-both:config.eth-both.toml eth-ml-both:config.eth-ml-both.toml
      eth-basic-both:config.eth-ml-both.toml@pricing.model=basis
      eth-ml-okx-only:config.eth-ml-both.toml@guard.drawdown=0@futures.drawdown=0@trades.drawdown=0@bybit.drawdown=0@arcus_guard.drawdown=0@trend.drawdown=0@add_guard.drawdown=0@lag.max_ms=0@takes.pause_ms=0@drift.markup_factor=1
-     btc-ml-okx-only:config.btc-ml-both.toml@guard.drawdown=0@futures.drawdown=0@trades.drawdown=0@bybit.drawdown=0@arcus_guard.drawdown=0@trend.drawdown=0@add_guard.drawdown=0@lag.max_ms=0@takes.pause_ms=0@drift.markup_factor=1@okx.enabled=true@okx.connections=1"
+     btc-ml-okx-only:config.btc-ml-both.toml@guard.drawdown=0@futures.drawdown=0@trades.drawdown=0@bybit.drawdown=0@arcus_guard.drawdown=0@trend.drawdown=0@add_guard.drawdown=0@lag.max_ms=0@takes.pause_ms=0@drift.markup_factor=1@okx.enabled=true@okx.connections=1
+     eth-snap:config.eth-ml-both.toml@queue.paper_queue=true
+     eth-step:config.eth-ml-both.toml@queue.paper_queue=true@queue.step_share=0.25
+     eth-nosnap:config.eth-ml-both.toml@queue.paper_queue=true@queue.snap=false"
 cmd=${1:-start}
 [ $# -gt 0 ] && shift
 names="$*"

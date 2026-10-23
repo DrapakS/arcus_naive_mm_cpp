@@ -254,6 +254,19 @@ struct CTraderConfig {
     double pause_ms = 200.0;
 };
 
+struct QueueConfig {
+    // Where the order stands among the others' levels on its side, within what the markup allows.
+    // snap: an order between two of the others' levels fills on the same sweeps anywhere in the gap,
+    // so it goes a tick past the level behind it (more edge, the same fills). step_share > 0: a level
+    // of wall_x times order_size or more at our price, or nearer the market within step_share of the
+    // markup, is stepped over by a tick (ahead of its whole queue). paper_queue: a paper order at a
+    // level fills only after the size that stood there when it was placed (less what left since).
+    bool snap = false;
+    double step_share = 0.0;
+    double wall_x = 3.0;
+    bool paper_queue = false;
+};
+
 struct TakesConfig {
     // Arcus taker waves: a taker order of `min_usd` or more in the Arcus public trades pulls our
     // order on the side it hit and no order goes there for `pause_ms` after the last such take.
@@ -432,6 +445,7 @@ struct Config {
     BybitConfig bybit;
     OkxConfig okx;
     CTraderConfig ctrader;
+    QueueConfig queue;
     ArcusGuardConfig arcus_guard;
     TakesConfig takes;
     TrendConfig trend;

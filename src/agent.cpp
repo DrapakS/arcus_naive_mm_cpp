@@ -424,6 +424,9 @@ StrategyOptions Agent::strategy_options() {
     o.halt = open_halt.get();
     o.halt_close = config.open_halt.closing;
     o.vol = vol_scale.get();
+    o.queue_snap = config.queue.snap;
+    o.queue_step_share = config.queue.step_share;
+    o.queue_wall_x = config.queue.wall_x;
     return o;
 }
 
@@ -491,7 +494,9 @@ awaitable<void> Agent::start_trading() {
     }
     auto changed = [this] { changed_.set(); };
     if (t.mode == "paper") {
-        gateway = std::make_unique<PaperGateway>(market, config.arcus.ws_url, changed, config.arcus.connections, config.agent.slow_link_ms);
+        auto paper = std::make_unique<PaperGateway>(market, config.arcus.ws_url, changed, config.arcus.connections, config.agent.slow_link_ms);
+        if (config.queue.paper_queue) paper->book = &venue_book;  // fills behind the queue at the order's price
+        gateway = std::move(paper);
     } else {
         ArcusGateway::Options o;
         o.ws_url = config.arcus.ws_url;

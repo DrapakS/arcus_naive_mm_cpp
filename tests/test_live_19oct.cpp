@@ -262,6 +262,8 @@ TEST(SolConfig, TheSolBasicConfigIsSolBothWithEveryGuardOn) {
     EXPECT_EQ(b.portfolio.limit_usd, 3500.0);  // the class lean over $3500 (21 Oct)
     b.portfolio.limit_usd = s.portfolio.limit_usd;
     b.vol_markup = s.vol_markup;  // and their x0.8..3 at ^0.75 (20 Oct evening)
+    EXPECT_TRUE(b.queue.snap);  // [queue] snap on the live bots (23 Oct, the owner's)
+    b.queue = s.queue;
     EXPECT_EQ(b.trading.markup, 0.00012);  // 1.2 bp (23 Oct, the owner's: x2; sol-both 0.6 bp)
     b.trading.markup = s.trading.markup;
     EXPECT_EQ(describe(b), describe(s));

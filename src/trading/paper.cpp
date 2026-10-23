@@ -133,7 +133,10 @@ void PaperGateway::send_cancel(const OrderPtr& o, const std::string& why) {
 void PaperGateway::finish(const OrderPtr& order, OrderState state, std::optional<std::string> reason, bool fresh) {
     const OrderPtr o = order;  // a copy: finishing may destroy what `order` refers to
     Gateway::finish(o, state, std::move(reason), fresh);
-    if (terminal(o->state)) placed_us_.erase(o->client_id);  // no trade can fill it any more
+    if (terminal(o->state)) {  // no trade can fill it any more
+        placed_us_.erase(o->client_id);
+        ahead_.erase(o->client_id);
+    }
 }
 
 void PaperGateway::cancel_acts(const OrderPtr& o) {
@@ -161,13 +164,31 @@ void PaperGateway::on_message(const Json& msg, Link* link) {
             Decimal price = Decimal::parse(to_str(jget(trade, "price")));
             bool crossed = o->side == "BUY" ? price <= o->price : price >= o->price;
             if (!crossed) continue;
-            Decimal size = min(Decimal::parse(to_str(jget(trade, "size"))), o->remaining());
+            Decimal traded = Decimal::parse(to_str(jget(trade, "size")));
+            if (book != nullptr && price == o->price) traded = after_queue(*o, traded);
+            if (traded <= 0) continue;
+            Decimal size = min(traded, o->remaining());
             fill(o, o->filled + size, fmt(o->price));  // a maker fills at its own price
             if (o->remaining() <= 0) finish(o, OrderState::FILLED);
             on_change();
         }
     }
     if (on_trades && !contents->get_array().empty()) on_trades(contents->get_array());
+}
+
+Decimal PaperGateway::after_queue(const Order& o, const Decimal& size) {
+    double p = o.price.to_double();
+    auto [it, fresh] = ahead_.try_emplace(o.client_id, o.book_base.value_or(0.0));  // what stood there as it went out
+    double& ahead = it->second;
+    const std::vector<Level> levels = o.side == "BUY" ? book->bids(50) : book->asks(50);
+    auto shown = std::find_if(levels.begin(), levels.end(), [&](const Level& l) { return l.first == p; });
+    bool covered = !levels.empty() && (o.side == "BUY" ? levels.back().first <= p : levels.back().first >= p);
+    if (shown != levels.end()) ahead = std::min(ahead, shown->second);  // those ahead that cancelled
+    else if (covered) ahead = 0.0;  // the level is gone: nobody left ahead
+    double s = size.to_double();
+    double left = s - ahead;
+    ahead = std::max(ahead - s, 0.0);
+    return left > 0 ? Decimal::from_double(left) : Decimal(0);
 }
 
 bool PaperGateway::printed_before(const Json& trade, const Order& o) const {

@@ -116,6 +116,9 @@ template <class F> void fields(CTraderConfig& c, F&& f) {
     f("enabled", c.enabled); f("symbol", c.symbol); f("credentials", c.credentials); f("heartbeat_s", c.heartbeat_s);
     f("window_ms", c.window_ms); f("drawdown", c.drawdown); f("pause_ms", c.pause_ms);
 }
+template <class F> void fields(QueueConfig& c, F&& f) {
+    f("snap", c.snap); f("step_share", c.step_share); f("wall_x", c.wall_x); f("paper_queue", c.paper_queue);
+}
 template <class F> void fields(TakesConfig& c, F&& f) {
     f("min_usd", c.min_usd); f("pause_ms", c.pause_ms); f("min_takes", c.min_takes); f("min_move", c.min_move);
     f("score_ms", c.score_ms);
@@ -165,7 +168,7 @@ template <class F> void sections(Config& c, F&& f) {
     f("guard", c.guard); f("futures", c.futures); f("trades", c.trades); f("bybit", c.bybit);
     f("okx", c.okx); f("ctrader", c.ctrader); f("arcus_guard", c.arcus_guard); f("takes", c.takes); f("trend", c.trend); f("add_guard", c.add_guard);
     f("open_guard", c.open_guard); f("open_halt", c.open_halt); f("portfolio", c.portfolio); f("vol_markup", c.vol_markup);
-    f("drift", c.drift); f("lag", c.lag); f("imbalance", c.imbalance); f("agent", c.agent);
+    f("drift", c.drift); f("lag", c.lag); f("imbalance", c.imbalance); f("queue", c.queue); f("agent", c.agent);
 }
 
 // Keys that changed meaning: a config still using them is stopped with the new name.
@@ -545,6 +548,8 @@ void Config::validate() const {
         throw std::invalid_argument("ctrader.symbol is empty: the broker's name of the symbol (US500, USTEC, XAUUSD)");
     if (ctrader.enabled && ctrader.credentials.empty())
         throw std::invalid_argument("ctrader.credentials is empty: the TOML file of this bot's cTrader FIX login");
+    if (!(0 <= queue.step_share && queue.step_share <= 1)) throw std::invalid_argument("queue.step_share must be within 0..1 (0 = off)");
+    if (!(1 <= queue.wall_x && queue.wall_x <= 1000)) throw std::invalid_argument("queue.wall_x must be within 1..1000 (times order_size)");
     if (!(5 <= ctrader.heartbeat_s && ctrader.heartbeat_s <= 120)) throw std::invalid_argument("ctrader.heartbeat_s must be within 5..120");
     if (!guard_ok(arcus_guard.drawdown, arcus_guard.window_ms, arcus_guard.pause_ms))
         throw std::invalid_argument("arcus_guard needs 0 < window_ms <= 600000, 0 <= drawdown < 1, pause_ms within 0..60000");

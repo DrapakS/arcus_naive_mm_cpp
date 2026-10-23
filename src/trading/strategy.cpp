@@ -90,7 +90,11 @@ QuoteStrategy::QuoteStrategy(Gateway* gateway_, MarketSpec market_, StrategyOpti
     : direction(o.direction), both(o.direction == "both"), session(o.session), exit_after_s(o.exit_after_s),
       add_guard(o.add_guard), open_guard(o.open_guard), halt(o.halt), halt_close(o.halt_close), vol(o.vol), portfolio(o.portfolio), drift(o.drift),
       drift_factor_float(o.drift_factor), gateway(gateway_), market(std::move(market_)), guards(o.guards), never_lead(o.never_lead),
-      imbalance(o.imbalance), came_hold_s(o.came_hold_s) {
+      imbalance(o.imbalance), came_hold_s(o.came_hold_s), queue_snap(o.queue_snap) {
+    if (!(0 <= o.queue_step_share && o.queue_step_share <= 1) || !(o.queue_wall_x > 0))
+        throw std::invalid_argument("queue_step_share must be within 0..1 and queue_wall_x > 0");
+    queue_step_share = D(o.queue_step_share);
+    queue_wall_x = D(o.queue_wall_x);
     if (direction != "long" && direction != "short" && direction != "both")
         throw std::invalid_argument("direction must be \"long\", \"short\" or \"both\"");
     // One side at a time: the sides by role. Both sides: no fixed roles (closing() says by the position).
@@ -230,12 +234,16 @@ std::optional<Decimal> QuoteStrategy::price(const std::string& s, const MarketVi
     if (drifted(s)) m *= drift_factor;
     if (auto thin = thin_side(view); thin && thin->first == s && widens(s)) m *= D(imbalance->factor);
     Decimal result;
+    bool queued = !is_urgent && (queue_snap || queue_step_share > 0);
+    bound_[s] = std::nullopt;
+    queue_note_[s].clear();
     if (s == "BUY") {
         Decimal best_ask = D(*ask);
         Decimal cap = best_ask - market.tick_at(best_ask);
         if (never_lead)
             if (auto others = best_of_others(view, "BUY")) cap = min(cap, D(*others));  // join the best bid at most, never improve it
         result = market.floor_price(min(quoted * (Decimal(1) - m), cap));
+        if (queued) result = queue_price(s, view, result, quoted * m * queue_step_share, cap);
         if (is_urgent) {  // join the best bid (the others' with never_lead), still under the ask
             std::optional<double> join = never_lead ? best_of_others(view, "BUY") : std::nullopt;
             Decimal j = D(join ? *join : *bid);
@@ -248,6 +256,7 @@ std::optional<Decimal> QuoteStrategy::price(const std::string& s, const MarketVi
         if (never_lead)
             if (auto others = best_of_others(view, "SELL")) floor = max(floor, D(*others));
         result = market.ceil_price(max(floor, (quoted + tick) * (Decimal(1) + m)));
+        if (queued) result = queue_price(s, view, result, quoted * m * queue_step_share, floor);
         if (is_urgent) {  // join the best ask (the others' with never_lead), still over the bid
             std::optional<double> join = never_lead ? best_of_others(view, "SELL") : std::nullopt;
             Decimal j = D(join ? *join : *ask);
@@ -363,6 +372,50 @@ std::optional<std::pair<double, double>> QuoteStrategy::own_in_book(const std::s
     }
     gw->forget_cancelled(s);
     return std::nullopt;
+}
+
+Decimal QuoteStrategy::queue_price(const std::string& s, const MarketView& view, const Decimal& raw, const Decimal& budget,
+                                   const Decimal& limit) {
+    // [queue]: `raw` is the markup's price; `budget` how much nearer the market a step over a wall may
+    // go; `limit` the nearest price allowed at all (a tick off the other side, the others' best with
+    // never_lead). Sets bound_ (the nearest price an order may stand at) and the note.
+    bool buy = s == "BUY";
+    std::vector<Level> levels = others_levels(buy ? view.venue->bids : view.venue->asks, s);
+    auto nearer = [&](const Decimal& a, const Decimal& b) { return buy ? a > b : a < b; };  // a nearer the market than b
+    auto past = [&](double p) {  // one tick past the level at p, toward the market
+        Decimal level = D(p);
+        return buy ? level + market.tick_at(level) : level - market.tick_at(level);
+    };
+    double t = raw.to_double();
+    bound_[s] = raw;
+    if (queue_step_share > 0) {
+        double wall = (order_size * queue_wall_x).to_double();
+        std::optional<Level> over;
+        for (const auto& level : levels) {
+            if (level.second < wall || (buy ? level.first < t : level.first > t)) continue;  // small, or behind us already
+            Decimal step = past(level.first);
+            if ((step - raw).abs() > budget || nearer(step, limit)) continue;
+            if (!over || (buy ? level.first > over->first : level.first < over->first)) over = level;
+        }
+        if (over) {
+            Decimal step = past(over->first);
+            bound_[s] = step;
+            queue_note_[s] = std::format("queue: stepped over {:g} at {:g}, {} bp nearer than the markup's {}", over->second, over->first,
+                                         ((step - raw).abs() / raw * Decimal(10'000)).fixed(2), fmt(raw));
+            return step;
+        }
+    }
+    if (!queue_snap) return raw;
+    // the others' level at our price or the nearest one behind it; none seen there: the gap is unknown
+    std::optional<double> behind;
+    for (const auto& [p, size_] : levels)
+        if ((buy ? p <= t : p >= t) && (!behind || (buy ? p > *behind : p < *behind))) behind = p;
+    if (!behind) return raw;
+    Decimal snapped = past(*behind);
+    if (!nearer(raw, snapped)) return raw;  // at a level, or a tick past it already
+    queue_note_[s] = std::format("queue: {} bp back from the markup's {}, a tick past the others' {:g}",
+                                 ((raw - snapped).abs() / raw * Decimal(10'000)).fixed(2), fmt(raw), *behind);
+    return snapped;
 }
 
 std::vector<Level> QuoteStrategy::others_levels(const std::vector<Level>& levels, const std::string& s) {
@@ -589,6 +642,7 @@ void QuoteStrategy::place(const Quote& quote, const MarketView& view) {
     bool widened = thin && thin->first == quote.side && widens(quote.side);
     if (widened) why += "; " + lopsided(*thin, thin_held);
     why += "; " + queue_note(levels, quote.side, quote.price.to_double(), market.tick_at(quote.price).to_double());
+    if (const std::string& note = queue_note_[quote.side]; !note.empty()) why += "; " + note;
     if (auto note = gap_note(view.fair_gap_bps, view.fair_gap_change_bps, quote.side)) why += "; " + *note;
     if (auto note = drift_note(quote.side)) why += "; " + *note;
     if (vol != nullptr)
@@ -688,7 +742,7 @@ std::optional<std::string> QuoteStrategy::cancel_reason(const OrderPtr& o, const
         auto thin = thin_side(view);
         stranded = !(thin && thin->first == o->side);
     }
-    if (needs_move(o->side, o->price, quote->price, stranded)) {
+    if (needs_move(o->side, o->price, quote->price, stranded, bound_[o->side])) {
         Decimal off = (o->price - quote->price).abs() / quote->price;
         return std::format("target {} is {} bp away{}", fmt(quote->price), (off * Decimal(10'000)).fixed(2),
                            stranded ? ", the thin-side markup is over" : "");
@@ -696,7 +750,13 @@ std::optional<std::string> QuoteStrategy::cancel_reason(const OrderPtr& o, const
     return std::nullopt;
 }
 
-bool QuoteStrategy::needs_move(const std::string& s, const Decimal& p, const Decimal& target_price, bool strict) const {
+bool QuoteStrategy::needs_move(const std::string& s, const Decimal& p, const Decimal& target_price, bool strict,
+                               const std::optional<Decimal>& bound) const {
+    if (bound && !strict && *bound != target_price) {  // [queue]: between the target and the bound it stays
+        bool beyond = s == "BUY" ? p > *bound : p < *bound;
+        if (beyond) return (p - *bound).abs() / *bound > tol;
+        if (s == "BUY" ? p >= target_price : p <= target_price) return false;
+    }
     Decimal off = (p - target_price).abs() / target_price;
     bool toward = s == "BUY" ? target_price < p : target_price > p;
     if (toward || strict) return off > tol;

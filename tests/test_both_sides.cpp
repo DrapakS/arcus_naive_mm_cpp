@@ -79,6 +79,7 @@ Config as_long(Config both_cfg, const Config& long_cfg) {
     both_cfg.portfolio = long_cfg.portfolio;  // the class's lean across the bots (19 Oct): two-sided crypto bots only
     both_cfg.lag.max_pause_ms = long_cfg.lag.max_pause_ms;
     both_cfg.ctrader = long_cfg.ctrader;
+    both_cfg.queue = long_cfg.queue;  // [queue] snap on the live two-sided bots (23 Oct)
     // 23 Oct, the owner's, on the two-sided stock bots: no Binance spot guards, no Arcus mid guard
     both_cfg.guard.drawdown = long_cfg.guard.drawdown;
     both_cfg.trades.enabled = long_cfg.trades.enabled;

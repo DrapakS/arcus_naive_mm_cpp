@@ -1,8 +1,11 @@
 // Paper trading: orders live locally and fill against Arcus public trades.
 //
 // A resting buy fills when a trade prints at or below its price, a sell when a
-// trade prints at or above it, up to the trade size. Queue position and the
-// effect of our own size on the market are ignored, so fills are optimistic.
+// trade prints at or above it, up to the trade size. The effect of our own size on
+// the market is ignored. Queue position too unless `book` is set ([queue]
+// paper_queue): then a trade AT the order's price first takes the size that stood
+// there when the order was placed (cut to what the book shows there now, as those
+// ahead cancel), and only the rest fills the order; one through its price fills it.
 //
 // A cancel takes CANCEL_LATENCY_S to act, as live, and trades printed before it
 // acts still fill the order. That matters: the Arcus book frame that shows a
@@ -42,6 +45,7 @@ public:
     Link* check_links(std::optional<double> now = {});
 
     std::string ws_url;
+    const OrderBook* book = nullptr;  // the Arcus book: set, the queue ahead of an order counts (paper_queue)
     std::vector<Link> links;  // the trades connections
     double slow_link_ms;  // reconnect a connection this far behind the first copies; 0 = never
     // The orders whose placement time is kept: those a trade can still fill (tests).
@@ -58,6 +62,9 @@ private:
     // Without trades we cannot tell whether the orders would have filled.
     void trades_lost(const std::string& reason);
     void cancel_acts(const OrderPtr& order);
+    // paper_queue: the size of a trade at the order's own price left for it, the queue ahead taken first
+    Decimal after_queue(const Order& order, const Decimal& size);
+    std::map<std::string, double> ahead_;  // by client id: the others' size still ahead of the order at its price
     // The trade happened before `order` was placed: on the exchange's clock, set against ours when the offset is known.
     bool printed_before(const Json& trade, const Order& order) const;
 
