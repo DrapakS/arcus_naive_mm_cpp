@@ -44,7 +44,7 @@ off_hours_markup_factor = 2   # outside 04:00-20:00 New York, Mon-Fri (holidays 
 tol = 0.00001                 # 0.1 bp (~1.5 ticks): an order that far on the danger side of its target is re-placed at once
 tol_away = 0.0001             # 1 bp: an order the market left that far behind is placed again
 close_tol_away = 0.0001       # = tol_away (21 Oct, the owner's): the closing order re-placed as late as the opening one
-order_size = 0.145            # SNDK, ~$200 at $1376 (21 Oct, the owner's). Arcus minimum 0.01 SNDK and $5; step 1e-7
+order_size = 0.1885           # SNDK, ~$259 at $1376 (24 Oct, the owner's: x1.3; 0.145 before, 21 Oct, the owner's). Arcus minimum 0.01 SNDK and $5; step 1e-7
 never_lead = false            # may improve the best price
 came_hold_ms = 300
 dms_timeout_s = 60            # per-market switch, independent of the other bots' switches
