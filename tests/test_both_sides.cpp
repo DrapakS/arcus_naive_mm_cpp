@@ -333,14 +333,14 @@ TEST(BothSides, PaperFillsEachSideAgainstTheTradesThatCrossIt) {
 }
 
 TEST(BothSides, TheShippedTwoSidedConfigsAreTheirLongOnesButForTheDirectionLimitAndInventoryControls) {
-    // BTC and ETH from 18 Oct afternoon: ~$750 orders within $1500; SOL $3000, GLD $2250 (23 Oct evening)
+    // BTC and ETH from 18 Oct afternoon: ~$750 orders within $1500; SOL $3000, GLD $3375 (24 Oct)
     struct Case {
         const char* coin;
         const char* long_name;
         double limit;
     };
     for (auto [coin, long_name, limit] : {Case {"btc", "recommended", 1500.0}, Case {"eth", "eth", 1500.0}, Case {"sol", "sol", 3000.0},
-                                          Case {"gld", "gld", 2250.0}}) {
+                                          Case {"gld", "gld", 3375.0}}) {
         Config both_cfg = load(std::format("config.{}-both.toml", coin));
         Config long_cfg = load(std::format("config.{}.toml", long_name));
         const TradingConfig& t = both_cfg.trading;
