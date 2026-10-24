@@ -363,7 +363,7 @@ TEST(BothSides, TheShippedTwoSidedConfigsAreTheirLongOnesButForTheDirectionLimit
 TEST(BothSides, TheShippedNvdaConfigsSizeAndLimitAndDoubleTheMarkupOffHours) {
     Config both_cfg = load("config.nvda-both.toml"), long_cfg = load("config.nvda.toml");
     EXPECT_EQ(both_cfg.trading.direction, "both");
-    EXPECT_EQ(both_cfg.trading.max_position_usd, 1500.0);  // 23 Oct, the owner's
+    EXPECT_EQ(both_cfg.trading.max_position_usd, 1950.0);  // 24 Oct, the owner's
     double both_usd = both_cfg.trading.order_size * 218;  // ~$881 orders (24 Oct)
     EXPECT_TRUE(875 < both_usd && both_usd < 890) << both_usd;
     double usd = long_cfg.trading.order_size * 214;  // the long-only one as it was: ~$500

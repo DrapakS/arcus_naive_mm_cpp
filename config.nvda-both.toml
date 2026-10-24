@@ -44,8 +44,8 @@ min_samples = 100
 [trading]
 mode = "off"                  # the command line sets --trade quote / paper / live
 direction = "both"            # a buy and a sell at once, order_size each (README, "С двух сторон")
-max_position_usd = 1500       # $1500 (23 Oct, the owner's: x1.5; $1000 before: 22 Oct, the owner's; $2000 on 21 Oct, $3000 on 20 Oct evening); a side at the limit is not quoted
-max_position_resume = 0.95    # ... and comes back once the position on that side is under $1425
+max_position_usd = 1950       # $1950 (24 Oct, the owner's: x1.3; $1500 before: 23 Oct, the owner's: x1.5; $1000 before: 22 Oct, the owner's; $2000 on 21 Oct, $3000 on 20 Oct evening); a side at the limit is not quoted
+max_position_resume = 0.95    # ... and comes back once the position on that side is under $1852
 skew_open = 1.0               # as the other two-sided bots: the adding order's markup x (1 + position/limit), the
 skew_close = 1.0              # closing one's x (1 - position/limit): with one order filling the $500, none at the limit
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order

@@ -198,7 +198,7 @@ TEST(SpyConfig, TheSndkConfigQuotesSanDiskOffTheBinancePerpWithAnOkxGuard) {
     EXPECT_FALSE(c.bybit.enabled);
     EXPECT_EQ(c.trading.direction, "both");
     EXPECT_TRUE(255 < c.trading.order_size * 1376 && c.trading.order_size * 1376 < 265);  // ~$259 (24 Oct, x1.3)
-    EXPECT_EQ(c.trading.max_position_usd, 500.0);
+    EXPECT_EQ(c.trading.max_position_usd, 650.0);  // 24 Oct, x1.3
     EXPECT_EQ(c.portfolio.asset_class, "stocks");
     EXPECT_EQ(c.portfolio.weight, 2.7);
     EXPECT_TRUE(c.open_halt.closing);
