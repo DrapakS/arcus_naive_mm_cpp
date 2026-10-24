@@ -17,7 +17,7 @@ TEST(Live19Oct, BtcMlLiveTheOkxAndFuturesGuardsTheTakePauseAndTheDriftMarkup) {
     const TradingConfig& t = c.trading;
     EXPECT_EQ(c.pricing.model, "ml");
     EXPECT_EQ(t.direction, "both");
-    EXPECT_EQ(t.markup, 0.00006);  // 0.6 bp (23 Oct, the owner's: x1.5 of 0.4 bp)
+    EXPECT_EQ(t.markup, 0.000075);  // 0.75 bp (24 Oct, the owner's: +25%)
     EXPECT_EQ(t.order_size, 0.0122);
     EXPECT_EQ(t.max_position_usd, 2500.0);
     EXPECT_FALSE(t.never_lead);
@@ -40,7 +40,7 @@ TEST(Live19Oct, BtcMlLiveTheOkxAndFuturesGuardsTheTakePauseAndTheDriftMarkup) {
 TEST(Live19Oct, EthMlLiveTheOkxGuardTheTakePauseAndTheDriftMarkupOnly) {
     Config c = cfg("eth-ml-both");
     const TradingConfig& t = c.trading;
-    EXPECT_EQ(t.markup, 0.00003);  // 0.3 bp (23 Oct, the owner's: x2)
+    EXPECT_EQ(t.markup, 0.0000375);  // 0.375 bp (24 Oct, the owner's: +25%)
     EXPECT_EQ(t.order_size, 0.627);
     EXPECT_EQ(t.max_position_usd, 6000.0);  // 21 Oct, the owner's
     EXPECT_FALSE(t.never_lead);
@@ -85,7 +85,7 @@ TEST(Live19Oct, TheLiveCryptoBotsWeighTheClassLeanAgainst3500) {
 // markup, the size and the model (20 Oct), for the C++ bot live next to the Python bots on one host.
 TEST(Live19Oct, TheCppBtcMlBothConfigIsTheLiveOkxOnlySet) {
     Config cpp = cfg("btc-ml-both");
-    EXPECT_EQ(cpp.trading.markup, 0.00006);  // 0.6 bp (23 Oct, the owner's: x1.5 of 0.4 bp)
+    EXPECT_EQ(cpp.trading.markup, 0.000075);  // 0.75 bp (24 Oct, the owner's: +25%)
     EXPECT_EQ(cpp.trading.order_size, 0.0118);  // ~$1000 (21 Oct)
     EXPECT_EQ(cpp.trading.max_position_usd, 4000.0);  // 21 Oct
     Config live = cfg("btc-ml-okx-only");
@@ -223,7 +223,7 @@ TEST(SpyConfig, TheQqqConfigIsTheSpyOneOnQqq) {
     q.futures.symbol = s.futures.symbol;
     q.binance.symbol = s.binance.symbol;
     q.trading.order_size = s.trading.order_size;
-    EXPECT_EQ(q.trading.markup, 0.0000286875);  // 0.286875 bp (both -25% on 23 Oct evening, QQQ -10% and -15% more; the owner's)
+    EXPECT_EQ(q.trading.markup, 0.000021515625);  // -25% on 24 Oct;  // 0.286875 bp (both -25% on 23 Oct evening, QQQ -10% and -15% more; the owner's)
     EXPECT_EQ(s.trading.markup, 0.00001875);
     q.trading.markup = s.trading.markup;
     q.portfolio.weight = s.portfolio.weight;  // its volatility over BTC's: QQQ 0.6, SPY 0.35

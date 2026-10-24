@@ -60,7 +60,7 @@ skew_close = 1.0              # the order that closes it: its markup x (1 - u) (
 exit_after_s = 0              # OFF from 18 Oct, the owner's call: no urgent exit (was 600 s: the closing order
                               # joined the best price with no markup after 10 min). The closing order keeps its markup
 exit_loss = 0                 # OFF from 18 Oct as well (was 0.00025: the same once that far under water at the Arcus mid)
-markup = 0.00001875           # 0.1875 bp (23 Oct evening, the owner's: -25%; 0.25 bp before). Before: 0.25 bp (20 Oct, the owner's: half; was 0.5 bp), ~1 tick under the fair bid (a buy joins the best bid only when the fair is 2
+markup = 0.0000140625         # 0.140625 bp (24 Oct, the owner's: -25%; 0.1875 bp before). Before: 0.1875 bp (23 Oct evening, the owner's: -25%; 0.25 bp before). Before: 0.25 bp (20 Oct, the owner's: half; was 0.5 bp), ~1 tick under the fair bid (a buy joins the best bid only when the fair is 2
                               # ticks over it). Not BTC's 0.25 bp x 0.5: one tick is 0.26 bp, and the takers are informed:
                               # against a fair off XAUT the maker side of GLD trades lost 0.38 bp 5 s later and 0.68 bp 30 s
                               # later; makers that bought only 0.5 bp under that fair made +0.56 bp at 5 s, -0.20 bp at 30 s
